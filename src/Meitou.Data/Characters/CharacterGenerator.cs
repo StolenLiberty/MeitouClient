@@ -433,6 +433,18 @@ public static class CharacterGenerator
         return (int)h;
     }
 
-    static string Resolve(string installRoot, string fcsPath) =>
-        Path.Combine(installRoot, fcsPath.Replace('\\', Path.DirectorySeparatorChar).TrimStart('.', Path.DirectorySeparatorChar));
+    /// <summary>
+    /// The file an FCS path field names: through <see cref="Physics.CollisionPaths.Resolve"/> (install, then <c>.\mods\Mod Name\x</c> as that mod's own
+    /// folder, which for a Workshop mod is its Workshop folder), else under the install as written. Race mods name their editor limits so
+    /// (<c>./mods/Re Faces/editor/Greenlander.xml</c>; <b>Observed</b> in Workshop 3386939298 and 3590384572, one with a trailing tab).
+    /// </summary>
+    internal static string Resolve(string installRoot, string fcsPath)
+    {
+        fcsPath = fcsPath.Trim();
+        if (Meitou.Content.GameInstall.IsValid(installRoot)
+            && Physics.CollisionPaths.Resolve(installs.GetOrAdd(installRoot, Meitou.Content.GameInstall.Open), fcsPath) is { } found) return found;
+        return Path.Combine(installRoot, fcsPath.Replace('\\', Path.DirectorySeparatorChar).TrimStart('.', Path.DirectorySeparatorChar));
+    }
+
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Meitou.Content.GameInstall> installs = new(StringComparer.Ordinal);
 }

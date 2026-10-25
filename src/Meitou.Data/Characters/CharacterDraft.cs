@@ -123,8 +123,7 @@ public sealed class CharacterDraft
         if (race.GetPath("editor limits") is not { Length: > 0 } path) return null;
         try
         {
-            return AppearanceLimits.Read(Path.Combine(installRoot, path.Replace('\\', Path.DirectorySeparatorChar).TrimStart('.', Path.DirectorySeparatorChar)),
-                female, GameConstants.FromDatabase(db).AppearanceRandomDeviation);
+            return AppearanceLimits.Read(CharacterGenerator.Resolve(installRoot, path), female, GameConstants.FromDatabase(db).AppearanceRandomDeviation);
         }
         catch (Exception e) when (e is IOException or System.Xml.XmlException or UnauthorizedAccessException) { return null; }
     }
