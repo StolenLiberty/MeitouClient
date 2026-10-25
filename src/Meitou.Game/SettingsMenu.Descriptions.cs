@@ -112,6 +112,7 @@ sealed partial class SettingsMenu
         InputAction.Screenshot => "Save an image of the current view.",
         InputAction.ToggleSettings => "Open or close this settings dialog.",
         InputAction.ToggleDebugMenu => "Open or close the debug menu: teleport, spawn, items, money, heal and damage.",
+        InputAction.ToggleCheatMenu => "Open or close the cheat menu: health, skills, items, factions, money and the map.",
         InputAction.ToggleStats => "Show or hide frame statistics.",
         InputAction.CycleProfiler => "Cycle GPU, CPU and hidden profiler views.",
         InputAction.QuickSave => "Save the game to the quicksave slot.",

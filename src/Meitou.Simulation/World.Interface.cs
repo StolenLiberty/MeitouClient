@@ -19,7 +19,7 @@ public sealed partial class World
             or Construction.PlaceBuildings or Construction.CancelSite or Construction.PauseSite or Editing.EditCharacter or Editing.FinishCreation
             or MoveOrder or FollowOrder or StopCommand or FirstAid.TreatOrder or FirstAid.SplintOrder or FirstAid.RestOrder or Combat.AttackOrder or Combat.ShootAtOrder
             or Locks.PickLockOrder or Locks.GetOutOrder or Locks.ShackleOrder or Locks.PutShacklesOrder or Locks.ToggleDoorsOrder or Locks.ToggleDoorLocksOrder
-            or Locks.DoorOrder or Locks.SetFreeOrder or Locks.GetInCageOrder);
+            or Locks.DoorOrder or Locks.SetFreeOrder or Locks.GetInCageOrder or DebugCommand);
         if (due.Count == 0) return;
         Characters.BeginTick();
         Characters.Phase = TablePhase.Inputs;

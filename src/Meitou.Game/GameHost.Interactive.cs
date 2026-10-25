@@ -128,6 +128,9 @@ sealed partial class GameHost
                         (population.KeepRoamers, population.OffscreenFights, population.OffscreenHealing, population.CampaignAncestorsOnce, population.KeepWild, population.ResidentSchedule) = (config.KeepRoamers, config.OffscreenFights, config.OffscreenHealing, config.CampaignAncestorsOnce, config.KeepWild, config.ResidentSchedule);
                 },
             };
+        var cheats = new CheatMenu(player, () => session.World, () => scene.Database, () => popData, () => session.Camera.Current.Target,
+            () => session.Bindings.Get(InputAction.ToggleCheatMenu) is { Count: > 0 } keys ? keys[0].ToString() : "unbound");
+        bool cheatDrag = false;
         void ApplyCameraRotateSpeed(float speed) => session.Camera.Settings.RotateSpeedX = session.Camera.Settings.RotateSpeedY =
             Math.Clamp(speed, UserConfig.MinCameraRotateSpeed, UserConfig.MaxCameraRotateSpeed);
         ApplyCameraRotateSpeed(config.CameraRotateSpeed);
@@ -198,7 +201,7 @@ sealed partial class GameHost
         // Silk raises KeyDown once per press (no OS key repeat), so a held erase or caret key in a text field repeats here: after 0.5 s, then
         // 30 times a second (the Windows defaults). Typed characters already repeat through KeyChar.
         (Silk.NET.Input.IKeyboard Keyboard, SilkKey Key, long Next)? heldEditKey = null;
-        bool TextFieldFocused() => panel?.Visible == true || debugMenuOpen || player.UiEditing;
+        bool TextFieldFocused() => panel?.Visible == true || debugMenuOpen || cheats.TakesKeyboard || player.UiEditing;
         void RepeatEditKey()
         {
             if (heldEditKey is not { } held || Stopwatch.GetTimestamp() < held.Next) return;
@@ -224,6 +227,7 @@ sealed partial class GameHost
             {
                 if (Covered) return;
                 if (panel?.Visible == true) panel.TextInput(value);
+                else if (cheats.TakesKeyboard) cheats.TextInput(value);
                 else if (sandboxPicker is { Open: true }) sandboxPicker.TextInput(value);
                 else if (debugMenuOpen) DebugMenuText(value);
                 else player.UiText(value);
@@ -254,6 +258,12 @@ sealed partial class GameHost
             {
                 if ((k == SilkKey.KeypadEnter ? EngineKey.Enter : KeyMap.Map(k)) is { } pickerKey) sandboxPicker.KeyDown(pickerKey);
                 return;
+            }
+            // F1 (rebindable) opens the cheat menu; while a text box of it is focused it takes every key, otherwise only Esc.
+            if (KeyMap.Map(k) is { } cheatKey)
+            {
+                if (!cheats.TakesKeyboard && session.Bindings.Get(InputAction.ToggleCheatMenu).Contains(Binding.Of(cheatKey)) && !g.NoPopulation) { cheats.Visible = !cheats.Visible; return; }
+                if (cheats.KeyDown(k == SilkKey.KeypadEnter ? EngineKey.Enter : cheatKey)) return;
             }
             // F10 (rebindable) opens the debug menu, which then takes every key until it closes.
             if (KeyMap.Map(k) is { } mapped && session.Bindings.Get(InputAction.ToggleDebugMenu).Contains(Binding.Of(mapped))) { debugMenuOpen = !debugMenuOpen; return; }
@@ -341,11 +351,16 @@ sealed partial class GameHost
                 var at = Pixels(m.Position);
                 if (PanelLive() && KeyMap.Map(b) is { } settingsButton && panel?.MouseDown(at, settingsButton) == true) { panelDrag = true; return; }
                 if (PanelLive() && panel?.Contains(at) == true) return;
+                if (PanelLive() && KeyMap.Map(b) is { } cheatButton && cheats.MouseDown(at, cheatButton)) { cheatDrag = true; return; }
                 if (b == SilkButton.Left && PanelLive() && sandboxPicker?.MouseDown(at) == true) return;
                 if (b == SilkButton.Left && profiler?.Click(at) == true) { profilerClick = true; return; }   // F12's legend opens and closes rows
                 // The cinema's editor: its clicks never select or move characters.
                 if (b == SilkButton.Left && cinema.MouseDown(at)) return;
                 if (cinema.Contains(at)) return;
+                // The cheat menu's Alt + right-click teleport (its Character page's switch): the selection to the ground under the pointer.
+                if (b == SilkButton.Right && cheats.AltTeleport && silkInput.Keyboards.Any(k => k.IsKeyPressed(SilkKey.AltLeft) || k.IsKeyPressed(SilkKey.AltRight))
+                    && player.Ray(at) is { } teleportRay && player.GroundHit(teleportRay.Origin, teleportRay.Direction) is { } teleportTo)
+                { cheats.TeleportSelection(teleportTo); return; }
                 if (KeyMap.Map(b) is { } button)
                 {
                     // Ctrl and Alt with the right button: pick up / put down and loot (docs/game/ui-input.md, Meitou's carry bindings).
@@ -357,7 +372,9 @@ sealed partial class GameHost
             mouse.MouseUp += (m, b) =>
             {
                 bool cinemaDrag = cinema.MouseUp();
-                if (!Covered && !cinemaDrag && !panelDrag && !profilerClick && panel?.Visible != true && KeyMap.Map(b) is { } released) player.MouseUp(released, Pixels(m.Position), shiftDown);
+                bool cheatHeld = cheats.MouseUp() || cheatDrag;
+                cheatDrag = false;
+                if (!Covered && !cinemaDrag && !panelDrag && !cheatHeld && !profilerClick && panel?.Visible != true && KeyMap.Map(b) is { } released) player.MouseUp(released, Pixels(m.Position), shiftDown);
                 profilerClick = false;
                 panel?.MouseUp();
                 panelDrag = false;
@@ -368,6 +385,7 @@ sealed partial class GameHost
                 session.Input.SetMousePosition(p.X, p.Y);
                 if (Covered) { lastMouse = p; return; }
                 if (PanelLive() && panel?.MouseMove(Pixels(p)) == true || panelDrag) { lastMouse = p; return; }
+                if (PanelLive() && cheats.MouseMove(Pixels(p)) || cheatDrag) { lastMouse = p; return; }
                 if (cinema.MouseMove(Pixels(p))) { lastMouse = p; return; }
                 player.MouseMove(Pixels(p));
                 if (player.UiCapturesPointer || player.ModalOpen) { lastMouse = p; return; }
@@ -377,6 +395,7 @@ sealed partial class GameHost
             mouse.Scroll += (m, wheel) =>
             {
                 if (Covered || PanelLive() && panel?.Scroll(wheel.Y) == true) return;
+                if (PanelLive() && cheats.Scroll(wheel.Y)) return;
                 if (PanelLive() && sandboxPicker?.Scroll(wheel.Y) == true) return;
                 if (!cinema.Contains(Pixels(m.Position)) && !player.UiScroll(Pixels(m.Position), wheel.Y) && !(PanelLive() && player.ContainsUi(Pixels(m.Position)))) session.Input.AddWheel(wheel.Y);
             };
@@ -554,7 +573,7 @@ sealed partial class GameHost
                 panel?.Visible != true && !interfaceHidden && !cinema.Clean && !cinemaHolds && !cinema.EditorVisible;
             if (gpu.Objects is { } signObjects) signObjects.HighlightSigns = highlighting;
             player.HighlightFocus = highlighting && !screenshotRequested && takeFile is null ? camera.Target : null;
-            bool pointerWorld = pointerMouse is not null && !Covered && !g.NoPopulation && !(PanelLive() && panel?.Visible == true) && !cinema.Contains(pointerAt);
+            bool pointerWorld = pointerMouse is not null && !Covered && !g.NoPopulation && !(PanelLive() && panel?.Visible == true) && !(PanelLive() && cheats.Contains(pointerAt)) && !cinema.Contains(pointerAt);
             bool freeLook = pointerWorld && session.Camera.IsFree && !player.ModalOpen;
             // Hover outline (Advanced, Meitou only): not in the free camera, with the interface hidden, or in saved pictures.
             bool outlining = config.HoverOutline && !session.Camera.IsFree && !interfaceHidden && !cinema.Clean && !screenshotRequested && takeFile is null;
@@ -633,6 +652,7 @@ sealed partial class GameHost
                     profiler?.Draw(overlay, size.X, size.Y);
                     profiler?.DrawVram(overlay, size.X, size.Y);
                 }
+                if (ui && !g.NoPopulation) cheats.Draw(size.X, size.Y);
                 if (ui) panel?.Draw(size.X, size.Y);
                 // Over everything: the letterbox and the cinema's editor (F6, also with F7); the game hides its status line.
                 if (overlay is not null && !covered) cinema.Draw(overlay, size.X, size.Y, shot || take || (interfaceHidden && !cinema.EditorVisible), showStatus: false);

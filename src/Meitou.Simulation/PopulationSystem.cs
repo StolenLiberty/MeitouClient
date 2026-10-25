@@ -107,7 +107,7 @@ public sealed partial class PopulationSystem : ITickSystem, IDisposable
         foreach (var c in commands)
         {
             if (c is FocusCommand f) focus = f.Position;
-            else if (c is DebugSpawn spawn) SpawnSandbox(world, spawn.Record, spawn.At, player: false, variant: ++debugSpawns);
+            else if (c is DebugSpawn spawn) SpawnSandbox(world, spawn.Record, spawn.At, player: false, variant: ++debugSpawns, faction: spawn.Faction);
         }
 
         var ready = new List<BuiltTown>();

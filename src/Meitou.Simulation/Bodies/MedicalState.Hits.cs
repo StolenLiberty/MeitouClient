@@ -193,6 +193,9 @@ public sealed partial class MedicalState
 
     void StartKo(in MedicalContext ctx, List<MedicalEvent>? events) => ApplyKo(KoTime(ctx), events);
 
+    /// <summary>The cheat menu's Knock out: a knockout of the usual length (<see cref="KoTime"/>) without a hit.</summary>
+    public void CheatKnockOut(in MedicalContext ctx) => StartKo(ctx, null);
+
     /// <summary>
     /// The factor of the KO given to a non-friendly character that is put down (docs/game/carry-loot.md "Putting down"): lerp(0.1, 0.4, the carrier's assassination / 100)
     /// (<b>Observed</b>, <c>Task_PutDownObject</c>; the help text says assassination decides how long they stay out).

@@ -281,7 +281,7 @@ public sealed partial class DialogueSystem
             if (c.Stats is { } stats) foreach (var stat in TamedStats) stats[stat] *= 0.25f;
             var packed = c.Inventory?.Backpack?.Contents is { } bag ? bag.All().ToList() : [];
             foreach (var item in packed) c.Inventory!.Remove(item);
-            if (!JoinPlayer(world, slot, buyer)) continue;
+            if (!JoinPlayer(world, data, slot, buyer)) continue;
             foreach (var item in packed) GiveBack(world, sellerSquad, item);
         }
         if (world.Player.Money >= total) world.Player.Money -= total;

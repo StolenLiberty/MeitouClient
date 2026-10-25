@@ -21,7 +21,7 @@ public sealed partial class DialogueSystem
             c.Ended = true;
             return false;
         }
-        if (!JoinPlayer(world, slot, tc)) return true;
+        if (!JoinPlayer(world, data, slot, tc)) return true;
         if (withEditor)
         {
             c.Ended = true;
@@ -30,7 +30,7 @@ public sealed partial class DialogueSystem
         return true;
     }
 
-    static int PlayerHeads(World world)
+    internal static int PlayerHeads(World world)
     {
         var table = world.Characters;
         int heads = 0;
@@ -40,14 +40,18 @@ public sealed partial class DialogueSystem
     }
 
     /// <summary>The character at <paramref name="slot"/> leaves its squad and joins the player's active squad (or a new blank squad when it is full) as a player character.</summary>
-    bool JoinPlayer(World world, int slot, CharacterCold talker)
+    /// <summary>
+    /// Moves the character in <paramref name="slot"/> into the player's active squad (else the selection's, else <paramref name="talker"/>'s) as a player character, or into a new
+    /// "blank squad" when that squad is full. Shared by recruiting dialogue and the cheat menu's Recruit. False when there is no squad to join.
+    /// </summary>
+    internal static bool JoinPlayer(World world, PopulationData data, int slot, CharacterCold? talker)
     {
         var table = world.Characters;
         var me = table.IdOf(slot);
         var mc = table.Cold(slot)!;
         var limits = data.Bodies.Constants;
         var selected = world.Player.Selection.Select(id => Cold(world, id)).FirstOrDefault(s => s is { IsPlayer: true });
-        if ((world.Squads.Find(world.Player.Squad) ?? world.Squads.Find(selected?.SquadId ?? -1) ?? world.Squads.Find(talker.SquadId)) is not { } squad) return false;
+        if ((world.Squads.Find(world.Player.Squad) ?? world.Squads.Find(selected?.SquadId ?? -1) ?? world.Squads.Find(talker?.SquadId ?? -1)) is not { } squad) return false;
         if (squad.Members.Count >= limits.MaxSquadSize)
             squad = SquadManagement.NewSquad(world, data.Db, table.Next[slot].Position, data.Factions[world.Player.Faction].Name is { Length: > 0 } f ? f : "Nameless");
 
@@ -95,7 +99,7 @@ public sealed partial class DialogueSystem
             if (slave.IsImprisoned) world.Fixtures.Release(world, id);   // it clears the slave state; restored below
             if (tc.IsPlayer || tc.Faction == world.Player.Faction)
             {
-                if (PlayerHeads(world) >= data.Bodies.Constants.MaxFactionSize || !JoinPlayer(world, s, tc)) break;
+                if (PlayerHeads(world) >= data.Bodies.Constants.MaxFactionSize || !JoinPlayer(world, data, s, tc)) break;
             }
             else if (world.Squads.Find(tc.SquadId) is { } theirs)
             {

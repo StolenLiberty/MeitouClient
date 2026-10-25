@@ -19,6 +19,8 @@ public enum InputAction
     Screenshot, ToggleSettings,
     /// <summary>The debug menu (the game's cheats), the frame statistics, the profiler chart (gpu, cpu, off).</summary>
     ToggleDebugMenu, ToggleStats, CycleProfiler,
+    /// <summary>The cheat menu (Meitou.Game CheatMenu; F1, the game's unused toggle_help).</summary>
+    ToggleCheatMenu,
     /// <summary>The small frame-rate counter at the top left.</summary>
     ToggleFps,
     /// <summary>The game's quicksave and quickload (F5 and F9, docs/game/ui-input.md): the host saves to and loads from its own "quicksave" slot.</summary>
@@ -154,6 +156,7 @@ public sealed class InputBindings
         Set(InputAction.QuickSave, Key.F5);
         Set(InputAction.QuickLoad, Key.F9);
         Set(InputAction.ToggleDebugMenu, Key.F10);
+        Set(InputAction.ToggleCheatMenu, Key.F1);
         Set(InputAction.ToggleStats, Key.F11);
         Set(InputAction.CycleProfiler, Key.F12);
         Set(InputAction.Quit, Key.Escape);

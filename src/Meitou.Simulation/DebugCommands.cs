@@ -57,12 +57,13 @@ public sealed record DebugGiveItem(CharacterId Character, string Record, int Qua
 public sealed record DebugUnlockResearch : DebugCommand;
 
 /// <summary>Spawns a character of record <see cref="Record"/> at <see cref="At"/>, alone in a squad of the first faction hostile to the player (<see cref="PopulationSystem"/> applies it).</summary>
-public sealed record DebugSpawn(string Record, Vector2 At) : DebugCommand;
+public sealed record DebugSpawn(string Record, Vector2 At, int? Faction = null) : DebugCommand;
 
 static class DebugCheats
 {
     public static void Apply(World world, PopulationData? data, CharacterAssembly? assembly, DebugCommand command)
     {
+        if (CheatApply.Apply(world, data, assembly, command)) return;
         var table = world.Characters;
         switch (command)
         {
@@ -127,6 +128,8 @@ static class DebugCheats
                 break;
         }
     }
+
+    internal static (MedicalState, MedicalContext)? BodyOf(World world, PopulationData data, CharacterId id) => Body(world, data, id);
 
     static (MedicalState, MedicalContext)? Body(World world, PopulationData data, CharacterId id)
     {
