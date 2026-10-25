@@ -262,7 +262,7 @@ sealed partial class GameHost
             // F1 (rebindable) opens the cheat menu; while a text box of it is focused it takes every key, otherwise only Esc.
             if (KeyMap.Map(k) is { } cheatKey)
             {
-                if (!cheats.TakesKeyboard && session.Bindings.Get(InputAction.ToggleCheatMenu).Contains(Binding.Of(cheatKey)) && !g.NoPopulation) { cheats.Visible = !cheats.Visible; return; }
+                if (!cheats.TakesKeyboard && !shiftDown && session.Bindings.Get(InputAction.ToggleCheatMenu).Contains(Binding.Of(cheatKey)) && !g.NoPopulation) { cheats.Visible = !cheats.Visible; return; }
                 if (cheats.KeyDown(k == SilkKey.KeypadEnter ? EngineKey.Enter : cheatKey)) return;
             }
             // F10 (rebindable) opens the debug menu, which then takes every key until it closes.
