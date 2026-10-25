@@ -34,6 +34,8 @@ public sealed record TradeItemView(int Index, string Record, string Name, string
 {
     /// <summary>The current transfer reverses a purchase or sale from this trade window at its original price.</summary>
     public bool Buyback { get; init; }
+    /// <summary>Turned a quarter (<see cref="Items.ItemInstance.Rotated"/>).</summary>
+    public bool Rotated { get; init; }
     /// <summary>A bag (a container with a contents grid): it trades whole, and may go into the backpack slot.</summary>
     public bool Container { get; init; }
     /// <summary>The item's material record ("" none), which picks its icon.</summary>
@@ -589,7 +591,7 @@ public sealed class TradeSystem : ITickSystem, ITradeSource
             return new(index, item.Record, item.Name, item.Section, item.X, item.Y, item.Width, item.Height, item.Quantity,
                 item.Quality, Price(m, item, item.Quantity, sell, shop.Terms, holder), Price(m, item, 1, sell, shop.Terms, holder), stolen)
             {
-                Buyback = buyback, Container = item.Contents is not null,
+                Buyback = buyback, Container = item.Contents is not null, Rotated = item.Rotated,
                 Material = item.MaterialId, Charge = item.ChargeFraction, Value = value, SellValue = sellValue, Weight = item.Weight, PriceFactor = m.TraderFactor(item, shop.Terms, holder),
                 MarketFactor = m.MarketFactor(shop.Terms.Site, item.Record), Company = item.CompanyId, Level = item.Level, Charges = item.Charges, MaxCharges = item.MaxCharges, StolenFrom = stolen ? item.StolenFrom : -1,
                 FenceChance = sell && stolen && item.StolenFrom == squad.Faction ? Math.Clamp(FenceChance(thievery, true), 0, 1) : null,

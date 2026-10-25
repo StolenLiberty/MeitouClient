@@ -65,8 +65,17 @@ public sealed class ItemInstance
     public float LimbDamage { get; set; }
     public float LimbWear { get; set; }
     public float LimbStun { get; set; }
-    public int Width { get; init; } = 1;
-    public int Height { get; init; } = 1;
+    int width = 1, height = 1;
+    /// <summary>The footprint in cells, turned a quarter when <see cref="Rotated"/> (the record's width and height swapped).</summary>
+    public int Width { get => Rotated ? height : width; init => width = value; }
+    public int Height { get => Rotated ? width : height; init => height = value; }
+    /// <summary>
+    /// Meitou: turned a quarter in its grid (R while held, as the RE_Kenshi plugin KenshiRotate; the original cannot rotate items). Only in grids: an equipment or prosthetic section
+    /// takes it upright (<see cref="Upright"/>). Saved as <c>meitou rotated</c>.
+    /// </summary>
+    public bool Rotated { get; set; }
+    /// <summary>Whether turning it changes its footprint (it is not square).</summary>
+    public bool Rotatable => width != height;
     /// <summary>Weight of one unit in kg as it counts in the inventory total (weapons already scaled by <c>weapon inventory weight mult</c>).</summary>
     public float UnitWeight { get => DynamicWeight is null ? baseWeight : WorkedWeight(); init => baseWeight = value; }
     float baseWeight;
@@ -111,7 +120,7 @@ public sealed class ItemInstance
     public ItemInstance WithQuantity(int quantity) => new()
     {
         Record = Record, Name = Name, Type = Type, EquipmentSection = EquipmentSection, IsLocked = IsLocked, WornOnlyBy = WornOnlyBy, WornNeverBy = WornNeverBy, MaterialId = MaterialId, CompanyId = CompanyId, Section = Section, X = X, Y = Y, Quantity = quantity, Level = Level, Crafter = Crafter,
-        ItemFunction = ItemFunction, Quality = Quality, Charges = Charges, MaxCharges = MaxCharges, Width = Width, Height = Height, UnitWeight = baseWeight, DynamicWeight = DynamicWeight, StackLimit = StackLimit,
+        ItemFunction = ItemFunction, Quality = Quality, Charges = Charges, MaxCharges = MaxCharges, Width = width, Height = height, Rotated = Rotated, UnitWeight = baseWeight, DynamicWeight = DynamicWeight, StackLimit = StackLimit,
         IsFood = IsFood, ContentsFactor = ContentsFactor, StolenFrom = StolenFrom, Death = Death, Buyback = Buyback?.Take(quantity),
     };
 

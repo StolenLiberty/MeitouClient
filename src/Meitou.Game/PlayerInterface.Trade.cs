@@ -187,7 +187,7 @@ sealed partial class PlayerInterface
             if (Lifted(ItemOwner.Stock, item.Index)) continue;
             AddItemCell(controls, $"trade-item-{item.Index}",
                 new(area.X + item.X * area.Width / columns, area.Y + item.Y * area.Height / rows, item.Width * area.Width / columns, item.Height * area.Height / rows),
-                item.Record, item.Material, item.Name, item.Quantity, ItemTip.Of(item), "TradeItem", item.Index, slot.Clip, charge: item.Charge);
+                item.Record, item.Material, item.Name, item.Quantity, ItemTip.Of(item), "TradeItem", item.Index, slot.Clip, charge: item.Charge, rotated: item.Rotated);
         }
     }
 

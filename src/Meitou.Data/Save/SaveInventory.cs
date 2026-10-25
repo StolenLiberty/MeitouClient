@@ -28,6 +28,8 @@ public sealed class SaveItem
     public float Stun { get; init; }
     /// <summary>The <c>death</c> bool: a death item still on its owner (docs/game/animals.md "Death items").</summary>
     public bool Death { get; init; }
+    /// <summary>Meitou's <c>meitou rotated</c> bool: the item lies turned a quarter in its grid (written only when true).</summary>
+    public bool Rotated { get; init; }
     /// <summary>Shackles' lock (LockedArmour, docs/game/locks.md "Save keys"): <c>lock lvl</c>, <c>locked</c>, <c>broken</c>, <c>hardness</c>; null for other items.</summary>
     public SaveItemLock? Lock { get; init; }
     /// <summary>A container's contents (the INVENTORY_STATE its one instance names); null for other items.</summary>
@@ -86,6 +88,7 @@ public static class SaveInventory
         Wear = r.Floats.GetValueOrDefault("wear"),
         Stun = r.Floats.GetValueOrDefault("stun"),
         Death = r.Bools.GetValueOrDefault("death"),
+        Rotated = r.Bools.GetValueOrDefault("meitou rotated"),
         Lock = r.Ints.TryGetValue("lock lvl", out int lockLevel) ? new SaveItemLock(lockLevel, r.Bools.GetValueOrDefault("locked"), r.Bools.GetValueOrDefault("broken"), r.Floats.GetValueOrDefault("hardness")) : null,
         Contents = contents,
         Source = r,
@@ -129,6 +132,7 @@ public static class SaveInventory
             Hand.Null.Write(r, "ownedby");
         }
         r.Bools["death"] = item.Death;
+        if (item.Rotated) r.Bools["meitou rotated"] = true; else r.Bools.Remove("meitou rotated");
         r.Strings["material sid"] = item.MaterialId;
         r.Strings["company sid"] = item.CompanyId;
         if (item.Crafter.Length > 0) r.Strings["crafter"] = item.Crafter;   // written only when not empty, as the original

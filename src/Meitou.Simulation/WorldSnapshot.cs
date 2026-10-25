@@ -49,6 +49,8 @@ public sealed record HudView(float Blood, float BloodCapacity, float Bleeding, f
 public readonly record struct ExtendedStats(float AthleticsXp, float StrengthXp, float ToughnessXp, float KoPoint, float RunSpeed, float RunValue, float HungerRate);
 public sealed record InventoryItemView(int Index, string Record, string Name, string Section, int X, int Y, int Width, int Height, int Quantity, float Weight, float Quality)
 {
+    /// <summary>Turned a quarter (<see cref="Items.ItemInstance.Rotated"/>): <see cref="Width"/> and <see cref="Height"/> are the turned footprint, the icon is drawn turned.</summary>
+    public bool Rotated { get; init; }
     /// <summary>The item's material record (<c>material sid</c>; "" none), which picks its icon.</summary>
     public string Material { get; init; } = "";
     /// <summary>How full the item is (0 to 1, <see cref="Items.ItemInstance.ChargeFraction"/>); null: no charge bar.</summary>

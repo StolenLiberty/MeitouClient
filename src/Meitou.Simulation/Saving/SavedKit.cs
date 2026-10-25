@@ -24,7 +24,7 @@ public static class SavedKit
     {
         var (width, height) = ItemFactory.MainSize(owner);
         foreach (var s in items)
-            if (s.Section == "main" && factory.Info(s.BaseId) is { } info) height = Math.Max(height, s.Y + Math.Max(info.Height, 1));
+            if (s.Section == "main" && factory.Info(s.BaseId) is { } info) height = Math.Max(height, s.Y + Math.Max(s.Rotated ? info.Width : info.Height, 1));
         var inventory = new Inventory(width, height);
         Fill(inventory, items, factory, notes);
         return inventory;
@@ -59,6 +59,7 @@ public static class SavedKit
         item.Crafter = s.Crafter;
         item.Charges = s.Charges;
         item.Death = s.Death;
+        item.Rotated = s.Rotated && item.Rotatable && !InventoryCommands.IsEquipmentSection(s.Section) && !InventoryCommands.IsLimbSection(s.Section);
         (item.LimbDamage, item.LimbWear, item.LimbStun) = (s.Damage, s.Wear, s.Stun);
         if (s.Lock is { } l && item.Lock is { } lockState)
         {
@@ -78,7 +79,7 @@ public static class SavedKit
     {
         BaseId = i.Record, MaterialId = i.MaterialId, CompanyId = i.CompanyId, Crafter = i.Crafter, Section = i.Section, X = i.X, Y = i.Y, Quantity = i.Quantity, Level = i.Level,
         ItemFunction = i.ItemFunction, Quality = i.Quality, Charges = i.Charges, Source = i.Saved,
-        Damage = i.LimbDamage, Wear = i.LimbWear, Stun = i.LimbStun, Death = i.Death,
+        Damage = i.LimbDamage, Wear = i.LimbWear, Stun = i.LimbStun, Death = i.Death, Rotated = i.Rotated,
         Lock = i.Lock is { } l ? new SaveItemLock(l.Level, l.EffectivelyLocked, l.Broken, l.Hardness) : null,
         Contents = i.Contents is { } bag ? FromInventory(bag) : null,
     };

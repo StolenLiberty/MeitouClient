@@ -22,7 +22,7 @@ sealed partial class PlayerInterface
     /// An item icon filling <paramref name="area"/> with its quantity in the corner, or a name while the icon loads. <paramref name="tip"/> is what its hover tooltip lists (the name only when null).
     /// The transparent text control handles picking and carries <paramref name="property"/>.
     /// </summary>
-    void AddItemCell(List<UiControl> controls, string name, UiRect area, string record, string material, string itemName, int quantity, ItemTip? tip, string property, int index, UiRect? clip, bool pickable = true, float? charge = null)
+    void AddItemCell(List<UiControl> controls, string name, UiRect area, string record, string material, string itemName, int quantity, ItemTip? tip, string property, int index, UiRect? clip, bool pickable = true, float? charge = null, bool rotated = false)
     {
         itemTips[name] = tip ?? ItemTip.NameOnly(record, material, itemName, quantity);
         string count = quantity > 1 ? quantity.ToString(CultureInfo.InvariantCulture) : "";
@@ -37,7 +37,14 @@ sealed partial class PlayerInterface
         bool shown = image is not null;
         controls.Add(new($"{name}-background", "Widget", area, "", "", "", true,
             new Dictionary<string, string>(), new(0.12f, 0.08f, 0.04f, 0.25f), Pickable: false, Clip: clip));
-        if (shown) controls.Add(new($"{name}-icon", "ImageBox", area, "", "", "", true, image!, System.Numerics.Vector4.Zero, Pickable: false, Clip: clip));
+        if (shown && rotated)
+        {
+            // Meitou: a turned item's picture is its upright one turned a quarter clockwise about the footprint's centre.
+            image!["ImageAngle"] = (MathF.PI / 2).ToString(CultureInfo.InvariantCulture);
+            var upright = new UiRect(area.X + (area.Width - area.Height) / 2, area.Y + (area.Height - area.Width) / 2, area.Height, area.Width);
+            controls.Add(new($"{name}-icon", "ImageBox", upright, "", "", "", true, image, System.Numerics.Vector4.Zero, Pickable: false, Clip: clip));
+        }
+        else if (shown) controls.Add(new($"{name}-icon", "ImageBox", area, "", "", "", true, image!, System.Numerics.Vector4.Zero, Pickable: false, Clip: clip));
         if (charge is { } fill)
         {
             // A white line over a black track along the cell's bottom edge, as long as what is left (the vanilla inventory and trader screenshots show it under food stacks).

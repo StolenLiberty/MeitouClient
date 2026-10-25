@@ -32,6 +32,16 @@ public static class InventoryCommands
     /// </summary>
     public static bool TryEquip(Inventory root, ItemInstance item, string? wearer = null)
     {
+        // Meitou: worn upright; a turned item that finds no slot stays turned.
+        bool turned = item.Rotated;
+        item.Rotated = false;
+        if (Equip(root, item, wearer)) return true;
+        item.Rotated = turned;
+        return false;
+    }
+
+    static bool Equip(Inventory root, ItemInstance item, string? wearer)
+    {
         if (!item.WearableBy(wearer) || item.Quantity != 1 || item.Width <= 0 || item.Height <= 0) return false;
         string[] sections = item.Type is Meitou.Data.Fcs.FcsRecordType.WEAPON or Meitou.Data.Fcs.FcsRecordType.CROSSBOW ? ["back", "hip"]
             : item.Type is Meitou.Data.Fcs.FcsRecordType.ARMOUR or Meitou.Data.Fcs.FcsRecordType.ITEM && IsEquipmentSection(item.EquipmentSection) && item.EquipmentSection is not ("back" or "hip" or "backpack_attach") ? [item.EquipmentSection] : [];
@@ -91,6 +101,16 @@ public static class InventoryCommands
     /// stale or the place does not take the item (an equipment or prosthetic section also one the race <paramref name="wearer"/> may not wear; null: no check).
     /// </summary>
     public static bool Transfer(Inventory from, InventoryItemToken token, Inventory into, string section, int x, int y, bool limbs = false, string? wearer = null)
+    {
+        // Meitou: an equipment or prosthetic section takes an item upright; refused, it stays as it was.
+        var turned = from.All().ElementAtOrDefault(token.Index) is { Rotated: true } t && (IsEquipmentSection(section) || IsLimbSection(section)) ? t : null;
+        if (turned is not null) turned.Rotated = false;
+        if (TransferUpright(from, token, into, section, x, y, limbs, wearer)) return true;
+        if (turned is not null) turned.Rotated = true;
+        return false;
+    }
+
+    static bool TransferUpright(Inventory from, InventoryItemToken token, Inventory into, string section, int x, int y, bool limbs, string? wearer)
     {
         var item = from.All().ElementAtOrDefault(token.Index);
         bool Movable(string s) => IsMovableSection(s) || limbs && IsLimbSection(s);

@@ -167,7 +167,7 @@ sealed partial class PlayerInterface
                 AddItemCell(controls, $"machine-item-{item.Index}",
                     new(area.X + item.X * area.Width / grid.Width, area.Y + item.Y * area.Height / grid.Height, item.Width * area.Width / grid.Width, item.Height * area.Height / grid.Height),
                     item.Record, item.Material, item.Name, item.Quantity, ItemTip.Of(item), "MachineItem", 1000 + item.Index,
-                    slot.Bounds.Intersect(slot.Clip ?? slot.Bounds), charge: item.Charge);
+                    slot.Bounds.Intersect(slot.Clip ?? slot.Bounds), charge: item.Charge, rotated: item.Rotated);
             }
             return;
         }

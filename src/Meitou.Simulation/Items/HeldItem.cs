@@ -29,6 +29,8 @@ public sealed class HeldItem
     public int X { get; init; }
     public int Y { get; init; }
     public CharacterId Actor { get; init; } = CharacterId.None;
+    /// <summary>Whether it lay turned where it came from: put back, it is turned so again (<see cref="RotateHeld"/> may have turned it on the mouse).</summary>
+    public bool StartRotated { get; init; }
 }
 
 /// <summary>
@@ -39,7 +41,11 @@ public sealed record HeldItemView(string Record, string Name, string Material, M
     float? Charge, ItemOwner From, int BagItems)
 {
     public static HeldItemView Of(HeldItem held) => new(held.Item.Record, held.Item.Name, held.Item.MaterialId, held.Item.Type, held.Item.EquipmentSection, held.Item.Quantity,
-        held.Item.Width, held.Item.Height, held.Item.ChargeFraction, held.From, held.Item.Contents?.Items.Count ?? -1) { WornOnlyBy = held.Item.WornOnlyBy, WornNeverBy = held.Item.WornNeverBy };
+        held.Item.Width, held.Item.Height, held.Item.ChargeFraction, held.From, held.Item.Contents?.Items.Count ?? -1)
+        { WornOnlyBy = held.Item.WornOnlyBy, WornNeverBy = held.Item.WornNeverBy, Rotated = held.Item.Rotated };
+
+    /// <summary>Turned a quarter (<see cref="ItemInstance.Rotated"/>): <see cref="Width"/> and <see cref="Height"/> are the turned footprint.</summary>
+    public bool Rotated { get; init; }
 
     /// <summary>The held item's race limits (<see cref="ItemInstance.WornOnlyBy"/>, <see cref="ItemInstance.WornNeverBy"/>).</summary>
     public string[] WornOnlyBy { get; init; } = [];
@@ -78,6 +84,9 @@ public sealed record DropHeld : HeldCommand;
 
 /// <summary>Puts the held item back where it came from (<c>FUN_14070d860</c>).</summary>
 public sealed record ReturnHeld : HeldCommand;
+
+/// <summary>Meitou: turns the held item a quarter (R; the original cannot), a square one unchanged.</summary>
+public sealed record RotateHeld : HeldCommand;
 
 /// <summary>
 /// A right click on an item of a player character's own window with no other owner's window open (<c>FUN_140714a20</c>): a money item (function 14) is turned into cats; a grid item goes

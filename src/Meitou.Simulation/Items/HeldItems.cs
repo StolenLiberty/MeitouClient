@@ -37,6 +37,7 @@ public sealed partial class PlayerSystem
             case GiveHeld give: Give(world, give); break;
             case DropHeld: DropHeldItem(world); break;
             case ReturnHeld: ReturnHeldItem(world); break;
+            case RotateHeld: if (world.Player.Held is { Item: { Rotatable: true } turned }) turned.Rotated = !turned.Rotated; break;
         }
     }
 
@@ -81,7 +82,7 @@ public sealed partial class PlayerSystem
     }
 
     static void Hold(World world, LiftItem lift, ItemInstance unit, Inventory? grid, string section, int x, int y) =>
-        world.Player.Held = new HeldItem { Item = unit, From = lift.From, Grid = grid, Section = section, X = x, Y = y, Actor = lift.Actor };
+        world.Player.Held = new HeldItem { Item = unit, From = lift.From, Grid = grid, Section = section, X = x, Y = y, Actor = lift.Actor, StartRotated = unit.Rotated };
 
     void Lift(World world, LiftItem lift)
     {
@@ -262,6 +263,8 @@ public sealed partial class PlayerSystem
             ReturnHeldItem(world);
             return;
         }
+        // Meitou: an equipment or prosthetic section takes an item upright.
+        if (InventoryCommands.IsEquipmentSection(target.Section) || InventoryCommands.IsLimbSection(target.Section)) item.Rotated = false;
         // Money moved out of another's window into the player's own becomes cats.
         if (item.ItemFunction == MoneyFunction && target.Owner is { IsPlayer: true } && !FromPlayerWindow(world, held) && !buy)
         {
@@ -324,8 +327,8 @@ public sealed partial class PlayerSystem
                 var (kept, coming) = (other.Buyback, buy || sell ? trade!.PayHeld(world, item, n, sell) : item.Buyback?.Take(n));
                 InventoryCommands.Merge(other, item, n);
                 if (kept is not null && coming is not null && kept.Joins(coming)) other.Buyback = kept.Append(coming);
-                // The merged stack lies at the drop's cell.
-                (other.X, other.Y) = (x, y);
+                // The merged stack lies at the drop's cell, turned as the held item was (the cells checked are the held item's footprint).
+                (other.X, other.Y, other.Rotated) = (x, y, item.Rotated);
                 if (item.Quantity <= 0) player.Held = null;
                 else Undo(item);
                 if (changes) LeftLoot(world, held, death);
@@ -338,7 +341,7 @@ public sealed partial class PlayerSystem
             target.Grid.Items.Remove(other);
             if (InventoryCommands.LimbSlotOf(target.Section) is >= 0 and var fitted) target.Owner?.Medical?.RemoveReplacement(fitted);
             Put(target, item, x, y);
-            player.Held = new HeldItem { Item = other, From = into, Grid = target.Root, Section = other.Section, X = other.X, Y = other.Y, Actor = held.Actor };
+            player.Held = new HeldItem { Item = other, From = into, Grid = target.Root, Section = other.Section, X = other.X, Y = other.Y, Actor = held.Actor, StartRotated = other.Rotated };
             if (changes) LeftLoot(world, held, death);
             Touched(world, held, target);
             return;
@@ -487,6 +490,7 @@ public sealed partial class PlayerSystem
         if (player.Held is not { } held) return;
         player.Held = null;
         var item = held.Item;
+        item.Rotated = held.StartRotated;
         if (held.Grid is not { } root)
         {
             if (world.Machines.Find(held.From.Site) is { } m)

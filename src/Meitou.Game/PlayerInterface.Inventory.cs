@@ -182,14 +182,14 @@ sealed partial class PlayerInterface
         InventoryItemToken token;
         HeldItemView view;
         bool whole;
-        HeldItemView View(string record, string name, string material, int quantity, int width, int height, float? charge, ItemOwner from) =>
-            new(record, name, material, default, "", whole ? quantity : 1, width, height, charge, from, -1);
+        HeldItemView View(string record, string name, string material, int quantity, int width, int height, float? charge, ItemOwner from, bool rotated = false) =>
+            new(record, name, material, default, "", whole ? quantity : 1, width, height, charge, from, -1) { Rotated = rotated };
         if (control.Properties.TryGetValue("TradeItem", out var stockIndex))
         {
             code = int.Parse(stockIndex, CultureInfo.InvariantCulture);
             if (snapshot.Trade is not { } trade || trade.Stock.FirstOrDefault(i => i.Index == code) is not { } stock) return false;
             (window, actor, token, whole) = (ItemOwner.Stock, trade.Customer, stock.Token, pressShift || pressCtrl || stock.Quantity <= 1);
-            view = View(stock.Record, stock.Name, stock.Material, stock.Quantity, stock.Width, stock.Height, stock.Charge, window);
+            view = View(stock.Record, stock.Name, stock.Material, stock.Quantity, stock.Width, stock.Height, stock.Charge, window, stock.Rotated);
         }
         else if (control.Properties.TryGetValue("MachineItem", out var raw))
         {
@@ -200,7 +200,7 @@ sealed partial class PlayerInterface
             if (code >= 1000 && m.Storage?.Items.FirstOrDefault(i => i.Index == code - 1000) is { } stored)
             {
                 (token, whole) = (new(stored.Index, stored.Record, "main", stored.X, stored.Y, stored.Quantity, stored.Quality), pressShift || pressCtrl || stored.Quantity <= 1);
-                view = View(stored.Record, stored.Name, stored.Material, stored.Quantity, stored.Width, stored.Height, stored.Charge, window);
+                view = View(stored.Record, stored.Name, stored.Material, stored.Quantity, stored.Width, stored.Height, stored.Charge, window, stored.Rotated);
             }
             else if (code == 8 && m.Craft is { Done: [var made, ..] })
             {
@@ -222,7 +222,7 @@ sealed partial class PlayerInterface
                 || !(InventoryCommands.IsMovableSection(item.Section) || InventoryCommands.IsLimbSection(item.Section))) return false;
             (window, actor) = (ItemOwner.Of(owner.Id), loot ? snapshot.LootOpener : owner.Id);
             (token, whole) = (new(item.Index, item.Record, item.Section, item.X, item.Y, item.Quantity, item.Quality), pressShift || pressCtrl || item.Quantity <= 1);
-            view = View(item.Record, item.Name, item.Material, item.Quantity, item.Width, item.Height, item.Charge, window);
+            view = View(item.Record, item.Name, item.Material, item.Quantity, item.Width, item.Height, item.Charge, window, item.Rotated);
         }
         else return false;
         SayHeld(new LiftItem(actor, window, token, whole) { Tick = session.World.Tick });
@@ -291,9 +291,11 @@ sealed partial class PlayerInterface
             takes = section != "out" && Machine(window.Site) is { } m && int.Parse(section.AsSpan(2), CultureInfo.InvariantCulture) - 1 is var k && k < m.Inputs.Count && m.Inputs[k].Item == h.Record;
         if (columns == 0) return new(DropKind.Section, window, section, 0, 0, b, slot.Clip, takes);
         float cw = InventoryCommands.IsEquipmentSection(section) ? InventoryCell : b.Width / columns, ch = InventoryCommands.IsEquipmentSection(section) ? InventoryCell : b.Height / rows;
-        bool fits = h.Width <= columns && h.Height <= rows;
-        int x = Math.Clamp((int)MathF.Round((topLeft.X - b.X) / cw), 0, Math.Max(0, columns - h.Width)), y = Math.Clamp((int)MathF.Round((topLeft.Y - b.Y) / ch), 0, Math.Max(0, rows - h.Height));
-        return new(DropKind.Section, window, section, x, y, new(b.X + x * cw, b.Y + y * ch, h.Width * cw, h.Height * ch), slot.Clip, takes && fits);
+        // An equipment section takes the item upright (Meitou's rotation).
+        var (w, h2) = h.Rotated && InventoryCommands.IsEquipmentSection(section) ? (h.Height, h.Width) : (h.Width, h.Height);
+        bool fits = w <= columns && h2 <= rows;
+        int x = Math.Clamp((int)MathF.Round((topLeft.X - b.X) / cw), 0, Math.Max(0, columns - w)), y = Math.Clamp((int)MathF.Round((topLeft.Y - b.Y) / ch), 0, Math.Max(0, rows - h2));
+        return new(DropKind.Section, window, section, x, y, new(b.X + x * cw, b.Y + y * ch, w * cw, h2 * ch), slot.Clip, takes && fits);
     }
 
     /// <summary>A section's size in cells; 0 x 0 for one that holds one item whatever its footprint (clothing, the bag slot, prosthetics, machine slots).</summary>
@@ -380,9 +382,21 @@ sealed partial class PlayerInterface
                 controls.Add(new("held-target", "Widget", spot.Area, "", "", "", true, new Dictionary<string, string>(), new Vector4(1, 1, 1, 0.5f), Pickable: false, Clip: spot.Clip));
             float cell = InventoryCell;
             AddItemCell(controls, "held-item", new(mouse.X - heldGrab.X * cell, mouse.Y - heldGrab.Y * cell, h.Width * cell, h.Height * cell),
-                h.Record, h.Material, h.Name, h.Quantity, null, "HeldItem", 0, null, pickable: false, charge: h.Charge);
+                h.Record, h.Material, h.Name, h.Quantity, null, "HeldItem", 0, null, pickable: false, charge: h.Charge, rotated: h.Rotated);
         }
         AddFencePrompt(controls);
+    }
+
+    /// <summary>
+    /// R (rebindable): the held item turns a quarter clockwise about the point it is held by (<see cref="RotateHeld"/>); the picture turns at once, the world's held item follows.
+    /// A square item does not turn.
+    /// </summary>
+    void RotateHeldItem()
+    {
+        if (held is not { } h || h.Width == h.Height) return;
+        SayHeld(new RotateHeld { Tick = session.World.Tick });
+        held = h with { Width = h.Height, Height = h.Width, Rotated = !h.Rotated };
+        heldGrab = ClampGrab(new(h.Height - heldGrab.Y, heldGrab.X), held);
     }
 
     /// <summary>Right click or Escape: the held item goes back (and a scrollbar drag ends); true when there was one.</summary>
