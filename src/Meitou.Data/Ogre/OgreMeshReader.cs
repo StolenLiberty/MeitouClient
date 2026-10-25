@@ -4,7 +4,7 @@ using static Meitou.Data.Ogre.OgreMeshChunk;
 namespace Meitou.Data.Ogre;
 
 /// <summary>
-/// Reads Ogre <c>.mesh</c> files, serializer versions 1.100, 1.8 and 1.41 (everything Kenshi ships).
+/// Reads Ogre <c>.mesh</c> files, serializer versions 1.100, 1.8, 1.41 (everything Kenshi ships) and 1.40 (older mods' exports; Kenshi's Ogre 1.9 reads it).
 /// Follows the structure of Ogre's own MeshSerializerImpl (MIT): sections are parsed field by field,
 /// not by trusting chunk lengths, which old exporters sometimes got wrong.
 /// </summary>
@@ -13,6 +13,9 @@ public static class OgreMeshReader
     public const string Version1_100 = "[MeshSerializer_v1.100]";
     public const string Version1_8 = "[MeshSerializer_v1.8]";
     public const string Version1_41 = "[MeshSerializer_v1.41]";
+    /// <summary>Ogre's <c>MeshSerializerImpl_v1_4</c>: 1.41 but its LOD block has no strategy name and stores squared distances.</summary>
+    public const string Version1_40 = "[MeshSerializer_v1.40]";
+    static bool Known(string version) => version is Version1_100 or Version1_8 or Version1_41 or Version1_40;
 
     public static OgreMesh ReadFile(string path) => Read(File.ReadAllBytes(Meitou.Content.GameFiles.Resolve(path)));
 
@@ -36,7 +39,7 @@ public static class OgreMeshReader
             int end = Array.IndexOf(line, (byte)'\n', 0, n);
             if (end < 0) return false;
             string version = System.Text.Encoding.ASCII.GetString(line, 0, end).TrimEnd('\r');
-            if (version is not (Version1_100 or Version1_8 or Version1_41)) return false;
+            if (!Known(version)) return false;
             f.Position = 2 + end + 1;
             Span<byte> chunk = stackalloc byte[6];
             if (f.Read(chunk) < 6 || BitConverter.ToUInt16(chunk) != (ushort)Mesh) return false;
@@ -72,7 +75,7 @@ public static class OgreMeshReader
         try
         {
             var mesh = new OgreMesh { Version = s.ReadHeader() };
-            if (mesh.Version is not (Version1_100 or Version1_8 or Version1_41))
+            if (!Known(mesh.Version))
                 throw new OgreFormatException($"Unsupported mesh version {mesh.Version}.", 0);
 
             while (!s.Eof)
@@ -150,7 +153,7 @@ public static class OgreMeshReader
         while (s.TryReadChunk([Pose], out _, out _))
         {
             var pose = new OgrePose { Name = s.ReadString(), Target = s.ReadUInt16() };
-            pose.IncludesNormals = mesh.Version != Version1_41 && s.ReadBool();
+            pose.IncludesNormals = mesh.Version is not (Version1_41 or Version1_40) && s.ReadBool();
             while (s.TryReadChunk([PoseVertex], out _, out _))
             {
                 uint index = s.ReadUInt32();
@@ -281,15 +284,18 @@ public static class OgreMeshReader
     }
 
     // Versions 1.8 / 1.41: a "manual" flag for all levels; each level is a USAGE chunk holding a MANUAL chunk or one GENERATED chunk per submesh.
+    // 1.40 (Ogre's MeshSerializerImpl_v1_4::readMeshLodInfo): no strategy name (the mesh takes distance_sphere) and each level's value is the distance squared.
     static OgreLod ReadLodV1_8(OgreStream s, OgreMesh mesh)
     {
-        var lod = new OgreLod { Strategy = s.ReadString() };
+        bool squared = mesh.Version == Version1_40;
+        var lod = new OgreLod { Strategy = squared ? "distance_sphere" : s.ReadString() };
         int levels = s.ReadUInt16();
         bool manual = s.ReadBool();
         for (int level = 1; level < levels; level++)
         {
             Expect(s, MeshLodUsage);
-            var entry = new OgreLodLevel { UserValue = s.ReadFloat() };
+            float value = s.ReadFloat();
+            var entry = new OgreLodLevel { UserValue = squared ? MathF.Sqrt(value) : value };
             if (manual)
             {
                 Expect(s, MeshLodManual);

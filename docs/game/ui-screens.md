@@ -685,6 +685,8 @@ unless marked; Meitou: `PlayerInterface.Squads.cs`, commands in `SquadManagement
 - **Holding an item** (**Observed**, Ghidra decompile of `kenshi_x64.exe`; one item on the mouse at a time, `MouseInventory` `FUN_14070e640`):
   - Input: the item sections hook only pressed (`FUN_140716800`) and released (`FUN_1407169a0`); no double click, no inventory keys, no quantity dialog. Shift = `DAT_142133449`,
     Ctrl = `DAT_142133448` (key flags `FUN_14082b010`).
+  - The original has no way to turn an item (no inventory keys, above); the RE_Kenshi plugin KenshiRotate adds one. Meitou: R (`RotateItem`) turns the held item a quarter
+    about its grab point; it stays turned in grids (saved as the bool `meitou rotated`, container JSON `Rt`), and equipment or prosthetic sections take it upright.
   - Left press with nothing held (`FUN_1407139a0`): the section must be enabled; for a building's window the [trading range](economy.md#trading-range) ("Out of trading range.",
     `gui_notrade`). Cell = (pointer - grid origin) / cell, clamped. Locked (shackles) items do not lift. In a trade an item flagged equipped on a non-player owner: "That's not for sale.".
     A single unit, or Shift or Ctrl held: the whole stack lifts; otherwise one unit is split off and the rest stays. `Item_Lift`; the grab offset is kept, clamped so the pointer stays at

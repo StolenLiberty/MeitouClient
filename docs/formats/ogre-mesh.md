@@ -31,6 +31,11 @@ exceptions where structure is known. Current render conversion does not define t
 | `[MeshSerializer_v1.8]` | 1,460 | `MeshSerializerImpl_v1_8` |
 | `[MeshSerializer_v1.41]` | 77 | `MeshSerializerImpl_v1_41` (same as 1.8 except pose/morph data) |
 
+Mods: `[MeshSerializer_v1.40]` (`MeshSerializerImpl_v1_4`; **Observed** in 99 Workshop meshes of four mods, e.g. Merc Armor Bundle 2875287426) is 1.41 except
+the LOD block: no strategy name (Ogre 1.9 gives the mesh `distance_sphere`) and each level's value is the distance squared (`userValue = sqrt(value)`), per Ogre 1.9.1
+`MeshSerializerImpl_v1_4::readMeshLodInfo`. Kenshi's Ogre 1.9 reads it; a reader that refuses it leaves the item invisible and without an icon. **Verified** that
+`OgreMeshReader` reads four of those files; none of them has a LOD block, so the LOD difference is not checked against a file.
+
 ### Chunks — layout/example
 
 ```
