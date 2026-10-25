@@ -19,8 +19,6 @@ public enum InputAction
     Screenshot, ToggleSettings,
     /// <summary>The debug menu (the game's cheats), the frame statistics, the profiler chart (gpu, cpu, off).</summary>
     ToggleDebugMenu, ToggleStats, CycleProfiler,
-    /// <summary>The cheat menu (Meitou.Game CheatMenu; F1, the game's unused toggle_help).</summary>
-    ToggleCheatMenu,
     /// <summary>The small frame-rate counter at the top left.</summary>
     ToggleFps,
     /// <summary>The game's quicksave and quickload (F5 and F9, docs/game/ui-input.md): the host saves to and loads from its own "quicksave" slot.</summary>
@@ -45,6 +43,8 @@ public enum InputAction
     /// <summary>Meitou's own: the selection sits down to rest, and the carriers put their bodies down (no binding in the game).</summary>
     Rest, PutDown,
     Quit,
+    /// <summary>The cheat menu (Meitou.Game CheatMenu; F1, the game's unused toggle_help). Last, so the earlier actions keep their numbers.</summary>
+    ToggleCheatMenu,
 }
 
 /// <summary>The actions of one tick: for each, held, pressed or released this tick, plus the mouse movement and wheel.</summary>
