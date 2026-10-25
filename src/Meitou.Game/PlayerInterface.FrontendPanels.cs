@@ -26,6 +26,35 @@ sealed partial class PlayerInterface
         if (id == "load" && UiMode == UiMode.Meitou) b.Positions["GamesList"] = new(x + 0.0102941f * w, (Height - h) / 2 + 0.135385f * h, 0.644118f * w, 0.69f * h);
     }
 
+    /// <summary>The Esc menu's CHEAT MENU button (Meitou), between OPTIONS and EXIT GAME.</summary>
+    public const string CheatMenuButton = "CheatMenuButton";
+
+    /// <summary>
+    /// The Esc menu with CHEAT MENU after OPTIONS: the panel one button row taller (centred as before), the buttons their old size on screen, those below OPTIONS a row lower.
+    /// </summary>
+    static MyGuiLayout WithCheatMenuButton(MyGuiLayout menu)
+    {
+        MyGuiWidget Walk(MyGuiWidget w)
+        {
+            if (w.Name != "MainMenuPopupPanel" || w.Children.FirstOrDefault(c => c.Name == "OptionsButton") is not { } options
+                || w.Children.FirstOrDefault(c => c.Name == "SaveGameButton") is not { } save) return w with { Children = [.. w.Children.Select(Walk)] };
+            float row = save.Position.Y - w.Children.First(c => c.Name == "NewGameButton").Position.Y;
+            float grow = 1 + row, shrink = 1 / grow;
+            var panel = w.Position with { Height = w.Position.Height * grow, Y = w.Position.Y - w.Position.Height * row / 2 };
+            var children = new List<MyGuiWidget>();
+            foreach (var c in w.Children)
+            {
+                float y = c.Position.Y > options.Position.Y ? c.Position.Y + row : c.Position.Y;
+                children.Add(c with { Position = c.Position with { Y = y * shrink, Height = c.Position.Height * shrink } });
+                if (c.Name == "OptionsButton")
+                    children.Add(c with { Name = CheatMenuButton, Properties = new Dictionary<string, string> { ["Caption"] = "CHEAT MENU" },
+                        Position = c.Position with { Y = (c.Position.Y + row) * shrink, Height = c.Position.Height * shrink } });
+            }
+            return w with { Position = panel, Children = children };
+        }
+        return menu with { Roots = [.. menu.Roots.Select(Walk)] };
+    }
+
     /// <summary>The load window with a Meitou row under its list: a tick that hides the base game's saves, styled as the reset tick (hidden in Faithful).</summary>
     static MyGuiLayout WithSaveFilter(MyGuiLayout load)
     {

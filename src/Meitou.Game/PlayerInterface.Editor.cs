@@ -28,6 +28,8 @@ sealed partial class PlayerInterface
         public int Index;
         public EditorTab Tab = EditorTab.Body;
         public bool Clothes = true;
+        /// <summary>Meitou: APPLY TO ALL is on; each edit of the shown character is made on every character in the editor too (each keeps the rest of its look).</summary>
+        public bool ApplyAll;
         public Dictionary<CharacterId, CharacterDraft> Drafts { get; } = [];
         public Dictionary<CharacterId, string> StartNames { get; } = [];
         public int Seed = Environment.TickCount;
@@ -288,9 +290,10 @@ sealed partial class PlayerInterface
             case "FaceTabButton": s.Tab = EditorTab.Face; return;
             case "HairTabButton": s.Tab = EditorTab.Hair; return;
             case "NameText" when e.Action == "text": draft.Name = e.Text; return;
-            case "RandomiseButton": draft.Randomise(s.Tab, s.Seed++); return;
-            case "RandomiseAllButton": draft.Randomise(null, s.Seed++); return;
-            case "ResetButton": draft.Reset(); return;
+            case ApplyAllButton: s.ApplyAll = !s.ApplyAll; return;
+            case "RandomiseButton": foreach (var d in Edited(s, draft)) d.Randomise(s.Tab, s.Seed++); return;
+            case "RandomiseAllButton": foreach (var d in Edited(s, draft)) d.Randomise(null, s.Seed++); return;
+            case "ResetButton": foreach (var d in Edited(s, draft)) d.Reset(); return;
             case "ClothesButton": s.Clothes = !s.Clothes; return;
             case "CharLeftArrow" or "CharRightArrow":
                 s.Index = (s.Index + (e.Widget == "CharLeftArrow" ? s.Characters.Count - 1 : 1)) % s.Characters.Count;
@@ -305,12 +308,15 @@ sealed partial class PlayerInterface
                 int step = e.Widget.Contains("Left", StringComparison.Ordinal) ? -1 : 1;
                 if (e.Widget.StartsWith("Race", StringComparison.Ordinal)) { g = (g + step + groups.Count) % groups.Count; r = 0; }
                 else r = (r + step + groups[g].Races.Count) % groups[g].Races.Count;
-                draft.SetRace(groups[g].Races[r], s.Seed++);
+                foreach (var d in Edited(s, draft)) d.SetRace(groups[g].Races[r], s.Seed++);
                 return;
             }
             case "GenderLeftButton" or "GenderRightButton" when creation:
-                draft.SetFemale(!draft.Female, s.Seed++);
+            {
+                bool female = !draft.Female;
+                foreach (var d in Edited(s, draft)) if (d == draft || !d.Race.GetBool("single gender")) d.SetFemale(female, s.Seed++);
                 return;
+            }
             case "ConfirmButton":
                 ConfirmEditor();
                 return;
@@ -327,7 +333,62 @@ sealed partial class PlayerInterface
         {
             if (e.Action == "scroll" && !control.IsPicker) draft.Set(control, control.Min + (int)MathF.Round(e.Value));
             else if (e.Action == "step" && control.IsPicker) draft.Step(control.Kind, (int)e.Value);
+            else return;
+            if (s.ApplyAll) Mirror(s, draft, control);
         }
+    }
+
+    /// <summary>The APPLY TO ALL toggle (Meitou), left of RANDOMISE ALL.</summary>
+    const string ApplyAllButton = "ApplyAllButton";
+
+    /// <summary>The drafts an edit is made on: the shown character's, and with APPLY TO ALL every other character's in the editor.</summary>
+    IEnumerable<CharacterDraft> Edited(EditorSession s, CharacterDraft shown)
+    {
+        yield return shown;
+        if (!s.ApplyAll) yield break;
+        foreach (var id in s.Characters)
+            if (id != s.Current && Draft(id) is { } other) yield return other;
+    }
+
+    /// <summary>
+    /// APPLY TO ALL: the control just changed on <paramref name="from"/> takes the same value on every other character's draft (the same control by kind and name; a picker
+    /// the same choice by record). A character whose race has no such control or choice is left as it is.
+    /// </summary>
+    void Mirror(EditorSession s, CharacterDraft from, EditorControl control)
+    {
+        string choice = control.IsPicker ? from.Options(control.Kind).ElementAtOrDefault(from.OptionIndex(control.Kind))?.StringId ?? "" : "";
+        int value = control.IsPicker ? 0 : from.Value(control);
+        foreach (var other in Edited(s, from).Skip(1))
+        {
+            if (other.Controls(s.Tab).FirstOrDefault(c => c.Kind == control.Kind && c.Label == control.Label) is not { } match) continue;
+            if (!match.IsPicker) { other.Set(match, value); continue; }
+            int index = other.Options(match.Kind).ToList().FindIndex(o => (o?.StringId ?? "") == choice);
+            if (index >= 0) other.SetOption(match.Kind, index);
+        }
+    }
+
+    /// <summary>
+    /// Meitou: the editor's bottom row with APPLY TO ALL first, the four buttons (APPLY TO ALL, RANDOMISE ALL, RANDOMISE, RESET) narrower than the original's three so
+    /// they fill the same row.
+    /// </summary>
+    static MyGuiLayout WithApplyToAll(MyGuiLayout layout)
+    {
+        string[] row = [ApplyAllButton, "RandomiseAllButton", "RandomiseButton", "ResetButton"];
+        const float Left = 0.0347f, Right = 0.9653f, Gap = 0.0139f;
+        float width = (Right - Left - Gap * (row.Length - 1)) / row.Length;
+        MyGuiWidget Walk(MyGuiWidget w)
+        {
+            var children = w.Children.Select(Walk).ToList();
+            if (children.FirstOrDefault(c => c.Name == "RandomiseAllButton") is { } template)
+            {
+                children.Insert(children.IndexOf(template), template with { Name = ApplyAllButton, Properties = new Dictionary<string, string> { ["Caption"] = "APPLY TO ALL" } });
+                for (int i = 0; i < children.Count; i++)
+                    if (Array.IndexOf(row, children[i].Name) is var k and >= 0)
+                        children[i] = children[i] with { Align = "Left Bottom", Position = new(Left + k * (width + Gap), template.Position.Y, width, template.Position.Height) };
+            }
+            return w with { Children = children };
+        }
+        return layout with { Roots = [.. layout.Roots.Select(Walk)] };
     }
 
 
@@ -474,7 +535,7 @@ sealed partial class PlayerInterface
     {
         if (editor is not { } s || Draft(s.Current) is not { } draft || EditorData is not { } data) return;
         bool creation = s.Kind == EditKind.Creation;
-        foreach (string name in new[] { "BodyTabButton", "FaceTabButton", "HairTabButton", "RandomiseButton", "RandomiseAllButton", "ResetButton", "ClothesButton", "ConfirmButton" })
+        foreach (string name in new[] { ApplyAllButton, "BodyTabButton", "FaceTabButton", "HairTabButton", "RandomiseButton", "RandomiseAllButton", "ResetButton", "ClothesButton", "ConfirmButton" })
         { b.Disabled.Remove(name); b.Actions[name] = name; }
         // Race, subrace and gender arrows: only at creation, and only where there is a choice (FUN_1405ee0c0); hidden otherwise.
         var groups = EditorRaces(data.Db);
@@ -497,6 +558,8 @@ sealed partial class PlayerInterface
         foreach (var (name, key) in EditorCaptions) b.Text[name] = Loc.Tr(key).ToUpperInvariant();
         string tabButton = s.Tab switch { EditorTab.Face => "FaceTabButton", EditorTab.Hair => "HairTabButton", _ => "BodyTabButton" };
         b.Properties[tabButton] = new Dictionary<string, string> { ["Checked"] = "true" };
+        b.Text[ApplyAllButton] = "APPLY TO ALL";
+        b.Properties[ApplyAllButton] = new Dictionary<string, string> { ["Checked"] = s.ApplyAll ? "true" : "false" };
         b.Properties["ClothesButton"] = new Dictionary<string, string> { ["Checked"] = s.Clothes ? "true" : "false", ["StateSelected"] = s.Clothes ? "true" : "false" };
         var everyRace = CharacterDraft.PlayableRaces(data.Db);
         int shown = IndexOf(everyRace, draft.Race);

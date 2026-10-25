@@ -128,8 +128,7 @@ sealed partial class GameHost
                         (population.KeepRoamers, population.OffscreenFights, population.OffscreenHealing, population.CampaignAncestorsOnce, population.KeepWild, population.ResidentSchedule) = (config.KeepRoamers, config.OffscreenFights, config.OffscreenHealing, config.CampaignAncestorsOnce, config.KeepWild, config.ResidentSchedule);
                 },
             };
-        var cheats = new CheatMenu(player, () => session.World, () => scene.Database, () => popData, () => session.Camera.Current.Target,
-            () => session.Bindings.Get(InputAction.ToggleCheatMenu) is { Count: > 0 } keys ? keys[0].ToString() : "unbound");
+        var cheats = new CheatMenu(player, () => session.World, () => scene.Database, () => popData, () => session.Camera.Current.Target);
         bool cheatDrag = false;
         void ApplyCameraRotateSpeed(float speed) => session.Camera.Settings.RotateSpeedX = session.Camera.Settings.RotateSpeedY =
             Math.Clamp(speed, UserConfig.MinCameraRotateSpeed, UserConfig.MaxCameraRotateSpeed);
@@ -259,12 +258,8 @@ sealed partial class GameHost
                 if ((k == SilkKey.KeypadEnter ? EngineKey.Enter : KeyMap.Map(k)) is { } pickerKey) sandboxPicker.KeyDown(pickerKey);
                 return;
             }
-            // F1 (rebindable) opens the cheat menu; while a text box of it is focused it takes every key, otherwise only Esc.
-            if (KeyMap.Map(k) is { } cheatKey)
-            {
-                if (!cheats.TakesKeyboard && !shiftDown && session.Bindings.Get(InputAction.ToggleCheatMenu).Contains(Binding.Of(cheatKey)) && !g.NoPopulation) { cheats.Visible = !cheats.Visible; return; }
-                if (cheats.KeyDown(k == SilkKey.KeypadEnter ? EngineKey.Enter : cheatKey)) return;
-            }
+            // The cheat menu (opened from the Esc menu): while a text box of it is focused it takes every key, otherwise only Esc.
+            if (KeyMap.Map(k) is { } cheatKey && cheats.KeyDown(k == SilkKey.KeypadEnter ? EngineKey.Enter : cheatKey)) return;
             // F10 (rebindable) opens the debug menu, which then takes every key until it closes.
             if (KeyMap.Map(k) is { } mapped && session.Bindings.Get(InputAction.ToggleDebugMenu).Contains(Binding.Of(mapped))) { debugMenuOpen = !debugMenuOpen; return; }
             if (debugMenuOpen)
@@ -415,6 +410,7 @@ sealed partial class GameHost
             else if (e.Action == "new-game") newGameRequested = e.Text;
             else if (e.Action == "main-menu") mainMenuRequested = true;
             else if (e.Widget == "OptionsButton" && panel is not null) panel.Visible = true;
+            else if (e.Widget == PlayerInterface.CheatMenuButton && !g.NoPopulation) cheats.Visible = true;
             else if (e.Widget == "ExitGameButton") quit = true;
         };
         bool cinemaWasPlaying = false, cinemaWasRecording = false;

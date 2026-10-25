@@ -205,7 +205,7 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
         if (page == 3)
             result.Add(new(CameraRotateSpeed.Label, "How fast the rotate and tilt keys and the mouse turn the camera (the game: 6).", Slider: CameraRotateSpeed));
         if (page == 3)
-            foreach (var action in Enum.GetValues<InputAction>().Where(a => a != InputAction.Quit && a != InputAction.ToggleFps))
+            foreach (var action in Enum.GetValues<InputAction>().Where(a => a != InputAction.Quit && a != InputAction.ToggleFps && a != InputAction.ToggleCheatMenu))
                 result.Add(new(ActionLabel(action), BindingHint(action), Binding: action));
         if (page == 5)
         {

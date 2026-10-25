@@ -156,7 +156,7 @@ public sealed class InputBindings
         Set(InputAction.QuickSave, Key.F5);
         Set(InputAction.QuickLoad, Key.F9);
         Set(InputAction.ToggleDebugMenu, Key.F10);
-        Set(InputAction.ToggleCheatMenu, Key.F1);
+        Set(InputAction.ToggleCheatMenu);   // unused: the cheat menu opens from the Esc menu
         Set(InputAction.ToggleStats, Key.F11);
         Set(InputAction.CycleProfiler, Key.F12);
         Set(InputAction.Quit, Key.Escape);

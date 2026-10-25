@@ -238,9 +238,6 @@ sealed partial class CheatMenu
 
         Surface(bounds, "window");
         Text("Cheat Menu", R(20, 6, 300, 32), 22, LightInk);
-        var key = R(156, 15, 40, 16);
-        Rect(key, new(0.05f, 0.04f, 0.03f, 1)); Outline(key, MainInk with { W = 0.18f });
-        Text(closeKey().ToUpperInvariant(), key, 10, LightInk, "Center");
         var close = R(1069, 6, 31, 32);
         controls.Add(new("cheat-close", "Button", close, "", "cheat:close", "Kenshi_CloseButtonSkin", true, new Dictionary<string, string>(), Vector4.Zero));
         hits.Add(new(close, () => Visible = false));
@@ -281,7 +278,7 @@ sealed partial class CheatMenu
 
         Rect(R(20, 676, 1080, 1), MainInk with { W = 0.12f });
         if (notice.Length > 0 && Environment.TickCount64 - noticeAt < 8000) Text(notice, R(20, 684, 700, 28), 12, Brass);
-        Text($"Game keeps running · Esc or {closeKey()} closes", R(700, 684, 260, 28), 11, MutedInk, "Right VCenter");
+        Text("Game keeps running · Esc closes", R(700, 684, 260, 28), 11, MutedInk, "Right VCenter");
         Button("Close", R(980, 684, 120, 28), () => Visible = false);
 
         if (openDropdown is { } open) DrawDropdown(open);

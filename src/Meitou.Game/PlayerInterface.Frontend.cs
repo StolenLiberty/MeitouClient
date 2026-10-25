@@ -119,6 +119,7 @@ sealed partial class PlayerInterface
                 case "LoadGameButton": if (!(title && wasOpen)) OpenSlots("load"); break;
                 case "ImportGameButton": if (!wasOpen) { advancedOpen = false; OpenSlots("import"); } break;
                 case "OptionsButton": ScreenAction?.Invoke(e); break;
+                case CheatMenuButton: faithfulScreens.Close("menu"); UpdateMenuPause(); ScreenAction?.Invoke(e); break;
                 case "CreditsButton": showCredits = true; creditsStart = System.Diagnostics.Stopwatch.GetTimestamp(); break;
                 case "ContinueButton": if (slots.FirstOrDefault() is { } last) ScreenAction?.Invoke(new("load", "LoadButton", "load", last.Folder)); break;
                 case "ExitButton": Confirm("EXIT", "Are you sure you want to exit?", () => ScreenAction?.Invoke(new("menu", "ExitGameButton", "exit"))); break;
@@ -217,7 +218,7 @@ sealed partial class PlayerInterface
             if (id == "menu")
             {
                 Enable("ExitGameButton", "ResumeButton");
-                if (session.World.Player.Exists) Enable("SaveGameButton");
+                if (session.World.Player.Exists) Enable("SaveGameButton", CheatMenuButton);
                 return true;
             }
             Enable("ExitButton", "CreditsButton");

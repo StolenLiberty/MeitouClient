@@ -10,12 +10,12 @@ using Meitou.Simulation;
 namespace Meitou.Game;
 
 /// <summary>
-/// The cheat menu (F1, rebindable; Meitou only): character, health, skills, items, factions and world cheats in the Meitou UI kit's window, an overhaul of the
+/// The cheat menu (the Esc menu's CHEAT MENU; Meitou only): character, health, skills, items, factions and world cheats in the Meitou UI kit's window, an overhaul of the
 /// RE_Kenshi "Cheat Menu" plugin (Workshop 3706407417). Every change is a <see cref="DebugCommand"/> (Meitou.Simulation/CheatCommands.cs), applied between ticks,
 /// also while paused. The game keeps running while it is open; it takes the mouse over its window and the keyboard only while a text field is focused.
 /// </summary>
 sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<GameDatabase?> database, Func<PopulationData?> population,
-    Func<Vector3> cameraTarget, Func<string> closeKey)
+    Func<Vector3> cameraTarget)
 {
     enum Page { Character, Health, Skills, Items, Factions, World }
     enum Target { Selected, Inspected, Squad }
