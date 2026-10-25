@@ -214,6 +214,7 @@ sealed partial class PlayerInterface
         SyncLimbsScreen();
         SyncDialogueScreen();
         SyncCharacterTradeScreen();
+        SyncTownClaimPrompt();
         ValidateInventoryDrag();
         var b = BindUi();
         faithfulScreens.FocusRing = UiMode == UiMode.Meitou;

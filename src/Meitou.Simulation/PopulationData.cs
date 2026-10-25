@@ -94,8 +94,19 @@ public sealed class PopulationData
     /// Worlds built on the same data share it.
     /// </summary>
     public FactionRelations Relations { get; init; } = FactionRelations.Build([]);
-    /// <summary>The faction of every placed town, a position in <see cref="Factions"/> (-1: none).</summary>
-    public IReadOnlyList<int> SiteFactions { get; init; } = [];
+    /// <summary>
+    /// The faction that owns every placed town now, a position in <see cref="Factions"/> (-1: none): its TOWN <c>faction</c> (<see cref="TownFactions"/>) unless the player claimed it
+    /// (<see cref="Towns.TownClaimSystem"/>, which resets it for every new world, as worlds share this data).
+    /// </summary>
+    public IReadOnlyList<int> SiteFactions => siteFactions;
+    int[] siteFactions = [];
+    /// <summary>The faction of every placed town's TOWN record (-1: none): whose residents it makes and keeps, whoever owns it now.</summary>
+    public IReadOnlyList<int> TownFactions { get => townFactions; init { townFactions = [.. value]; siteFactions = [.. value]; } }
+    int[] townFactions = [];
+    /// <summary>Gives <paramref name="site"/> to <paramref name="faction"/> (-1: nobody). Serial phases only.</summary>
+    public void SetSiteFaction(int site, int faction) { if (site >= 0 && site < siteFactions.Length) siteFactions[site] = faction; }
+    /// <summary>Every town back to its TOWN record's faction (a new world: no claims).</summary>
+    public void ResetSiteFactions() => Array.Copy(townFactions, siteFactions, townFactions.Length);
 
     /// <summary>The nearest placed town whose radius holds a point (the game's position lookup, <c>FUN_140928890</c>), -1 when none.</summary>
     public int TownAt(Vector3 p)
@@ -255,7 +266,7 @@ public sealed class PopulationData
         {
             Db = db, Sites = sites, Factions = factions, Appearances = appearances, Biomes = biomes, Roads = roads is null ? null : new RoadNetwork(roads), BodyOptions = bodyOptions ?? BodyOptions.Default, PlayerFaction = player,
             Relations = relations,
-            SiteFactions = [.. sites.Select(s => s.Town.Faction is { } fid ? byId.GetValueOrDefault(fid, -1) : -1)],
+            TownFactions = [.. sites.Select(s => s.Town.Faction is { } fid ? byId.GetValueOrDefault(fid, -1) : -1)],
         };
     }
 }

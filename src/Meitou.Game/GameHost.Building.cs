@@ -244,7 +244,7 @@ sealed partial class GameHost
                     foreach (var site in d.Sites)
                     {
                         // A building whose state names no owner belongs to its town's faction (the original re-owns a town's buildings to it).
-                        string? townOwner = site.Index < d.SiteFactions.Count && d.SiteFactions[site.Index] is >= 0 and var townFaction && townFaction < d.Factions.Count ? d.Factions[townFaction].Name : null;
+                        string? townOwner = site.Index < d.TownFactions.Count && d.TownFactions[site.Index] is >= 0 and var townFaction && townFaction < d.Factions.Count ? d.Factions[townFaction].Name : null;
                         foreach (var b in site.Buildings)
                             townOf[(b.Zone, b.InstanceId)] = (site.Town.Name, b.OwnerFactionId is { } id ? d.Factions.FirstOrDefault(f => f.Id == id)?.Name ?? townOwner : townOwner);
                     }
@@ -286,7 +286,7 @@ sealed partial class GameHost
             levelOwners = new(StringComparer.Ordinal);
             foreach (var site in d.Sites)
             {
-                string? townOwner = site.Index < d.SiteFactions.Count && d.SiteFactions[site.Index] is >= 0 and var f && f < d.Factions.Count ? d.Factions[f].Id : null;
+                string? townOwner = site.Index < d.TownFactions.Count && d.TownFactions[site.Index] is >= 0 and var f && f < d.Factions.Count ? d.Factions[f].Id : null;
                 foreach (var b in site.Buildings) levelOwners[b.Key] = (b.InstanceId, b.OwnerFactionId ?? townOwner);
             }
         }

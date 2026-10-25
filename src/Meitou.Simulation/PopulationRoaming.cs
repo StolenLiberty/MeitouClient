@@ -512,7 +512,7 @@ public sealed partial class PopulationSystem
         foreach (var site in data.Sites)
         {
             if (states[site.Index].Status != SiteStatus.Loaded || site.Town.RoamingSquads.Count == 0) continue;
-            int factionIndex = data.SiteFactions[site.Index];
+            int factionIndex = data.TownFactions[site.Index];   // the record's: a claimed town keeps making its own roaming squads
             if (factionIndex < 0) continue;
             int cap = (int)MathF.Floor(settings.RoamingShare * data.Factions[factionIndex].RoamingPopulation * settings.PopulationMultiplier);
             int members = 0;

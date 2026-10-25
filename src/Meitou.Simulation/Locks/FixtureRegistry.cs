@@ -102,7 +102,8 @@ public sealed partial class FixtureRegistry
     public void RegisterSite(World world, PopulationData data, int site)
     {
         if (site < 0 || site >= data.Sites.Count || !sites.Add(site)) return;
-        int townFaction = site < data.SiteFactions.Count ? data.SiteFactions[site] : -1;
+        // The record's faction: claiming a town (Towns.TownClaimSystem) leaves its buildings their owners', loaded or not.
+        int townFaction = site < data.TownFactions.Count ? data.TownFactions[site] : -1;
         foreach (var b in data.Sites[site].Buildings)
         {
             RegisterBuilding(world, data, site, b, townFaction);

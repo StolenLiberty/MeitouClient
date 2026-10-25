@@ -522,6 +522,19 @@ on their way to {2}" (not hostile), "{1} against {2} has been defeated" (its lea
 world state, ownership, building or town state changes; looting or occupation are only what the loaded `pt2` packages do. In
 every message {1} is the campaign's name and {2} the target town's (the cancel message has only {1}; **Observed**).
 
+### Claiming towns (Meitou; the RE_Kenshi plugin Town Ownership)
+
+The original has no way to take a town. The RE_Kenshi plugin Town Ownership ("Conquest", Workshop 3750141111, closed source) adds one; Meitou's `Towns.TownClaimSystem` follows
+its Workshop description and its DLL's strings (**Observed**, not traced): a settings window on `'` (claim by **Defeat the ruler** or **Clear entire settlement**, CLAIM RUINED
+TOWN, DISMISS CURRENT TOWN), a YES / NO prompt "You have defeated X, the ruler of T. Would you like to claim this town?", and claiming calls `TownBase::setFaction(player)` only.
+- Ruler: the town's resident of its faction with the highest bounty (Meitou: a unique character wins a tie; none with no bounty). The plugin's search also looks at the town's
+  unique boss squads' leaders; how that ranks against bounty is **Unknown**. It counts when a player character's blow downed it.
+- Clear: at least 70 % of the town's own squads' members down or dead. Ruined: none of them alive.
+- Meitou keeps the owner apart from the record: `PopulationData.SiteFactions` is the owner (relations, dialogue conditions, campaigns, caravans, the map's owner), `TownFactions`
+  the TOWN record's, which still makes the residents, roaming and bar squads, owns the buildings and sets the culture prices, so a claim changes no building or resident.
+- Saved in the save (CAMERA `meitou claim method`, `meitou claim<i>` = the town's placement id, `meitou claim from<i>` = the FACTION it was taken from); the plugin kept a
+  `TownOwnership.claims` file shared by every save and re-applied it as towns loaded.
+
 ### 9. Settings and constants that matter
 
 | Name | Value | Effect |

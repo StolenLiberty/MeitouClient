@@ -62,6 +62,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
             if (visible == value) return;
             visible = value;
             dragging = null; focused = null; openDropdown = null;
+            if (!value) townsMode = false;
             if (value) { scroll = scrollTarget = 0; RefreshFields(); }
         }
     }
@@ -76,6 +77,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
     long Now => world().Tick;
 
     void Send(DebugCommand command) => world().Commands.Enqueue(command);
+    void Send(Meitou.Simulation.Towns.TownCommand command) => world().Commands.Enqueue(command);
 
     // ------------------------------------------------------------------ targets
 

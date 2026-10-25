@@ -255,6 +255,10 @@ public sealed record WorldSnapshot(long Tick, IReadOnlyList<CharacterSnapshot> C
     /// <summary>The item on the mouse (<see cref="PlayerState.Held"/>), null for none, and the serial of the last held-item command applied (<see cref="PlayerState.HeldSerial"/>).</summary>
     public Items.HeldItemView? Held { get; init; }
     public long HeldSerial { get; init; }
+    /// <summary>The town claim prompt waiting for an answer (<see cref="Towns.TownClaimSystem"/>), the way towns are won, and the claimed towns (sites).</summary>
+    public Towns.TownClaimOffer? TownOffer { get; init; }
+    public Towns.TownClaimMethod TownClaimMethod { get; init; }
+    public IReadOnlyList<int> ClaimedTowns { get; init; } = [];
     /// <summary>Player-built buildings and construction sites, in creation order (docs/simulation.md "Buildings").</summary>
     public IReadOnlyList<Construction.BuildingSnapshot> Buildings { get; init; } = [];
     /// <summary>Bumped when a building is added, completed, destroyed or removed (not on progress): the host diffs <see cref="Buildings"/> by id when it changes.</summary>

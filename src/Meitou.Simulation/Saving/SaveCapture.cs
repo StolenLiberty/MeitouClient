@@ -91,6 +91,7 @@ public static partial class SaveCapture
         camera.Record.Bools["bl"] = world.Player.BanditsLoot;
         BedSave.Write(camera.Record, world);
         camera.Record.Strings[SaveLoader.SeedKey] = world.Seed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (world.SystemOf<Towns.TownClaimSystem>() is { } towns) Towns.TownClaimSave.Write(camera.Record, towns, data);
         if (options.View is { } view)
         {
             // FUN_1406b0740: the pivot's position and orientation, the camera's local z, alt and the tracked object; Meitou's camera follows nobody.
@@ -558,7 +559,7 @@ public static partial class SaveCapture
             }
             var record = platoon.Record;
             record.Strings["basetown"] = site.Town.Id;
-            int siteFaction = data.SiteFactions.Count > town ? data.SiteFactions[town] : -1;
+            int siteFaction = data.TownFactions.Count > town ? data.TownFactions[town] : -1;   // the record's: a claimed town's residents are still its own
             // `sqt` is the town pool it counts against: 1 residents (and bar squads), 2 roaming (docs/formats/save.md "NPC platoons").
             record.Ints["sqt"] = roaming ? 2 : 1;
             // Residents and bar squads are persistent (the original keeps them off screen, docs/game/factions-squads-towns.md "Persistent platoons"), roaming ones not but

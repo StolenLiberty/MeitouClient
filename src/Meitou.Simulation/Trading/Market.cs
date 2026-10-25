@@ -96,7 +96,7 @@ public sealed class Market
     {
         if ((uint)trader.Site >= (uint)data.Sites.Count) return 1;
         if (SiteCulture(trader.Site) is { } town && town.TryPrice(record, out float f)) return f;
-        return FactionCulture(data.SiteFactions[trader.Site]) is { } owner && owner.TryPrice(record, out f) ? f : 1;
+        return FactionCulture(data.TownFactions[trader.Site]) is { } owner && owner.TryPrice(record, out f) ? f : 1;
     }
 
     /// <summary>

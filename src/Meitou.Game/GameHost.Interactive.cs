@@ -260,6 +260,9 @@ sealed partial class GameHost
             }
             // The cheat menu (opened from the Esc menu): while a text box of it is focused it takes every key, otherwise only Esc.
             if (KeyMap.Map(k) is { } cheatKey && cheats.KeyDown(k == SilkKey.KeypadEnter ? EngineKey.Enter : cheatKey)) return;
+            // ' (rebindable) opens the Town Ownership window, the plugin's key.
+            if (KeyMap.Map(k) is { } townKey && !TextFieldFocused() && !g.NoPopulation && !player.TitleOpen && !player.EditorOpen && session.World.Player.Exists
+                && session.Bindings.Get(InputAction.ToggleTownOwnership).Contains(Binding.Of(townKey))) { cheats.Open(towns: true); return; }
             // F10 (rebindable) opens the debug menu, which then takes every key until it closes.
             if (KeyMap.Map(k) is { } mapped && session.Bindings.Get(InputAction.ToggleDebugMenu).Contains(Binding.Of(mapped))) { debugMenuOpen = !debugMenuOpen; return; }
             if (debugMenuOpen)
@@ -410,7 +413,7 @@ sealed partial class GameHost
             else if (e.Action == "new-game") newGameRequested = e.Text;
             else if (e.Action == "main-menu") mainMenuRequested = true;
             else if (e.Widget == "OptionsButton" && panel is not null) panel.Visible = true;
-            else if (e.Widget == PlayerInterface.CheatMenuButton && !g.NoPopulation) cheats.Visible = true;
+            else if (e.Widget == PlayerInterface.CheatMenuButton && !g.NoPopulation) cheats.Open(towns: false);
             else if (e.Widget == "ExitGameButton") quit = true;
         };
         bool cinemaWasPlaying = false, cinemaWasRecording = false;

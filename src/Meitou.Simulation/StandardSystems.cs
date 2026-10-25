@@ -209,6 +209,8 @@ public static class StandardSystems
             if (captives is not null && library.IndexOf(Meitou.Simulation.Kidnap.CaptiveSystem.ChopClip) is >= 0 and var chop) captives.ChopSeconds = lengths.Of(library.Definitions[chop].Clip);
         }
         if (Has(StandardParts.Feed)) systems.Add(new FeedSystem(data.Items, o.Feed));
+        // Town Ownership (claiming towns): with the population (whose loaded towns it looks at) and the player.
+        if (population is not null && Has(StandardParts.Player)) systems.Add(new Meitou.Simulation.Towns.TownClaimSystem(data));
         if (Has(StandardParts.Retaliation)) systems.Add(new RetaliationSystem(combat!));
         AggroSystem? aggro = null;
         if (Has(StandardParts.Aggro)) systems.Add(aggro = new AggroSystem(data.Relations, o.Aggro) { Combat = combat });

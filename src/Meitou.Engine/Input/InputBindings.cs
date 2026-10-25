@@ -47,6 +47,8 @@ public enum InputAction
     ToggleCheatMenu,
     /// <summary>Meitou: turns the item on the mouse a quarter (R; the original cannot rotate items). Appended, so the earlier actions keep their numbers.</summary>
     RotateItem,
+    /// <summary>Meitou: the Town Ownership window (', the RE_Kenshi plugin Town Ownership's key). Appended.</summary>
+    ToggleTownOwnership,
 }
 
 /// <summary>The actions of one tick: for each, held, pressed or released this tick, plus the mouse movement and wheel.</summary>
@@ -163,6 +165,7 @@ public sealed class InputBindings
         Set(InputAction.CycleProfiler, Key.F12);
         Set(InputAction.Quit, Key.Escape);
         Set(InputAction.RotateItem, Key.R);   // only while an item is held, when it takes the key before stop_movement
+        Set(InputAction.ToggleTownOwnership, Key.Apostrophe);
     }
 
     /// <summary>

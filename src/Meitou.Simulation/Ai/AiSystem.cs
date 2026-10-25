@@ -1162,7 +1162,7 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
     /// <summary>A squad made from one of its town's <c>bar squads</c> entries (the original gives it no home; Meitou keeps it at the bar, not in a free building with beds).</summary>
     bool IsBarSquad(Squad squad)
     {
-        int f = squad.Town < data.SiteFactions.Count ? data.SiteFactions[squad.Town] : -1;
+        int f = squad.Town < data.TownFactions.Count ? data.TownFactions[squad.Town] : -1;   // the record's (a claimed town's bar squads are still its own)
         return PopulationSystem.BarEntries(data.Sites[squad.Town].Town, f >= 0 ? data.Factions[f] : null).Any(e => e.Id == squad.TemplateId);
     }
 

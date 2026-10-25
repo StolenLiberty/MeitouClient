@@ -113,6 +113,7 @@ sealed partial class SettingsMenu
         InputAction.ToggleSettings => "Open or close this settings dialog.",
         InputAction.ToggleDebugMenu => "Open or close the debug menu: teleport, spawn, items, money, heal and damage.",
         InputAction.ToggleCheatMenu => "Unused.",
+        InputAction.ToggleTownOwnership => "Open the Town Ownership window: how towns are claimed, claim a ruined town, give back a town you own.",
         InputAction.RotateItem => "Turn the item you are holding in the inventory sideways (it goes into weapon and armour slots upright).",
         InputAction.ToggleStats => "Show or hide frame statistics.",
         InputAction.CycleProfiler => "Cycle GPU, CPU and hidden profiler views.",

@@ -67,6 +67,7 @@ public static class SaveLoader
         var playerFaction = save.PlayerFaction;
         int playerIndex = playerFaction is not null && data.FactionIndex(playerFaction.Id) is var pi and >= 0 ? pi : data.PlayerFaction;
         world.Player.Faction = playerIndex;
+        if (world.SystemOf<Towns.TownClaimSystem>() is { } towns) Towns.TownClaimSave.Read(camera.Record, towns, world, data);
         world.Player.Money = camera.PlayerMoney;
         // A renamed player faction (the CAMERA's name differs from the data's).
         world.Player.FactionName = camera.PlayerFactionName is { Length: > 0 } savedName && playerIndex >= 0 && savedName != data.Factions[playerIndex].Name ? savedName : null;
@@ -275,7 +276,7 @@ public static class SaveLoader
         var (package, job) = data.Db.Find(platoon.SquadTemplate) is { } templateRecord && SquadFactory.IsTemplate(templateRecord)
             ? Ai.PlatoonJobs.For(data.Ai, Meitou.Data.Gameplay.SquadTemplate.From(templateRecord), saved) : (null, Ai.PlatoonJob.None);
         // Town-bound platoons are the town's own: its residents, bar squads, slaves and farm animals. They stay home, and the town makes none of its own.
-        int siteFaction = data.SiteFactions.Count > origin ? data.SiteFactions[origin] : -1;
+        int siteFaction = data.TownFactions.Count > origin ? data.TownFactions[origin] : -1;   // the record's: a claimed town's residents are still its own
         bool travels = campaign || Travels(platoon, job, data.Sites[origin].Town, siteFaction >= 0 ? data.Factions[siteFaction] : null);
         int faction = data.FactionIndex(platoon.FactionId);
         // A platoon without characters (no file, or none in it) has nothing to make: a town's stays in the save as it is, a travelling one is a stand-in whose members the

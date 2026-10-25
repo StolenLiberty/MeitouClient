@@ -142,7 +142,7 @@ public sealed partial class PopulationSystem
         {
             if (p.Origin != site || !p.Pinned || p.State != PlatoonState.Unloaded) continue;
             // Residents only: the pool counts them (base saves: <c>pop</c> = the resident platoons' size, not the bar squads').
-            if (p.Faction != data.SiteFactions[site]) continue;   // and of the town's faction (save 2: Squin's 36 = its Shek residents, without a Tech Hunters shop)
+            if (p.Faction != data.TownFactions[site]) continue;   // and of the town's faction (save 2: Squin's 36 = its Shek residents, without a Tech Hunters shop)
             if (p.Stored is { HomeBuilding: null } || p.Saved is { } r && !r.Source.Record.Bools.GetValueOrDefault("is resident")) continue;
             int size, living;
             if (p.Stored is { } stored) (size, living) = (p.Size, stored.Members.Count(m => m.Cold.Medical is not { Dead: true }));
