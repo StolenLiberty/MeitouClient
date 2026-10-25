@@ -202,7 +202,18 @@ sealed partial class CheatMenu
         ("LABOUR", [(StatsEnumerated.Labouring, "Labouring"), (StatsEnumerated.Farming, "Farming"), (StatsEnumerated.Cooking, "Cooking")]),
     ];
 
-    float setAll = 0.5f;
+    /// <summary>The skills sliders run 0 to this; a typed value (click the number) goes up to <see cref="CheatSetStat.Max"/>.</summary>
+    const float SkillSliderMax = 200;
+    float setAll = 0.25f;
+    readonly Dictionary<StatsEnumerated, Field> statFields = [];
+    readonly Field setAllField = new("setall", numeric: true);
+
+    Field StatField(StatsEnumerated stat, IReadOnlyList<CharacterId> ids)
+    {
+        if (!statFields.TryGetValue(stat, out var field))
+            statFields[stat] = field = new Field("stat" + (int)stat, text => { Send(new CheatSetStat(Targets(), stat, Math.Clamp(Parse(text, 0), 0, CheatSetStat.Max)) { Tick = Now }); focused = null; }, numeric: true);
+        return field;
+    }
 
     float DrawSkills()
     {
@@ -217,12 +228,16 @@ sealed partial class CheatMenu
         }
         Card(C(212, 46, 888, 44), clip);
         Text("Set all to", C(226, 46, 110, 44), 14, clip: clip);
-        float all = Slider("setall", C(340, 46, 380, 44), setAll, f => setAll = f, clip);
-        Text(Number(MathF.Round(all * 100)), C(724, 46, 40, 44), 13, LightInk, "Right VCenter", clip);
-        Button("Apply", C(780, 54, 140, 28), () => { Send(new CheatSetStat(ids, StatsEnumerated.None, MathF.Round(setAll * 100)) { Tick = Now }); Notice($"Every skill set to {MathF.Round(setAll * 100)}."); }, clip: clip);
-        Button("Max all", C(928, 54, 158, 28), () => { Send(new CheatSetStat(ids, StatsEnumerated.None, 100) { Tick = Now }); Notice("Every skill 100."); }, clip: clip);
+        float all = Slider("setall", C(340, 46, 360, 44), setAll, f => { setAll = f; setAllField.Text = Number(MathF.Round(f * SkillSliderMax)); }, clip);
+        if (setAllField.Text.Length == 0 && !ReferenceEquals(focused, setAllField)) setAllField.Text = Number(MathF.Round(setAll * SkillSliderMax));
+        if (Dragging("setall")) setAllField.Text = Number(MathF.Round(all * SkillSliderMax));
+        EditField(setAllField, C(708, 53, 64, 30), "", clip);
+        float Wanted() => Math.Clamp(Parse(setAllField.Text, setAll * SkillSliderMax), 0, CheatSetStat.Max);
+        Button("Apply", C(780, 54, 140, 28), () => { float v = Wanted(); Send(new CheatSetStat(ids, StatsEnumerated.None, v) { Tick = Now }); focused = null; Notice($"Every skill set to {Number(v)}."); }, clip: clip);
+        Button("Max all (100)", C(928, 54, 158, 28), () => { Send(new CheatSetStat(ids, StatsEnumerated.None, 100) { Tick = Now }); Notice("Every skill 100."); }, clip: clip);
+        Text("Drag up to 200, or click a number to type any value up to 1000.", C(212, 92, 888, 16), 11, MutedInk, clip: clip);
 
-        float[] columnY = [104, 104];
+        float[] columnY = [116, 116];
         int[] columnOf = [0, 0, 1, 1, 0, 0, 1, 1];
         for (int g = 0; g < StatGroups.Length; g++)
         {
@@ -236,8 +251,17 @@ sealed partial class CheatMenu
             {
                 var s = stat;
                 Text(name, C(x + 14, y, 150, 30), 14, clip: clip);
-                float v = Slider("stat" + (int)s, C(x + 170, y + 3, 200, 24), stats[s] / 100f, f => Send(new CheatSetStat(ids, s, MathF.Round(f * 100)) { Tick = Now }), clip);
-                Text(Number(Dragging("stat" + (int)s) ? MathF.Round(v * 100) : stats[s]), C(x + 374, y, 46, 30), 13, LightInk, "Right VCenter", clip);
+                float v = Slider("stat" + (int)s, C(x + 170, y + 3, 190, 24), stats[s] / SkillSliderMax, f => Send(new CheatSetStat(ids, s, MathF.Round(f * SkillSliderMax)) { Tick = Now }), clip);
+                var field = StatField(s, ids);
+                var numberAt = C(x + 366, y + 3, 56, 24);
+                if (ReferenceEquals(focused, field)) EditField(field, numberAt, "", clip);
+                else
+                {
+                    float shown = Dragging("stat" + (int)s) ? MathF.Round(v * SkillSliderMax) : stats[s];
+                    if (Hovered(numberAt, clip)) Rect(numberAt, MainInk with { W = 0.08f }, clip);
+                    Text(Number(shown), numberAt with { Width = numberAt.Width - 4 * scale }, 13, shown > 100 ? Good : LightInk, "Right VCenter", clip);
+                    if (Clickable(numberAt, clip)) hits.Add(new(numberAt, () => { field.Text = Number(stats[s]); focused = field; openDropdown = null; }));
+                }
                 y += 30;
             }
             columnY[col] = y + 18;

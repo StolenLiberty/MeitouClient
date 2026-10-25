@@ -27,8 +27,14 @@ public sealed record CheatRegrowLimbs(IReadOnlyList<CharacterId> Characters, boo
 /// <summary>Sets the blood (clamped to 0 .. the character's capacity) and/or the hunger (0 .. <see cref="MedicalState.MaxHunger"/>); null: unchanged.</summary>
 public sealed record CheatSetVitals(IReadOnlyList<CharacterId> Characters, float? Blood = null, float? Hunger = null) : DebugCommand;
 
-/// <summary>Sets one stat (<see cref="Stat"/>) or, with <see cref="StatsEnumerated.None"/>, every stat the menu lists, to <see cref="Value"/> (0 to 100).</summary>
-public sealed record CheatSetStat(IReadOnlyList<CharacterId> Characters, StatsEnumerated Stat, float Value) : DebugCommand;
+/// <summary>
+/// Sets one stat (<see cref="Stat"/>) or, with <see cref="StatsEnumerated.None"/>, every stat the menu lists, to <see cref="Value"/> (0 to <see cref="Max"/>). Above 100 is allowed:
+/// the game stores and uses such stats (XP even raises them further, <see cref="CharacterStats.CoreGain"/>).
+/// </summary>
+public sealed record CheatSetStat(IReadOnlyList<CharacterId> Characters, StatsEnumerated Stat, float Value) : DebugCommand
+{
+    public const float Max = 1000;
+}
 
 /// <summary>Renames a character (trimmed; at most 64 characters; empty is refused).</summary>
 public sealed record CheatRename(CharacterId Character, string Name) : DebugCommand;
@@ -133,7 +139,7 @@ static class CheatApply
                 foreach (var id in stat.Characters)
                 {
                     if (!table.TryResolveNext(id, out int slot) || table.Cold(slot)?.Stats is not { } stats) continue;
-                    float v = Math.Clamp(stat.Value, 0, 100);
+                    float v = Math.Clamp(stat.Value, 0, CheatSetStat.Max);
                     if (stat.Stat != StatsEnumerated.None) stats[stat.Stat] = v;
                     else foreach (var s in MenuStats) stats[s] = v;
                 }
