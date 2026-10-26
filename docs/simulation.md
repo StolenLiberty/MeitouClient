@@ -1444,7 +1444,7 @@ by BUILDING `building category`, a bed is Housing: `BuildGroup`) is above the ma
 builders on one; else "idle: nothing to do". A site waiting for a material the member cannot get (none carried, in storage, on the ground or in a machine's output in range: `ConstructionSystem.Missing`) is skipped and noted once in the log ("! X needs Y: none in storage or on the ground"). With no free outpost bed, one off shift or hurt stays where he is ("off shift, no free bed" / "hurt, no free bed"). A labour or building priority of 0 is never done (the Engineers role zeroes every labour group, so engineers only build); a turret
 is never labour, only Man turrets. A member sitting on a chair (the implicit sit job) counts as free. The members' own job lists do not run while the manager runs the squad
 (`ProductionSystem.PickJobs`; direct orders still do). A building a member came back
-  from within 10 s is not given to it again for 120 s (no materials, unreachable).
+  from within 10 s is not given to it again for 120 s (no materials, unreachable), unless the player gave it an order since it was sent (`ActivityTrace.LastPlayerOrder`).
 Making room (`ProductionSystem.MakeRoom`): a worker with no room for what its job carries (a builder's material, an operator's output, a hauler's load, any 1 x 1 for a cramped
 member) puts aside, biggest first, everything but what it wears, food, first aid, splint and robot kits, containers, locked items and the job's item: into the storage it stands at when
 that takes it, else on the ground ("Making room."). Only with nothing to put aside does it stop and say "My inventory is full." (at most every 30 s, `CharacterCold.FullBarkTick`).
@@ -1464,6 +1464,13 @@ takes, in order: what he carries to a processor input with room (a worked one fi
 storage; a mine's full output; any output a quarter full; a source another hauler is making for is skipped. Every chain machine in the outpost's radius counts (miners spread over the mines by free places), or with assigned buildings only those. **Observed** in a temporary
 probe (a 5-man squad, one stone mine, processor and box: manager, 2 miners, 1 processor worker, 1 hauler; building materials reach the box).
 The window lists each member's status (`SquadView.Managed`).
+
+## Activity trace
+
+Meitou's debugging recorder (`ActivityTrace`, `World.Trace`, on by default): the world loop checks the player's characters after every system's step (orders, schedule, think, move,
+act, effects, slow world) and writes a line whenever one's activity changes (task, its building, held state, combat), naming the system and phase that changed it; every command
+reaching one of them is written with who gave it (a system that deferred it, or "you"). The host writes the lines to `activity.txt` beside the executable, new each run, cut back past
+20 MB (`ActivityFile`). Not hashed or saved.
 
 ## Slaves
 

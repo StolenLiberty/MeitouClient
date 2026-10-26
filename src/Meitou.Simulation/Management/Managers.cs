@@ -212,8 +212,10 @@ public sealed partial class ManagerSystem(PopulationData? data = null) : ITickSy
         if (Defend(world, m, slot, id, c, task, threats, town)) return;
         task = (CharacterTask)n.Task;
 
-        bool wounded = s.RestUntilHealed && c.Race is not { IsRobot: true } && AutonomyRules.Rested(c) * 100 < s.RestThreshold;
-        bool healed = !s.RestUntilHealed || AutonomyRules.Rested(c) * 100 >= s.HealedThreshold || c.Race is { IsRobot: true };
+        bool mayRest = AutonomyRules.MayRestHurt(s, world.GameHours);
+        bool wounded = mayRest && c.Race is not { IsRobot: true } && AutonomyRules.Rested(c) * 100 < s.RestThreshold;
+        // Up once healed, or as soon as it is day in work hours (healing waits for the night).
+        bool healed = !mayRest || AutonomyRules.Rested(c) * 100 >= s.HealedThreshold || c.Race is { IsRobot: true };
         // In bed: up when the shift starts and it is healed (only one the manager put there, or any while it is work time).
         if (c.InSomething == Locks.HeldState.Bed)
         {
@@ -250,7 +252,8 @@ public sealed partial class ManagerSystem(PopulationData? data = null) : ITickSy
             return;
         }
         // Back from a building it was just sent to: that one does not work for it for a while.
-        if (sent.TryGetValue(id, out var last) && (world.Tick - last.Tick) * world.TickSeconds < 10)
+        // (Not when the player took it off: his order is no sign the building cannot be worked.)
+        if (sent.TryGetValue(id, out var last) && (world.Tick - last.Tick) * world.TickSeconds < 10 && world.Trace.LastPlayerOrder(id) < last.Tick)
             stuck[(id, last.Site)] = world.Tick + (long)(StuckSeconds / world.TickSeconds);
         if (wounded || rest)
         {

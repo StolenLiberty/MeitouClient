@@ -134,8 +134,9 @@ public sealed partial class ProductionSystem
                 && NearestSite(world, at, Settings.HaulRange, (_, m) => m.Data.IsStorage && m.Storage is not null && inv.All().Any(item => Takes(world, m, item))) is { } store)
                 return (TaskType.DITCH_ALL_RESOURCES, store);
         }
-        // Meitou: resting until healed follows the squad's autonomy: off, never; on, its "Rest until healed" box.
-        if ((options & SquadAi.Sleep) != 0 && Injured(cold) && Beds is not null && cold.SquadId >= 0 && world.Squads.Find(cold.SquadId)?.Autonomy is { Enabled: true, RestUntilHealed: true })
+        // Meitou: resting until healed follows the squad's autonomy (off: never) and the one rule for it (AutonomyRules.MayRestHurt: at night or off shift).
+        if ((options & SquadAi.Sleep) != 0 && Injured(cold) && Beds is not null && cold.SquadId >= 0 && world.Squads.Find(cold.SquadId)?.Autonomy is { Enabled: true } squadRules
+            && Autonomy.AutonomyRules.MayRestHurt(squadRules, world.GameHours))
         {
             if (cold.Implicit == TaskType.GO_HOME_AND_GO_TO_BED && cold.OperateSite is { } bed && world.Fixtures.Find(bed) is { } kept
                 && Gap(kept.Position, at) <= Locks.FixtureRegistry.BedSearchRange)

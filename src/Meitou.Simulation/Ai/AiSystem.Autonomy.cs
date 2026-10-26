@@ -140,7 +140,7 @@ public sealed partial class AiSystem
     static float SleepWant(World world, AutonomySettings s, CharacterCold cold, AiMind mind, bool rest)
     {
         bool sleeping = cold.InSomething == Locks.HeldState.Bed;
-        if (s.RestUntilHealed && AutonomyRules.Wounded(cold, s))
+        if (AutonomyRules.MayRestHurt(s, world.GameHours) && AutonomyRules.Wounded(cold, s))
         {
             if (sleeping || rest) return 5;
             if (AutonomyRules.Rested(cold) <= s.RestThreshold / 100f) return 20;

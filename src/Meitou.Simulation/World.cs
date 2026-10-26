@@ -235,12 +235,20 @@ public sealed partial class World : IDisposable
         var prof = Profile.Enabled ? Profile : null;
         prof?.Begin(systems.Count);
         table.BeginTick();
+        var trace = Trace.Enabled ? Trace : null;
+        trace?.BeginTick(this);
 
         // 1. Inputs (serial).
         table.Phase = TablePhase.Inputs;
         var due = TakeDue();
         prof?.Lap(TickProfile.Inputs);
-        for (int k = 0; k < systems.Count; k++) { systems[k].Inputs(this, due); prof?.Lap(TickProfile.Inputs, k); }
+        for (int k = 0; k < systems.Count; k++)
+        {
+            if (trace is not null) trace.Current = systems[k].GetType().Name;
+            systems[k].Inputs(this, due);
+            trace?.Check(this, trace.Current + " (orders)");
+            prof?.Lap(TickProfile.Inputs, k);
+        }
 
         // 2. Schedule (serial): the grid of the last tick's positions, then the systems.
         table.Phase = TablePhase.Schedule;
@@ -250,13 +258,19 @@ public sealed partial class World : IDisposable
         prof?.Lap(TickProfile.Sight);
         MakePartitions();
         prof?.Lap(TickProfile.Schedule);
-        for (int k = 0; k < systems.Count; k++) { systems[k].Schedule(this); prof?.Lap(TickProfile.Schedule, k); }
+        for (int k = 0; k < systems.Count; k++)
+        {
+            if (trace is not null) trace.Current = systems[k].GetType().Name;
+            systems[k].Schedule(this);
+            trace?.Check(this, trace.Current + " (schedule)");
+            prof?.Lap(TickProfile.Schedule, k);
+        }
 
         // 3-5. Think, move, act (parallel; each system's phase is a barrier).
         table.Phase = TablePhase.Parallel;
         // A system that leaves a phase at its empty default is skipped there: a barrier costs more than the nothing it would wait for.
-        foreach (var p in phases) if (p.Think is { } think) RunParallel(think, prof, TickProfile.Think, p.Index);
-        foreach (var p in phases) if (p.Move is { } move) RunParallel(move, prof, TickProfile.Move, p.Index);
+        foreach (var p in phases) if (p.Think is { } think) { RunParallel(think, prof, TickProfile.Think, p.Index); trace?.Check(this, systems[p.Index].GetType().Name + " (think)"); }
+        foreach (var p in phases) if (p.Move is { } move) { RunParallel(move, prof, TickProfile.Move, p.Index); trace?.Check(this, systems[p.Index].GetType().Name + " (move)"); }
         foreach (var b in buffers) b.Reset();
         prof?.Lap(TickProfile.Act);
         foreach (var p in phases)
@@ -264,6 +278,7 @@ public sealed partial class World : IDisposable
             if (p.Act is not { } act) continue;
             foreach (var b in buffers) b.BeginSystem(p.Index);   // Effect.System is the system's real index, so the commit order does not depend on which systems act
             RunParallel(act, prof, TickProfile.Act, p.Index);
+            trace?.Check(this, systems[p.Index].GetType().Name + " (act)");
         }
 
         table.Phase = TablePhase.Commit;
@@ -273,12 +288,19 @@ public sealed partial class World : IDisposable
         effects.Sort(EffectBuffer.Order);
         prof?.Lap(TickProfile.Commit);
         foreach (var e in effects) { systems[e.System].Apply(this, e); prof?.Lap(TickProfile.Commit, e.System); }
+        trace?.Check(this, "effects");
 
         Squads.Refresh(table);
         prof?.Lap(TickProfile.Commit);
         table.Phase = TablePhase.SlowWorld;
         // 7. Slow world (serial).
-        for (int k = 0; k < systems.Count; k++) { systems[k].SlowWorld(this); prof?.Lap(TickProfile.SlowWorld, k); }
+        for (int k = 0; k < systems.Count; k++)
+        {
+            if (trace is not null) trace.Current = systems[k].GetType().Name;
+            systems[k].SlowWorld(this);
+            trace?.Check(this, trace.Current + " (slow)");
+            prof?.Lap(TickProfile.SlowWorld, k);
+        }
 
         // 8. Publish.
         Squads.Refresh(table);
@@ -290,6 +312,9 @@ public sealed partial class World : IDisposable
         if (publish && Settings.PublishSnapshots) Publish();
         prof?.Lap(TickProfile.Publish);
     }
+
+    /// <summary>The activity recorder: the player's characters' activity changes and the commands they get, with who changed or gave them (the host writes them to activity.txt).</summary>
+    public ActivityTrace Trace { get; } = new();
 
     /// <summary>The ticks' time per phase and system (off unless the host turns it on; F12's sim rows).</summary>
     public TickProfile Profile { get; } = new();
@@ -305,6 +330,7 @@ public sealed partial class World : IDisposable
         if (Characters.Phase == TablePhase.Parallel) throw new InvalidOperationException("commands are deferred in serial phases only");
         if (command.Tick <= Tick) throw new ArgumentException("a deferred command is for a later tick", nameof(command));
         deferred.Add(command);
+        if (Trace.Enabled) Trace.Command(this, command, Trace.Current);
     }
 
     /// <summary>The commands deferred for later ticks (for tests).</summary>
@@ -313,6 +339,7 @@ public sealed partial class World : IDisposable
     IReadOnlyList<SimCommand> TakeDue()
     {
         var external = Commands.TakeDue(Tick);
+        foreach (var c in external) Trace.PlayerCommand(this, c);
         if (deferred.Count == 0) return external;
         var due = new List<SimCommand>(deferred.Count + external.Count);
         int kept = 0;

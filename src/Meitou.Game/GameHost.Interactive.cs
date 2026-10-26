@@ -809,6 +809,7 @@ sealed partial class GameHost
     void WorldNews()
     {
         var world = session.World;
+        ActivityFile.Write(world.Trace.Take());
         foreach (string message in world.TakeMessages())
         {
             Console.WriteLine($"relations {message}");

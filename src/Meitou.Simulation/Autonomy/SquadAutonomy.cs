@@ -140,6 +140,21 @@ public static class AutonomyRules
         return max > 0 ? have / max : 1;
     }
 
+    /// <summary>The night for healing in bed (Meitou, engine choice): from 20:00 to 06:00.</summary>
+    public const int NightStarts = 20, NightEnds = 6;
+
+    public static bool Night(double gameHours)
+    {
+        int h = (int)(((gameHours % 24) + 24) % 24);
+        return h >= NightStarts || h < NightEnds;
+    }
+
+    /// <summary>
+    /// The one rule for lying down to heal (Meitou; the manager, the old mod's behaviours and the "Sleep when injured" option all ask it): the squad rests its hurt ("Rest until healed")
+    /// and it is night or off shift. In the day, in work hours, the hurt work, and those in bed get up.
+    /// </summary>
+    public static bool MayRestHurt(AutonomySettings s, double gameHours) => s.RestUntilHealed && (Night(gameHours) || s.IsRestTime(gameHours));
+
     /// <summary>Wounded as the plugin's rest rule reads it: not a robot, and less rested than the healed threshold.</summary>
     public static bool Wounded(CharacterCold c, AutonomySettings s) => c.Race is not { IsRobot: true } && Rested(c) < s.HealedThreshold / 100f;
 
