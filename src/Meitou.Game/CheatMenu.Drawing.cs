@@ -49,7 +49,7 @@ sealed partial class CheatMenu
         controls.Add(new("cheat-text", "TextBox", at, caption, "", "", true, properties, Vector4.Zero, colour ?? MainInk, Clip: clip, Pickable: false, TextScale: size * scale / 16));
     }
 
-    void Surface(UiRect at, string kind, bool selected = false, bool hover = false, UiRect? clip = null)
+    void Surface(UiRect at, string kind, bool selected = false, bool hover = false, UiRect? clip = null, float alpha = 1)
     {
         if (MeitouLook)
         {
@@ -62,12 +62,14 @@ sealed partial class CheatMenu
                 ["ImageBorder"] = window ? SettingsMenuArt.WindowBorder.ToString(CultureInfo.InvariantCulture) : "12",
                 ["ImageBorderScale"] = (window ? scale / SettingsMenuArt.WindowDensity : scale).ToString(CultureInfo.InvariantCulture),
             };
+            if (alpha < 1) properties["Alpha"] = alpha.ToString(CultureInfo.InvariantCulture);
             controls.Add(new("cheat-surface", "ImageBox", new(at.X - margin, at.Y - margin, at.Width + margin * 2, at.Height + margin * 2), "", "", "", true,
                 properties, Vector4.Zero, Clip: clip, Pickable: false));
         }
         else
             controls.Add(new("cheat-surface", "Panel", at, "", "", kind == "window" ? "Kenshi_GenericWindowSkin" : kind == "paper" ? "Kenshi_GenericTextBoxSkin" : "Kenshi_Button1Skin", true,
-                new Dictionary<string, string> { ["State"] = selected ? "pushed" : hover ? "highlighted" : "normal" },
+                alpha < 1 ? new Dictionary<string, string> { ["State"] = selected ? "pushed" : hover ? "highlighted" : "normal", ["Alpha"] = alpha.ToString(CultureInfo.InvariantCulture) }
+                    : new Dictionary<string, string> { ["State"] = selected ? "pushed" : hover ? "highlighted" : "normal" },
                 kind == "window" ? new(0.12f, 0.11f, 0.09f, 1) : Vector4.Zero, Clip: clip, Pickable: false));
     }
 

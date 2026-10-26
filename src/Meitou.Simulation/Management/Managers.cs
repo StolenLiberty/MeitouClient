@@ -251,7 +251,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         if (ours && (rest || wounded))
         {
             if (Bed(world, town, c, beds) is { } bed) { world.Defer(new Locks.UseBedOrder([id], bed) { Tick = world.Tick + 1 }); status[id] = rest ? "off to bed" : "off to bed (hurt)"; Log(world, c, rest ? "to bed (shift over)" : "to bed (hurt)"); }
-            else status[id] = "no free bed";
+            else status[id] = rest ? "off shift, no free bed" : "hurt, no free bed";
             return;
         }
         // Sitting on a chair (the idle sit job) is free time: work takes him off it.
@@ -275,7 +275,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         if (wounded || rest)
         {
             if (Bed(world, town, c, beds) is { } bed) { world.Defer(new Locks.UseBedOrder([id], bed) { Tick = world.Tick + 1 }); status[id] = wounded ? "off to bed (hurt)" : "off to bed"; Log(world, c, wounded ? "to bed (hurt)" : "to bed (off shift)"); }
-            else status[id] = "no free bed";
+            else status[id] = wounded ? "hurt, no free bed" : "off shift, no free bed";
             return;
         }
         // Assigned buildings: only those, the first in the list that needs building or has work for it.

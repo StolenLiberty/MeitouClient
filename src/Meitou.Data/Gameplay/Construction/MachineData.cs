@@ -135,6 +135,8 @@ public sealed record MachineData
         bool stores = building.GetBool("has inventory");
         if (function is null && !stores) return null;
         int fn = function?.GetInt("function", -1) ?? -1;
+        // Every research bench of the base game says no inventory, yet the original's benches hold the research costs (docs/game/buildings-production.md "Research").
+        if (fn == ResearchFunction) stores = true;
         var farm = building.GetReferences("farm data") is [var farmLink, ..] && db.Find(farmLink.TargetStringId) is { Type: FcsRecordType.FARM_DATA } fd ? FarmData.From(db, fd) : null;
         float rate = building.GetFloat("output rate", 1);
         if (fn != ResearchFunction && function is not null)

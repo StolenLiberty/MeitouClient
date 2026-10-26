@@ -137,12 +137,14 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
         pointer = at;
         if (!visible) return false;
         if (dragging is { Track: { } track }) { dragFraction = Math.Clamp((at.X - track.X) / track.Width, 0, 1); return true; }
+        if (AutDrag(at)) return true;
         return Contains(at);
     }
 
     public bool MouseUp()
     {
         pointerDown = false;
+        if (autGrab is not null) { autGrab = null; return true; }
         if (dragging is not { Commit: { } commit }) { bool had = dragging is not null; dragging = null; return had; }
         dragging = null;
         commit(dragFraction);

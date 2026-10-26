@@ -110,6 +110,19 @@ sealed partial class CheatMenu
 
     // ------------------------------------------------------------------ the window
 
+    /// <summary>Where the window was dragged to (its top left, pixels), and the pointer's offset in it while its title strip is held.</summary>
+    Vector2? autPlace, autGrab;
+    /// <summary>The window's background opacity (the world shows through a little).</summary>
+    const float WindowAlpha = 0.86f;
+
+    /// <summary>Moves the window while its title strip is held; true while dragging.</summary>
+    bool AutDrag(Vector2 at)
+    {
+        if (autGrab is not { } grab) return false;
+        autPlace = at - grab;
+        return true;
+    }
+
     void DrawAutonomyWindow(int width, int height, UiPainter painter)
     {
         const float W = 1080, H = 700;
@@ -117,9 +130,14 @@ sealed partial class CheatMenu
         controls.Clear(); hits.Clear();
         if (picking is { } pick) { DrawPicking(width, height, painter, pick); return; }
         if (assigning is { } assign) { DrawAssigning(width, height, painter, assign); return; }
-        bounds = new(MathF.Round((width - W * scale) / 2), MathF.Round((height - H * scale) / 2), MathF.Round(W * scale), MathF.Round(H * scale));
-        Surface(bounds, "window");
+        // Meitou: near the top of the screen (clear of the HUD's bottom panels) unless dragged by its title strip; the place is kept while the game runs.
+        float ww = MathF.Round(W * scale), wh = MathF.Round(H * scale), top = MathF.Round(16 * scale);
+        var place = autPlace ?? new Vector2((width - ww) / 2, top);
+        place = new(Math.Clamp(place.X, 40 * scale - ww, width - 40 * scale), Math.Clamp(place.Y, 0, height - 44 * scale));
+        bounds = new(MathF.Round(place.X), MathF.Round(place.Y), ww, wh);
+        Surface(bounds, "window", alpha: WindowAlpha);
         Text("Squad Autonomy", R(20, 6, 400, 32), 22, LightInk);
+        hits.Add(new(R(0, 0, W - 60, 44), () => autGrab = new(pointer.X - bounds.X, pointer.Y - bounds.Y)));
         var close = R(W - 51, 6, 31, 32);
         controls.Add(new("aut-close", "Button", close, "", "aut:close", "Kenshi_CloseButtonSkin", true, new Dictionary<string, string>(), Vector4.Zero));
         hits.Add(new(close, () => Visible = false));
@@ -188,7 +206,9 @@ sealed partial class CheatMenu
         if (s.ManagerRuns)
         {
             var doing = squad.Managed.GroupBy(d => d.Doing.Split(':')[0]).OrderByDescending(g => g.Count()).Take(3).Select(g => $"{g.Count()} {g.Key}");
-            return $"Run by {ManagerName(squad, MgmtSettings(squad))} · " + string.Join(" · ", doing);
+            int a = (int)s.StartWork, b = (int)s.EndWork;
+            string hours = a == b ? "never works (Schedule)" : a == 0 && b == 24 ? "works all day" : $"works {a:00}:00-{b % 24:00}:00";
+            return $"Run by {ManagerName(squad, MgmtSettings(squad))} · {hours} · " + string.Join(" · ", doing);
         }
         if (squad.Doing.Count == 0) return "Starting up...";
         var parts = squad.Doing.GroupBy(d => d).OrderByDescending(g => g.Count()).Select(g => $"{g.Count()} {g.Key}");

@@ -581,6 +581,9 @@ to `FUN_140836b70`: contribution k of the frame is x 0.6^k (counter `+0x174`, cl
   (`FUN_14029be00` -> `FUN_140834390`). Available (`FUN_1408333b0`): not `blueprint only`, not finished or queued,
   `level` <= tech level, requirements met (a RESEARCH finished, a BUILDING unlocked; `FUN_140830490`, engine reading
   of a garbled decompile), grouped by `category`.
+- **Bench inventory**: every research BUILDING of gamedata.base has `has inventory` false (**Verified**, record dump of Small Research Bench and Research Bench II, III, VI), yet the
+  original's bench window `Kenshi_InventoryResearchWindow` has a `backpack_content` grid (**Verified**, layout) and the queue is paid from the benches' inventories (below). Meitou gives
+  every research bench an inventory of its record's `storage size width` x `height` (18 x 18 in the base game); the original's grid size is **Unknown**.
 - **Queue** (`FUN_1408348a0`): needs `level` <= bench level (`FUN_140830a30` names the missing level) and the cost
   paid (`FUN_1408343c0`): `cost` items (x `repeat mult` per repeat, `FUN_1408320a0`) summed over the inventories of the
   player's research benches near the player (`FUN_14082e750`, `FUN_14082e810`), then removed; a paid id is remembered and

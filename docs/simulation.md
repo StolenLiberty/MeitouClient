@@ -1415,7 +1415,7 @@ on the squad's platoon as the Meitou-only string `meitou autonomy` (JSON; the pl
 - UI: the HUD's AUT button (the plugin's default place, 0.69 x 0.788 of the screen) opens `CheatMenu.Autonomy.cs` for the squad on the squad bar. Meitou's pages: Squad (work roles,
   presets of the labour and building priorities and turrets that turn the manager on and clear the packages; the manager, the squad leader by default; when attacked; what each
   member is doing; the manager's log), Priorities (labour and building bars, Build and repair, Man turrets), Buildings (the assigned list: up, down, remove, add the selected one, clear, and a world-pick banner where each click on one of the player's buildings adds or removes it), Schedule (places, work hours, health thresholds), Advanced (the plugin's
-  roles and packages, its combat and guard options). No button on the squads screen (the window picks the squad).
+  roles and packages, its combat and guard options). No button on the squads screen (the window picks the squad). The window opens at the top of the screen, centred, 86 % opaque, and is moved by dragging its title strip (kept until the game closes); the header shows the work hours.
 
 ## Managers
 
@@ -1430,7 +1430,7 @@ manager up, free and inside one of the player's outposts (`PlayerTown` radius), 
 - a free one (idle, out of combat, not in a formation, a Loot All or a follow): hurt or off shift, to bed; else the best machine (`ProductionSystem.AutonomyLabour`/`AutonomyBegin`), else a
   free turret with Man turrets; a site to build or repair (`BuildOrder`) goes before the machine when its group's priority (`ManagementSettings.BuildPriority`, the Building page; groups
 by BUILDING `building category`, a bed is Housing: `BuildGroup`) is above the machine's job priority, else after the turret; sites by priority then distance, at most `BuildersPerSite` (3)
-builders on one; else "idle: nothing to do". A labour or building priority of 0 is never done (the Engineers role zeroes every labour group, so engineers only build); a turret
+builders on one; else "idle: nothing to do". With no free outpost bed, one off shift or hurt stays where he is ("off shift, no free bed" / "hurt, no free bed"). A labour or building priority of 0 is never done (the Engineers role zeroes every labour group, so engineers only build); a turret
 is never labour, only Man turrets. A member sitting on a chair (the implicit sit job) counts as free. The members' own job lists do not run while the manager runs the squad
 (`ProductionSystem.PickJobs`; direct orders still do). A building a member came back
   from within 10 s is not given to it again for 120 s (no materials, unreachable).
