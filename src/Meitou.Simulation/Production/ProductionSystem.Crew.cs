@@ -157,6 +157,7 @@ public sealed partial class ProductionSystem
         if (!AtSite(n, atSite, at)) return;
         if (atId != toId)
         {
+            MakeRoom(world, slot, items.Create(item, 1), at.Data.IsStorage ? at : null);
             int room = to.Storage is null ? to.Inputs.Where(i => i.Item == item).Sum(i => Math.Max(0, i.Recipe.Capacity - i.Count)) : int.MaxValue;
             if (at.Output is { Count: > 0 } output && output.Recipe.Item == item && items.Create(item, Math.Min(output.Count, room)) is { } made)
                 output.Count -= Placed(inv, made);

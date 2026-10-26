@@ -571,7 +571,11 @@ public sealed partial class ProductionSystem : ITickSystem
             cold.Operating = false;
             if (Hauling(world, cold) is { } haul)
             {
-                if (AtSite(n, haul.Site, haul.Machine)) HaulAt(world, cold, m, haul.Machine);
+                if (AtSite(n, haul.Site, haul.Machine))
+                {
+                    if (cold.HaulFetch is { } want) MakeRoom(world, i, items.Create(want, 1), haul.Machine);
+                    HaulAt(world, cold, m, haul.Machine);
+                }
                 continue;
             }
             if (!AtSite(n, site, m)) continue;
@@ -595,9 +599,10 @@ public sealed partial class ProductionSystem : ITickSystem
             }
             bool full = false;
             if (Settings.AutoHaul && StartHaul(world, cold, site, m, out full)) continue;
+            // Meitou: no room to carry the output away: it puts aside what it does not need and tries again; with nothing to put aside it stops and says so.
+            if (full && m.Output is { } made && MakeRoom(world, i, items.Create(made.Recipe.Item, 1)) > 0) continue;
             if (full)
             {
-                // Meitou: its inventory is too full to carry the output away: it stops and says so.
                 InventoryFull(world, table.IdOf(i), cold);
                 End(table, i);
                 continue;

@@ -4,23 +4,12 @@ using Meitou.Simulation.Autonomy;
 
 namespace Meitou.Simulation.Management;
 
-/// <summary>What a managed squad does when its outpost is attacked (docs/simulation.md "Managers").</summary>
-public enum DefenceMode : byte
-{
-    /// <summary>Everyone takes on the enemies in the outpost.</summary>
-    Fighters = 0,
-    /// <summary>The men fight; the women go inside a building until it is over.</summary>
-    Militia = 1,
-    /// <summary>Everyone goes inside a building until it is over.</summary>
-    Shelter = 2,
-}
-
 /// <summary>What a building is for, as the manager ranks sites to build (by its BUILDING <c>building category</c>; a bed is housing).</summary>
 public enum BuildGroup : byte { Defence, Food, Power, Housing, Storage, Industry, Research, Other }
 
 /// <summary>
-/// A player squad's manager (Meitou-only): while <see cref="Manager"/> is up and in one of the player's outposts, <see cref="ManagerSystem"/> keeps the squad's members there busy. Work hours,
-/// job priorities, turrets and rest thresholds are the squad's <see cref="AutonomySettings"/> (the same pages of the window) with autonomy off.
+/// A player squad's manager (Meitou-only): while the squad's autonomy is on and <see cref="Manager"/> is up and in one of the player's outposts, <see cref="ManagerSystem"/> runs the
+/// squad's members there. Work hours, job priorities, turrets and rest thresholds are the squad's <see cref="AutonomySettings"/> (the same window).
 /// </summary>
 public sealed record ManagementSettings
 {
@@ -29,7 +18,7 @@ public sealed record ManagementSettings
     /// <summary>The manager as a save keeps it: his squad's <see cref="Squad.Index"/> and his name.</summary>
     public int ManagerSquadIndex { get; init; } = -1;
     public string ManagerName { get; init; } = "";
-    public DefenceMode Defence { get; init; } = DefenceMode.Militia;
+    public DefenceMode Defence { get; init; } = DefenceMode.StandGround;
     /// <summary>Whether he puts idle members on building and repairing the outpost's sites.</summary>
     public bool Build { get; init; } = true;
     /// <summary>How much each <see cref="BuildGroup"/> matters (0..10, 0: never built by him); a site goes before a machine whose job priority is lower.</summary>
@@ -73,7 +62,7 @@ public sealed record ManagementSettings
         catch (JsonException) { return null; }
         return s is null ? null : new ManagementSettings
         {
-            ManagerSquadIndex = s.S, ManagerName = s.N ?? "", Defence = Enum.IsDefined((DefenceMode)s.D) ? (DefenceMode)s.D : DefenceMode.Militia, Build = s.B,
+            ManagerSquadIndex = s.S, ManagerName = s.N ?? "", Defence = Enum.IsDefined((DefenceMode)s.D) ? (DefenceMode)s.D : DefenceMode.StandGround, Build = s.B,
             Buildings = s.A is { } a ? [.. a.Where(x => x.Length > 0).Distinct()] : [], Material = Math.Clamp(s.M, 0, 4),
             BuildPriority = s.P is { Count: > 0 } p ? [.. p.Concat(DefaultBuildPriority.Skip(p.Count)).Take(DefaultBuildPriority.Count).Select(v => Math.Clamp(v, 0, 10))] : DefaultBuildPriority,
         };
@@ -84,13 +73,13 @@ public sealed record ManagementSettings
 public sealed record SetSquadManagement(int SquadId, ManagementSettings? Settings) : SimCommand;
 
 /// <summary>
-/// Managers (Meitou-only, engine choices throughout; docs/simulation.md "Managers"). Every <see cref="CheckSeconds"/>, for each player squad with a manager and autonomy off: when the manager
+/// Managers (Meitou-only, engine choices throughout; docs/simulation.md "Managers"). Every <see cref="CheckSeconds"/>, for each player squad with autonomy on (and no old-mod behaviours): when the manager
 /// is up and inside one of the player's outposts, each member in that outpost who is free (idle, no formation, follow or Loot All) is given something to do, in this order: a wounded one (rest
 /// threshold) to bed; in rest hours to bed; else the best machine with work by the squad's job priorities (<see cref="Production.ProductionSystem.AutonomyLabour"/>), else a free turret (Man
 /// Turrets), else a site to build or repair (<see cref="ManagementSettings.Build"/>). Members he sent to work go to bed at the end of their shift or when hurt, and are got up when the shift
-/// starts and they are healed. While enemies are in the outpost the squad defends it by its <see cref="DefenceMode"/>, and goes back to work after.
+/// starts and they are healed. A fight at the outpost comes before all of it, by the squad's <see cref="DefenceMode"/> (Defence.cs).
 /// </summary>
-public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
+public sealed partial class ManagerSystem(PopulationData? data = null) : ITickSystem
 {
     /// <summary>At most this many builders on one site (engine choice).</summary>
     public const int BuildersPerSite = 3;
@@ -113,7 +102,6 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
     /// <summary>The building each member was last sent to and when (work and build), to spot one it cannot work.</summary>
     readonly Dictionary<CharacterId, (string Site, long Tick)> sent = [];
     readonly Dictionary<(CharacterId, string), long> stuck = [];
-    readonly HashSet<CharacterId> sheltering = [];
 
     public string? StatusOf(CharacterId id) => status.GetValueOrDefault(id);
 
@@ -171,7 +159,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         var table = world.Characters;
         var production = world.SystemOf<Production.ProductionSystem>();
         var combat = world.SystemOf<Combat.CombatSystem>();
-        var threats = new Dictionary<int, List<int>>();
+        var threats = new Dictionary<int, OutpostThreats>();
         var beds = new HashSet<string>();
         var building = new Dictionary<string, int>();
         foreach (var squad in world.Squads.All)
@@ -191,14 +179,14 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
                 Mark(world, squad, $"{manager.Name} is away");
                 continue;
             }
-            if (!threats.TryGetValue(town.Number, out var enemies)) threats[town.Number] = enemies = Enemies(world, combat, town);
+            if (!threats.TryGetValue(town.Number, out var fights)) threats[town.Number] = fights = Threats(world, combat, town);
             var settings = squad.Autonomy ?? new AutonomySettings();
             bool rest = settings.IsRestTime(world.GameHours);
             current = (squad.Id, manager.Name);
             var plan = m.Material != 0 && production is not null ? PlanCrew(world, production, squad, m, town, bossId) : null;
             foreach (var id in squad.Members)
-                Manage(world, production, m, settings, rest, town, enemies, table.Next[boss].Position, id, beds, building, plan);
-            if (enemies.Count == 0 && !rest && plan is null) Chain(world, production, squad, m);
+                Manage(world, production, m, settings, rest, town, fights, table.Next[boss].Position, id, beds, building, plan);
+            if (fights.Attackers.Count == 0 && !rest && plan is null) Chain(world, production, squad, m);
         }
     }
 
@@ -208,7 +196,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         foreach (var id in squad.Members) sheltering.Remove(id);
     }
 
-    void Manage(World world, Production.ProductionSystem? production, ManagementSettings m, AutonomySettings s, bool rest, Construction.PlayerTown town, List<int> enemies, Vector3 boss,
+    void Manage(World world, Production.ProductionSystem? production, ManagementSettings m, AutonomySettings s, bool rest, Construction.PlayerTown town, OutpostThreats threats, Vector3 boss,
         CharacterId id, HashSet<string> beds, Dictionary<string, int> building, CrewPlan? plan = null)
     {
         var table = world.Characters;
@@ -220,30 +208,9 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         if (OutpostAt(world, n.Position) is not { } here || here.Number != town.Number) { status[id] = "away from the outpost"; return; }
         var task = (CharacterTask)n.Task;
 
-        // Defence.
-        if (enemies.Count > 0)
-        {
-            // A slave is never armed against the raiders: it shelters.
-            bool fights = c.SlaveState != 1 && (m.Defence == DefenceMode.Fighters || m.Defence == DefenceMode.Militia && c.Appearance?.Female != true);
-            if (fights || c.InCombat)
-            {
-                status[id] = "defending";
-                if (!c.InCombat && task != CharacterTask.Attack && Nearest(table, n.Position, enemies) is int foe)
-                {
-                    world.Defer(new Combat.AttackOrder([id], table.IdOf(foe)) { Tick = world.Tick + 1, Defensive = true });
-                    Log(world, c, "to fight " + (table.Cold(foe)?.Name ?? "an enemy"));
-                }
-                return;
-            }
-            status[id] = "sheltering";
-            if (sheltering.Add(id) && Shelter(world, town, n.Position) is { } inside)
-            {
-                world.Defer(new MoveOrder([id], inside) { Tick = world.Tick + 1 });
-                Log(world, c, "inside to shelter");
-            }
-            return;
-        }
-        if (sheltering.Remove(id) && task == CharacterTask.GoTo) { MovementSystem.Stop(table, slot); task = CharacterTask.Idle; }
+        // A fight at the outpost first (Defence.cs).
+        if (Defend(world, m, slot, id, c, task, threats, town)) return;
+        task = (CharacterTask)n.Task;
 
         bool wounded = s.RestUntilHealed && c.Race is not { IsRobot: true } && AutonomyRules.Rested(c) * 100 < s.RestThreshold;
         bool healed = !s.RestUntilHealed || AutonomyRules.Rested(c) * 100 >= s.HealedThreshold || c.Race is { IsRobot: true };
@@ -276,7 +243,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             return;
         }
         // Too full to carry anything: it waits for the player to empty it (and says so now and then).
-        if (c.Inventory is { } carried && Items.InventoryCommands.Cramped(carried))
+        if (c.Inventory is { } carried && Items.InventoryCommands.Cramped(carried) && Production.ProductionSystem.MakeRoom(world, slot, null) == 0)
         {
             Production.ProductionSystem.InventoryFull(world, id, c);
             status[id] = "inventory full";
@@ -482,37 +449,6 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
     }
 
     /// <summary>The enemies in the outpost: up, not the player's, hostile to the player's faction or fighting one of the player's characters.</summary>
-    static List<int> Enemies(World world, Combat.CombatSystem? combat, Construction.PlayerTown town)
-    {
-        var table = world.Characters;
-        var list = new List<int>();
-        var relations = combat?.Relations;
-        int player = world.Player.Faction;
-        float r2 = town.Radius * town.Radius;
-        for (int s = 0; s < table.HighWater; s++)
-        {
-            ref readonly var n = ref table.Next[s];
-            if (!n.Alive || table.Cold(s) is not { IsPlayer: false } c || c.Medical is { Incapacitated: true } || c.IsImprisoned || c.Faction == player) continue;
-            if (Vector2.DistanceSquared(new(n.Position.X, n.Position.Z), new(town.Position.X, town.Position.Z)) > r2) continue;
-            bool hostile = relations is not null && c.Faction >= 0 && player >= 0 && relations.Contains(c.Faction) && relations.Contains(player) && relations.IsHostile(c.Faction, player);
-            bool attacking = c.InCombat && combat is not null && combat.StateOf(table.IdOf(s)) is { TargetSlot: >= 0 and var t } && t < table.HighWater && table.Cold(t) is { IsPlayer: true };
-            if (hostile || attacking) list.Add(s);
-        }
-        return list;
-    }
-
-    static int? Nearest(CharacterTable table, Vector3 at, List<int> slots)
-    {
-        int? best = null;
-        float bestD = float.MaxValue;
-        foreach (int s in slots)
-        {
-            float d = Vector3.DistanceSquared(at, table.Next[s].Position);
-            if (d < bestD) (best, bestD) = (s, d);
-        }
-        return best;
-    }
-
     /// <summary>The nearest complete building of the outpost with a door (one has an inside), its centre; null without one.</summary>
     static Vector3? Shelter(World world, Construction.PlayerTown town, Vector3 at)
     {

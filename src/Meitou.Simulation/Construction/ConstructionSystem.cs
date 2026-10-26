@@ -951,6 +951,8 @@ public sealed class ConstructionSystem : ITickSystem
         int taken = 0;
         if (cold.Inventory is { } inv && cold.FetchRecord is { } record)
         {
+            // Meitou: room for the material first (what it does not need goes into the storage it is at, else on the ground).
+            Production.ProductionSystem.MakeRoom(world, slot, items.Create(record, 1), cold.FetchSite is { } box ? world.Machines.Find(box) : null);
             if (cold.FetchItem is { } id && world.GroundItems.Find(id) is { } loose)
             {
                 int before = loose.Item.Quantity;

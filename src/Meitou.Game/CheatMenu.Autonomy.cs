@@ -459,9 +459,10 @@ sealed partial class CheatMenu
 
     static readonly (Meitou.Simulation.Management.DefenceMode Mode, string Name, string Blurb)[] DefenceModes =
     [
-        (Meitou.Simulation.Management.DefenceMode.Fighters, "Fighters", "Everyone drops their work and takes on enemies in the outpost."),
-        (Meitou.Simulation.Management.DefenceMode.Militia, "Militia", "The men take up arms; the women go inside a building until it's over."),
-        (Meitou.Simulation.Management.DefenceMode.Shelter, "Shelter", "Everyone goes inside a building until the enemies are gone."),
+        (Meitou.Simulation.Management.DefenceMode.StandGround, "Stand ground", "They keep working and fight only a threat right on them. Never go looking for a fight."),
+        (Meitou.Simulation.Management.DefenceMode.Soldiers, "Soldiers", "Quick reaction force: they run to any attack on your people and clear hostiles out of the outpost."),
+        (Meitou.Simulation.Management.DefenceMode.Militia, "Militia", "The men run to any attack on your people; the women go inside until it's over."),
+        (Meitou.Simulation.Management.DefenceMode.Shelter, "Shelter", "Everyone goes inside while your people are under attack."),
     ];
 
     static readonly (Meitou.Simulation.Management.BuildGroup Group, string Name, string Examples)[] BuildRows =
@@ -478,7 +479,9 @@ sealed partial class CheatMenu
 
     // ------------------------------------------------------------------ the Squad and Priorities pages (Meitou's autonomy: the manager runs the squad)
 
-    sealed record WorkRole(string Name, string Blurb, float[] Labour, float[] Build, bool Turrets, Meitou.Simulation.Management.DefenceMode? Defence = null, int Material = 0);
+    /// <summary>A preset of the Squad page: priorities, turrets, what it does about fights (work roles stand their ground; soldiers are the quick reaction force) and a crew's material.</summary>
+    sealed record WorkRole(string Name, string Blurb, float[] Labour, float[] Build, bool Turrets,
+        Meitou.Simulation.Management.DefenceMode Defence = Meitou.Simulation.Management.DefenceMode.StandGround, int Material = 0);
 
     // Labour order: Science, Labouring, Farming, Engineer, Cooking, Robotics, Medic, WeaponSmith, ArmourSmith, CrossbowSmith, AutomaticMachine, Other. Build order: BuildRows.
     static readonly WorkRole[] WorkRoles =
@@ -493,8 +496,8 @@ sealed partial class CheatMenu
         new("Crafters", "Smith weapons, armour and crossbows; make parts.", [0, 0, 0, 3, 0, 3, 0, 10, 10, 10, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Researchers", "Work the research benches.", [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Medics", "Run the medical benches.", [0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
-        new("Guards", "Man the turrets and fight off anyone who attacks the outpost.", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], true,
-            Meitou.Simulation.Management.DefenceMode.Fighters),
+        new("Soldiers", "Quick reaction force: answer any attack on your people, clear hostiles out, man turrets.", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], true,
+            Meitou.Simulation.Management.DefenceMode.Soldiers),
     ];
 
     bool IsRole(WorkRole role, AutonomySettings s, Meitou.Simulation.Management.ManagementSettings m) =>
@@ -521,7 +524,7 @@ sealed partial class CheatMenu
             {
                 // A role turns autonomy on for the manager (clearing the old mod's behaviours) and sets every priority.
                 AutSend(squad, s with { Enabled = true, Packages = [], Labour = role.Labour, ManTurrets = role.Turrets });
-                MgmtSend(squad, m with { BuildPriority = role.Build, Build = role.Build.Any(v => v > 0) || m.Build, Defence = role.Defence ?? m.Defence, Material = role.Material });
+                MgmtSend(squad, m with { BuildPriority = role.Build, Build = role.Build.Any(v => v > 0) || m.Build, Defence = role.Defence, Material = role.Material });
                 Notice($"{squad.Name}: {role.Name}. {ManagerName(squad, m)} runs them.");
             }));
         }
@@ -541,12 +544,12 @@ sealed partial class CheatMenu
         Text("He works too, and must be up and in your outpost for it to run.", R(x + 14, top + 62, half - 28, 20), 11, MutedInk);
         float gx = x + half + 14;
         Card(R(gx, top, half, 86));
-        CardTitle("When the outpost is attacked", gx + 14, top + 8);
-        float bw = (half - 28 - 16) / 3;
+        CardTitle("In a fight", gx + 14, top + 8);
+        float bw = (half - 28 - 8 * (DefenceModes.Length - 1)) / DefenceModes.Length;
         for (int i = 0; i < DefenceModes.Length; i++)
         {
             var (mode, name, _) = DefenceModes[i];
-            Button(name, R(gx + 14 + i * (bw + 8), top + 28, bw, 30), () => MgmtSend(squad, m with { Defence = mode }), selected: m.Defence == mode, size: 13);
+            Button(name, R(gx + 14 + i * (bw + 8), top + 28, bw, 30), () => MgmtSend(squad, m with { Defence = mode }), selected: m.Defence == mode, size: 12);
         }
         Text(DefenceModes.First(d => d.Mode == m.Defence).Blurb, R(gx + 14, top + 62, half - 28, 20), 11, MutedInk);
 

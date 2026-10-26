@@ -1430,8 +1430,13 @@ one its `ManagementSettings` name (any player character; saved as platoon string
 leader; the settings also hold a `DefenceMode`, Build and repair and the building priorities. Work hours, job priorities, Man turrets and the rest thresholds are the squad's
 `AutonomySettings`. Each new decision goes to the squad's log (`ManagerSystem.LogOf`, the last 8, `SquadView.ManagerLog`). Every 2 s (`ManagerSystem.SlowWorld`), with the
 manager up, free and inside one of the player's outposts (`PlayerTown` radius), each member in that outpost:
-- enemies in the outpost (up, hostile to the player's faction, or fighting a player character): Fighters all attack the nearest (`AttackOrder`, defensive); Militia: the men attack, the
-  women (`CharacterAppearance.Female`) walk into the nearest complete outpost building with a door and stay; Shelter: everyone does; afterwards they are free again;
+- a fight first (`Management/Defence.cs`). Each check finds the outpost's attackers (awake, not the player's, fighting one of the player's characters, within the radius plus
+  `DefendReach` 500) and hostiles (of a faction hostile to the player's, inside the radius, attacking nobody). One already fighting keeps at it; a slave shelters. By the squad's
+  `DefenceMode`: StandGround (the default, every work role) fights only an attacker within `LocalReach` (150) of it or fighting it, else keeps working; Soldiers (the Soldiers role,
+  the quick reaction force) go after the nearest attacker anywhere, else the nearest hostile; Militia: the men as soldiers against attackers only, the women (`CharacterAppearance.Female`)
+  shelter; Shelter: while there are attackers, everyone walks into the nearest complete outpost building with a door and stays. One in bed gets up to fight. Afterwards they work again.
+  **Observed** in a temporary probe (a hostile standing in the outpost: workers kept on, soldiers went for it; it attacking one worker: that one fought, a worker 400 off kept on,
+  the soldiers came);
 - in bed: got up (`GetOutOrder`) in work hours once healed; one he sent to work goes to bed at the end of the shift or below the rest threshold (`UseBedOrder`, a free outpost bed);
 - a free one (idle, out of combat, not in a formation, a Loot All or a follow): hurt or off shift, to bed; else the best machine (`ProductionSystem.AutonomyLabour`/`AutonomyBegin`), else a
   free turret with Man turrets; a site to build or repair (`BuildOrder`) goes before the machine when its group's priority (`ManagementSettings.BuildPriority`, the Building page; groups
@@ -1440,8 +1445,10 @@ builders on one; else "idle: nothing to do". A site waiting for a material the m
 is never labour, only Man turrets. A member sitting on a chair (the implicit sit job) counts as free. The members' own job lists do not run while the manager runs the squad
 (`ProductionSystem.PickJobs`; direct orders still do). A building a member came back
   from within 10 s is not given to it again for 120 s (no materials, unreachable).
-A member whose inventory has no free cell (`InventoryCommands.Cramped`) gets no work ("inventory full"); a machine operator or builder whose haul cannot fit stops and says
-"My inventory is full." (a bark, at most every 30 s, `CharacterCold.FullBarkTick`).
+Making room (`ProductionSystem.MakeRoom`): a worker with no room for what its job carries (a builder's material, an operator's output, a hauler's load, any 1 x 1 for a cramped
+member) puts aside, biggest first, everything but what it wears, food, first aid, splint and robot kits, containers, locked items and the job's item: into the storage it stands at when
+that takes it, else on the ground ("Making room."). Only with nothing to put aside does it stop and say "My inventory is full." (at most every 30 s, `CharacterCold.FullBarkTick`).
+**Observed** in a temporary probe (an engineer with a full grid put one item down, took the planks and built).
 Assigned buildings (`ManagementSettings.Buildings`, site ids, top first; the window's Buildings page, picked in the world): with any, the squad builds, works and mans only those, in list
 order, instead of the priorities. Every 20 s (`ManagerSystem.Chain`) a worker who has been at a lower one for 30 s or more is moved to the highest listed complete one he can work
 (`ProductionSystem.AutonomyCanWork`: operable, not blocked), so a stone crew listing processor above mines moves a miner to the processor when stone is in storage and back when it runs dry. A listed
