@@ -254,6 +254,9 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             else status[id] = "no free bed";
             return;
         }
+        // Sitting on a chair (the idle sit job) is free time: work takes him off it.
+        bool sitting = c.Implicit == Meitou.Data.Gameplay.Ai.TaskType.SIT_AROUND && task == CharacterTask.Operate;
+        if (sitting) task = CharacterTask.Idle;
         if (task != CharacterTask.Idle || c.InCombat || c.Formation is not null || c.LootAll is not null || !c.FollowOrder.IsNone)
         {
             status[id] = ours ? task == CharacterTask.FetchMaterials ? "fetching materials" : task is CharacterTask.Build or CharacterTask.DeliverMaterials ? "building: " + SiteName(world, job.Site) : "working: " + SiteName(world, job.Site) : c.Formation is not null ? "in formation" : TaskWord(task);
@@ -310,7 +313,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             StartBuild(world, id, c, later.Site, building);
             return;
         }
-        status[id] = "idle: nothing to do";
+        status[id] = sitting ? "sitting: nothing to do" : "idle: nothing to do";
     }
 
     /// <summary>

@@ -89,7 +89,9 @@ public sealed partial class ProductionSystem
             if (!onJob && task is not (CharacterTask.Idle or CharacterTask.Wander or CharacterTask.Follow)) continue;
             if (!Able(cold)) continue;
             int pick = -1;
-            for (int k = 0; k < cold.Jobs.Count && pick < 0; k++)
+            // Meitou: a squad its manager runs works by his priorities, not by each member's own job list (direct orders still work).
+            bool managed = cold.SquadId >= 0 && world.Squads.Find(cold.SquadId)?.Autonomy is { ManagerRuns: true };
+            for (int k = 0; k < cold.Jobs.Count && pick < 0 && !managed; k++)
                 if (Runnable(world, i, cold, k)) pick = k;
             if (pick >= 0)
             {

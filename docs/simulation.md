@@ -1430,7 +1430,9 @@ manager up, free and inside one of the player's outposts (`PlayerTown` radius), 
 - a free one (idle, out of combat, not in a formation, a Loot All or a follow): hurt or off shift, to bed; else the best machine (`ProductionSystem.AutonomyLabour`/`AutonomyBegin`), else a
   free turret with Man turrets; a site to build or repair (`BuildOrder`) goes before the machine when its group's priority (`ManagementSettings.BuildPriority`, the Building page; groups
 by BUILDING `building category`, a bed is Housing: `BuildGroup`) is above the machine's job priority, else after the turret; sites by priority then distance, at most `BuildersPerSite` (3)
-builders on one; else "idle: nothing to do". A building a member came back
+builders on one; else "idle: nothing to do". A labour or building priority of 0 is never done (the Engineers role zeroes every labour group, so engineers only build); a turret
+is never labour, only Man turrets. A member sitting on a chair (the implicit sit job) counts as free. The members' own job lists do not run while the manager runs the squad
+(`ProductionSystem.PickJobs`; direct orders still do). A building a member came back
   from within 10 s is not given to it again for 120 s (no materials, unreachable).
 A member whose inventory has no free cell (`InventoryCommands.Cramped`) gets no work ("inventory full"); a machine operator or builder whose haul cannot fit stops and says
 "My inventory is full." (a bark, at most every 30 s, `CharacterCold.FullBarkTick`).

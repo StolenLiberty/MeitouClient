@@ -463,12 +463,12 @@ sealed partial class CheatMenu
     // Labour order: Science, Labouring, Farming, Engineer, Cooking, Robotics, Medic, WeaponSmith, ArmourSmith, CrossbowSmith, AutomaticMachine, Other. Build order: BuildRows.
     static readonly WorkRole[] WorkRoles =
     [
-        new("Engineers", "Build and repair whatever you place. They fetch the materials from storage and the ground.", [1, 1, 1, 3, 1, 2, 1, 1, 1, 1, 1, 1], [9, 9, 9, 9, 9, 9, 9, 6], false),
+        new("Engineers", "Only build and repair what you place, fetching the materials. Nothing else.", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [9, 9, 9, 9, 9, 9, 9, 6], false),
         new("Workers", "Run every machine in the outpost. Build when nothing else needs doing.", [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], [3, 3, 3, 3, 3, 3, 3, 2], false),
         new("Farmers", "Plant, tend and harvest the farms; help cook.", [0, 0, 10, 0, 6, 0, 0, 0, 0, 0, 3, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Cooks", "Keep the stoves and ovens going; help on the farms.", [0, 0, 4, 0, 10, 0, 0, 0, 0, 0, 3, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Miners", "Mine and refine: ore, stone, copper, iron.", [0, 10, 0, 2, 0, 0, 0, 0, 0, 0, 4, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
-        new("Crafters", "Smith weapons, armour and crossbows; make parts.", [0, 0, 0, 3, 0, 3, 0, 10, 10, 10, 0, 2], [0, 0, 0, 0, 0, 0, 0, 0], false),
+        new("Crafters", "Smith weapons, armour and crossbows; make parts.", [0, 0, 0, 3, 0, 3, 0, 10, 10, 10, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Researchers", "Work the research benches.", [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Medics", "Run the medical benches.", [0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Guards", "Man the turrets and fight off anyone who attacks the outpost.", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], true,

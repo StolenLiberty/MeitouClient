@@ -27,6 +27,8 @@ public sealed partial class ProductionSystem
             if (Site(world, m.Site) is not { Complete: true } site || site.Town != town || site.Owner != world.Player.Faction) continue;
             bool automatic = m.Data.IsAutomatic && m.Data.IsProducer;
             if (!automatic && !m.Data.Operable) continue;
+            // A turret is manned only with Man turrets (the plugin's couldIOperate), not as "other" labour.
+            if (m.Data.Function == Meitou.Data.World.ObjectRanges.TurretFunction && !settings.ManTurrets) continue;
             int priority = settings.LabourPriority(AutonomyRules.KindOf(m.Data));
             if (priority <= 0) continue;
             var job = new PermaJob(automatic ? TaskType.OPERATE_AUTOMATIC_MACHINERY : TaskType.OPERATE_MACHINERY, site.Id);
