@@ -66,6 +66,9 @@ public sealed record DebugSpawn(string Record, Vector2 At, int? Faction = null) 
 /// </summary>
 public sealed record DebugSpawnSquad(string Record, Vector2 At, IReadOnlyList<Vector2> Offsets, float Yaw, int? Faction = null, bool Player = false) : DebugCommand;
 
+/// <summary>Takes <paramref name="Characters"/> out of the world for good (the cheat menu's Zeus, Delete): removed in the slow world, as a despawned platoon's are.</summary>
+public sealed record DebugRemove(IReadOnlyList<CharacterId> Characters) : DebugCommand;
+
 static class DebugCheats
 {
     public static void Apply(World world, PopulationData? data, CharacterAssembly? assembly, DebugCommand command)

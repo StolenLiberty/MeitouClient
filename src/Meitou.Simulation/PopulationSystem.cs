@@ -109,6 +109,7 @@ public sealed partial class PopulationSystem : ITickSystem, IDisposable
             if (c is FocusCommand f) focus = f.Position;
             else if (c is DebugSpawn spawn) SpawnSandbox(world, spawn.Record, spawn.At, player: false, variant: ++debugSpawns, faction: spawn.Faction);
             else if (c is DebugSpawnSquad group && group.Offsets.Count > 0) SpawnZeus(world, group);
+            else if (c is DebugRemove remove) removals.AddRange(remove.Characters);
         }
 
         var ready = new List<BuiltTown>();
@@ -149,6 +150,9 @@ public sealed partial class PopulationSystem : ITickSystem, IDisposable
 
     public void SlowWorld(World world)
     {
+        // Zeus's Delete: gone for good (their squads drop them and a new leader steps up; a body they carried stays where it was).
+        foreach (var id in removals) world.Characters.Remove(id);
+        removals.Clear();
         if (world.Tick % settings.CheckEveryTicks != 0) return;
         world.Uniques.SeedPrisoners(data.Db);
         RefreshUniques(world);

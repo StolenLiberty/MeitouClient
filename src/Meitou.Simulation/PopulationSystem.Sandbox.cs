@@ -12,6 +12,9 @@ public sealed partial class PopulationSystem
     /// <summary>Zeus's squads by record, faction and whether the player's: the next placing of the same joins it (not saved: after a load the next placing starts a new one).</summary>
     readonly Dictionary<(string Record, int Faction, bool Player), int> zeusSquads = [];
 
+    /// <summary>Characters Zeus's Delete takes out (<see cref="DebugRemove"/>), removed in the next slow world.</summary>
+    readonly List<CharacterId> removals = [];
+
     /// <summary>
     /// Zeus's placing (<see cref="DebugSpawnSquad"/>; the cheat menu): the characters in one new squad, each with a look of its own, which then joins the squad the earlier ones
     /// of the same record and side are in while it has members. The player's are the player's characters (selectable, in the squad bar); an NPC squad's first member leads and the

@@ -174,6 +174,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
             else Visible = false;
             return true;
         }
+        if (key == Key.Delete && zeusMode && focused is null && openDropdown is null) { ZeusDelete(); return true; }
         if (focused is not { } field) return false;
         switch (key)
         {

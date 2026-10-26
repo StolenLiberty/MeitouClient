@@ -254,11 +254,20 @@ sealed partial class CheatMenu
         Text(shown.ToString(System.Globalization.CultureInfo.InvariantCulture), R(W - 70, H - 100, 54, 28), 16, LightInk, "Right VCenter");
 
         Rect(R(16, H - 76, W - 32, 1), MainInk with { W = 0.12f });
-        string hint = zeusPick is { } held ? $"{held.Name}: left-click the ground to place, right-click to stop." : "Pick a unit, then click the ground.";
+        string hint = zeusPick is { } held ? $"{held.Name}: left-click the ground to place, right-click to stop." : "Pick a unit, then click the ground. Delete removes the one under the mouse.";
         Text(hint, R(16, H - 72, W - 32, 22), 11, zeusPick is null ? MutedInk : Brass);
         if (notice.Length > 0 && Environment.TickCount64 - noticeAt < 6000) Text(notice, R(16, H - 52, W - 140, 22), 11, Good);
         Button("Cheat menu", R(W - 124, H - 46, 108, 30), () => { zeusMode = false; zeusPick = null; scroll = scrollTarget = 0; }, size: 12);
         painter.Draw(controls, width, height, pointer, null);
+    }
+
+    /// <summary>Zeus's Delete: removes the character under the mouse, else the selected ones (<see cref="DebugRemove"/>).</summary>
+    void ZeusDelete()
+    {
+        IReadOnlyList<CharacterId> doomed = player.HoverTarget is { } hover ? [hover.Id] : [.. world().Player.Selection];
+        if (doomed.Count == 0) { Notice("Nobody under the mouse or selected."); return; }
+        Send(new DebugRemove(doomed) { Tick = Now });
+        Notice(doomed.Count == 1 ? "Removed 1 character." : $"Removed {doomed.Count} characters.");
     }
 
     /// <summary>One figure to draw where a pick will stand: its unit, faction (for its look), feet, facing, and outline colour (alpha above 1: a figure drawn see-through).</summary>
