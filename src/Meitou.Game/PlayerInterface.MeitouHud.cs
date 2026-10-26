@@ -49,6 +49,30 @@ sealed partial class PlayerInterface
     /// <summary>The Modern UI style: the Meitou mode draws this HUD instead of the game's (off: the Meitou style keeps the game's layout).</summary>
     public bool ModernHud { get; set; } = true;
     bool ModernHudOn => UiMode == UiMode.Meitou && ModernHud;
+    /// <summary>The characters Zeus has picked (any faction; red rings under them); null: none.</summary>
+    public IReadOnlySet<CharacterId>? ZeusMarked { get; set; }
+    /// <summary>Where the Modern HUD's top-right column (the outpost line) ends, in pixels: a panel on the right edge starts below it. 0 without the Modern HUD.</summary>
+    public float HudRightBelow { get; private set; }
+    /// <summary>The width in pixels of a panel along the right edge (Zeus): the alerts stand to its left.</summary>
+    public float RightPanel { get; set; }
+
+    /// <summary>Any character under a pixel, of any faction (Zeus's pick).</summary>
+    public CharacterId? AnyCharacterAt(Vector2 p) => PickWhere(p, _ => true);
+
+    /// <summary>Every character, of any faction, whose middle is inside the box from <paramref name="a"/> to <paramref name="b"/> (Zeus's box).</summary>
+    public IReadOnlyList<CharacterId> AnyInBox(Vector2 a, Vector2 b)
+    {
+        float x0 = MathF.Min(a.X, b.X), x1 = MathF.Max(a.X, b.X), y0 = MathF.Min(a.Y, b.Y), y1 = MathF.Max(a.Y, b.Y);
+        var list = new List<CharacterId>();
+        foreach (var c in session.CurrentSnapshot.Characters)
+        {
+            var p = where(c) + new Vector3(0, CharacterHeight / 2, 0);
+            if (Vector3.Distance(Eye, p) > BoxSelectRange) continue;
+            if (Project(p) is { } s && s.X >= x0 && s.X <= x1 && s.Y >= y0 && s.Y <= y1) list.Add(c.Id);
+        }
+        return list;
+    }
+
     /// <summary>The Modern style is on: the HUD, and the other windows in its look.</summary>
     public bool ModernHudShown => ModernHudOn;
     /// <summary>Opens the squad jobs window for a squad (the cheat menu's; the Modern HUD's Jobs button in the squad dock).</summary>
@@ -169,10 +193,12 @@ sealed partial class PlayerInterface
         hudControls = controls;
         hs = Height / 1080f * Math.Clamp(HudScale, 0.3f, 3);
         hudSerial = 0;
+        HudRightBelow = 0;
         if (buildMode) return;
         HudClock();
         HudPlace();
         float below = HudOutpost();
+        HudRightBelow = MathF.Round((PickTown() is null ? 20 + 48 : below) * hs);
         HudAlerts(below);
         var lead = Lead();
         float cardRight = HudCard(lead);
@@ -381,7 +407,8 @@ sealed partial class PlayerInterface
     void HudAlerts(float top)
     {
         const float width = 340;
-        float x = HudWidth - 24 - width, y = top;
+        // Left of a panel along the right edge (Zeus), else at the edge.
+        float x = HudWidth - 24 - width - (RightPanel > 0 ? RightPanel / hs + 12 : 0), y = RightPanel > 0 ? 20 + 48 + 8 : top;
         for (int i = 0; i < alerts.Count; i++)
         {
             var a = alerts[i];
@@ -770,7 +797,8 @@ sealed partial class PlayerInterface
             if (tabsWidth + 28 <= space || longest <= 30) break;
         }
         float dockWidth = MathF.Min(space, MathF.Max(rowWidth, tabsWidth) + 28);
-        float dockHeight = 10 + 26 + 8 + shownRows * pitch - (named ? 4 : 2) + 10;
+        // An empty squad (its members moved, dead or removed): one line, not an empty page.
+        float dockHeight = 10 + 26 + 8 + (members.Count == 0 ? 22 : shownRows * pitch - (named ? 4 : 2)) + 10;
         float dx = MathF.Round(centre - dockWidth / 2), dy = HudHeight - 24 - dockHeight;
         HudPlate(dx, dy, dockWidth, dockHeight);
         float tx = dx + 14;
@@ -811,6 +839,7 @@ sealed partial class PlayerInterface
         squadBarPage = V(px, py, columns * (cell + gap), shownRows * pitch);
         squadBarRow = MathF.Round((cell + gap) * hs);
         squadBarScroll = Math.Clamp(squadBarScroll, 0, Math.Max(0, (rows - shownRows) * pitch * hs));
+        if (members.Count == 0) HudText(Loc.Tr("No one in this squad."), dx + 14, py, dockWidth - 28, 22, 12, HudMuted);
         var camera = session.Camera.Current;
         PrunePortraitFlashes(members);
         for (int i = 0; i < members.Count; i++)

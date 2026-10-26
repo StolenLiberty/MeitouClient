@@ -94,8 +94,7 @@ sealed partial class CheatMenu
         Text("Squad Jobs", R(20, 6, 400, 32), 22, LightInk);
         hits.Add(new(R(0, 0, W - 60, 44), () => jobsGrab = new(pointer.X - bounds.X, pointer.Y - bounds.Y)));
         var close = R(W - 51, 6, 31, 32);
-        controls.Add(new("jobs-close", "Button", close, "", "jobs:close", "Kenshi_CloseButtonSkin", true, new Dictionary<string, string>(), Vector4.Zero));
-        hits.Add(new(close, () => Visible = false));
+        CloseButton(close, () => Visible = false);
         Rect(R(20, 44, W - 40, 1), MainInk with { W = 0.12f });
 
         if (JobsSquad() is not { } squad)

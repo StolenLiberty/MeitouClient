@@ -88,6 +88,24 @@ sealed partial class CheatMenu
         Outline(at, MainInk with { W = 0.12f }, clip);
     }
 
+    /// <summary>A window's close button: the game's X, or in the Modern style a plate button with the HUD's X.</summary>
+    void CloseButton(UiRect at, Action close)
+    {
+        if (Modern)
+        {
+            var box = new UiRect(at.X + 2 * scale, at.Y + 3 * scale, at.Width - 4 * scale, at.Width - 4 * scale);
+            bool hovered = Hovered(box, null);
+            Surface(box, "button", hover: hovered);
+            float icon = MathF.Round(box.Width * 0.55f);
+            controls.Add(new("cheat-close-x", "ImageBox", new(box.X + (box.Width - icon) / 2, box.Y + (box.Height - icon) / 2, icon, icon), "", "", "", true,
+                new Dictionary<string, string> { ["ImageTexture"] = MeitouHudArt.Icon("close"), ["Colour"] = hovered ? "0.851 0.808 0.722 1" : "0.686 0.651 0.545 1" }, Vector4.Zero, Pickable: false));
+            hits.Add(new(box, close));
+            return;
+        }
+        controls.Add(new("cheat-close", "Button", at, "", "cheat:close", "Kenshi_CloseButtonSkin", true, new Dictionary<string, string>(), Vector4.Zero));
+        hits.Add(new(at, close));
+    }
+
     void Outline(UiRect at, Vector4 colour, UiRect? clip = null)
     {
         float line = MathF.Max(1, MathF.Round(scale));
@@ -257,8 +275,7 @@ sealed partial class CheatMenu
         Surface(bounds, "window", alpha: WindowAlpha);
         Text("Cheat Menu", R(20, 6, 300, 32), 22, LightInk);
         var close = R(1069, 6, 31, 32);
-        controls.Add(new("cheat-close", "Button", close, "", "cheat:close", "Kenshi_CloseButtonSkin", true, new Dictionary<string, string>(), Vector4.Zero));
-        hits.Add(new(close, () => Visible = false));
+        CloseButton(close, () => Visible = false);
         Rect(R(20, 44, 1080, 1), MainInk with { W = 0.12f });
 
         DrawTargetBar();

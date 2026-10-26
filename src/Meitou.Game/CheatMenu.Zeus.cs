@@ -26,6 +26,10 @@ sealed partial class CheatMenu
     /// <summary>How many each click places, in a block (the formation drag's rows).</summary>
     int zeusCount = 1;
     static readonly string[] ZeusSides = ["Own", "Friend", "Neutral", "Foe"];
+    /// <summary>The characters picked with Zeus (a click or a box over the world, any faction): Delete removes them.</summary>
+    readonly HashSet<CharacterId> zeusSelected = [];
+    /// <summary>Where a press on the world began (Zeus with no unit picked): a box once dragged, else a click on one character.</summary>
+    Vector2? zeusBoxFrom;
     const int ZeusMost = 100;
 
     /// <summary>The amount slider: its position (0..1) for a count and back, squared so the small counts get most of its length.</summary>
@@ -111,7 +115,13 @@ sealed partial class CheatMenu
     /// <summary>A click outside the panel while Zeus is open: left places the pick, right puts it down. False: the click is the game's.</summary>
     bool ZeusClick(Vector2 at, MouseButton button)
     {
-        if (zeusPick is not { } unit) return false;
+        // No unit picked: a left press picks characters (a click on one, or a box), of any faction; the right button stays the game's.
+        if (zeusPick is not { } unit)
+        {
+            if (button != MouseButton.Left) return false;
+            zeusBoxFrom = at;
+            return true;
+        }
         if (button == MouseButton.Right) { zeusPick = null; return true; }
         if (button != MouseButton.Left) return false;
         if (ZeusGround(at) is not { } ground || ZeusSpots(at, ground) is not { } placed) return true;
@@ -123,6 +133,24 @@ sealed partial class CheatMenu
         string side = mine ? "yours" : faction is { } f ? FactionName(f) : "hostile";
         Notice($"Placed {(offsets.Length > 1 ? $"{offsets.Length} x " : "")}{unit.Name} ({side}).");
         return true;
+    }
+
+    /// <summary>The press let go: a box picks everyone inside it, a click the character under it (Ctrl adds to the picked ones; a click on nobody lets them go).</summary>
+    void ZeusPickUp(Vector2 from, Vector2 to)
+    {
+        bool add = player.CtrlHeld;
+        if (!add) zeusSelected.Clear();
+        if (Vector2.Distance(from, to) >= 6) foreach (var id in player.AnyInBox(from, to)) zeusSelected.Add(id);
+        else if (player.AnyCharacterAt(to) is { } one && !(add && zeusSelected.Remove(one))) zeusSelected.Add(one);
+    }
+
+    /// <summary>Zeus closes: nothing stays picked, the HUD's alerts go back to the edge.</summary>
+    void ZeusLetGo()
+    {
+        zeusSelected.Clear();
+        zeusBoxFrom = null;
+        player.ZeusMarked = null;
+        player.RightPanel = 0;
     }
 
     /// <summary>
@@ -170,8 +198,8 @@ sealed partial class CheatMenu
     {
         scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f))) * player.HudScale;
         controls.Clear(); hits.Clear();
-        // Clear of the performance line along the top and of the HUD's bottom panels; solid, so nothing of the HUD shows through it.
-        float pw = MathF.Round(ZeusWidth * scale), top = MathF.Round(48 * scale), bottom = MathF.Round(280 * scale);
+        // Below the HUD's top-right line (the outpost) and clear of its bottom panels; the alerts move to its left.
+        float pw = MathF.Round(ZeusWidth * scale), top = MathF.Round(Math.Max(48 * scale, player.HudRightBelow + 8 * scale)), bottom = MathF.Round(280 * scale);
         bounds = new(width - pw - MathF.Round(12 * scale), top, pw, Math.Max(240 * scale, height - top - bottom));
         float H = bounds.Height / scale, W = ZeusWidth;
 
@@ -179,13 +207,24 @@ sealed partial class CheatMenu
         if (zeusPick is { } pick && ZeusGround(pointer) is { } ground && player.Project(ground + new Vector3(0, pick.Animal ? 14 : 21, 0)) is { } over)
             Text(zeusCount > 1 ? $"{zeusCount} x {pick.Name}" : pick.Name, new(over.X - 160, over.Y - 24, 320, 22), 14, LightInk, "Center");
 
-        Rect(bounds, new Vector4(0.075f, 0.065f, 0.055f, 1));
+        player.RightPanel = bounds.Width + 12 * scale;
+        // The characters picked: those still in the world, ringed red by the HUD.
+        var present = player.Snapshot.Characters.Select(c => c.Id).ToHashSet();
+        zeusSelected.RemoveWhere(id => !present.Contains(id));
+        player.ZeusMarked = zeusSelected;
+        if (zeusBoxFrom is { } boxFrom && Vector2.Distance(boxFrom, pointer) >= 6)
+        {
+            var box = new UiRect(MathF.Min(boxFrom.X, pointer.X), MathF.Min(boxFrom.Y, pointer.Y), MathF.Abs(pointer.X - boxFrom.X), MathF.Abs(pointer.Y - boxFrom.Y));
+            Rect(box, Enemy with { W = 0.1f });
+            Outline(box, Enemy with { W = 0.85f });
+        }
+
+        // The Modern style's see-through plate; the others' solid one, so nothing of the game's HUD shows through.
+        if (!Modern) Rect(bounds, new Vector4(0.075f, 0.065f, 0.055f, 1));
         Surface(bounds, "window");
         Text("Zeus", R(16, 6, 200, 32), 22, LightInk);
         Text("CREATE", R(110, 10, 160, 26), 12, MutedInk);
-        var close = R(W - 47, 6, 31, 32);
-        controls.Add(new("zeus-close", "Button", close, "", "zeus:close", "Kenshi_CloseButtonSkin", true, new Dictionary<string, string>(), Vector4.Zero));
-        hits.Add(new(close, () => { zeusMode = false; zeusPick = null; }));
+        CloseButton(R(W - 47, 6, 31, 32), () => Visible = false);
         Rect(R(16, 44, W - 32, 1), MainInk with { W = 0.12f });
         EditField(zeusSearch, R(16, 54, W - 32, 30), "Search units or mods");
 
@@ -254,18 +293,22 @@ sealed partial class CheatMenu
         Text(shown.ToString(System.Globalization.CultureInfo.InvariantCulture), R(W - 70, H - 100, 54, 28), 16, LightInk, "Right VCenter");
 
         Rect(R(16, H - 76, W - 32, 1), MainInk with { W = 0.12f });
-        string hint = zeusPick is { } held ? $"{held.Name}: left-click the ground to place, right-click to stop." : "Pick a unit, then click the ground. Delete removes the one under the mouse.";
-        Text(hint, R(16, H - 72, W - 32, 22), 11, zeusPick is null ? MutedInk : Brass);
+        string hint = zeusPick is { } held ? $"{held.Name}: left-click the ground to place, right-click to stop."
+            : zeusSelected.Count > 0 ? $"{zeusSelected.Count} picked: Delete removes them, Esc lets go, Ctrl adds."
+            : "Click or drag over anyone to pick them; Delete removes them.";
+        Text(hint, R(16, H - 72, W - 32, 22), 11, zeusPick is null && zeusSelected.Count == 0 ? MutedInk : zeusSelected.Count > 0 ? Enemy : Brass);
         if (notice.Length > 0 && Environment.TickCount64 - noticeAt < 6000) Text(notice, R(16, H - 52, W - 140, 22), 11, Good);
         Button("Cheat menu", R(W - 124, H - 46, 108, 30), () => { zeusMode = false; zeusPick = null; scroll = scrollTarget = 0; }, size: 12);
         painter.Draw(controls, width, height, pointer, null);
     }
 
-    /// <summary>Zeus's Delete: removes the character under the mouse, else the selected ones (<see cref="DebugRemove"/>).</summary>
+    /// <summary>Zeus's Delete: removes the characters picked with Zeus, else the one under the mouse, else your selected ones (<see cref="DebugRemove"/>).</summary>
     void ZeusDelete()
     {
-        IReadOnlyList<CharacterId> doomed = player.HoverTarget is { } hover ? [hover.Id] : [.. world().Player.Selection];
-        if (doomed.Count == 0) { Notice("Nobody under the mouse or selected."); return; }
+        IReadOnlyList<CharacterId> doomed = zeusSelected.Count > 0 ? [.. zeusSelected]
+            : !bounds.Contains(pointer.X, pointer.Y) && player.AnyCharacterAt(pointer) is { } under ? [under] : [.. world().Player.Selection];
+        zeusSelected.Clear();
+        if (doomed.Count == 0) { Notice("Nobody picked, under the mouse or selected."); return; }
         Send(new DebugRemove(doomed) { Tick = Now });
         Notice(doomed.Count == 1 ? "Removed 1 character." : $"Removed {doomed.Count} characters.");
     }

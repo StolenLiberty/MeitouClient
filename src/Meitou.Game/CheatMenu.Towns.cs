@@ -43,8 +43,7 @@ sealed partial class CheatMenu
         Surface(bounds, "window");
         Text("Town Ownership", R(20, 6, 400, 32), 22, LightInk);
         var close = R(W - 51, 6, 31, 32);
-        controls.Add(new("towns-close", "Button", close, "", "towns:close", "Kenshi_CloseButtonSkin", true, new Dictionary<string, string>(), Vector4.Zero));
-        hits.Add(new(close, () => Visible = false));
+        CloseButton(close, () => Visible = false);
         Rect(R(20, 44, W - 40, 1), MainInk with { W = 0.12f });
 
         Text("Choose how to claim towns:", R(20, 56, W - 40, 24), 14, MainInk);

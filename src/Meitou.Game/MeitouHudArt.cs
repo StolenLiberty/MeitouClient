@@ -84,7 +84,7 @@ static class MeitouHudArt
     {
         var (fill, rim, radius) = kind switch
         {
-            "window" => (new Vector4(18 / 255f, 14 / 255f, 11 / 255f, 0.88f), Ink with { W = 0.18f }, 12f),
+            "window" => (new Vector4(18 / 255f, 14 / 255f, 11 / 255f, 0.72f), Ink with { W = 0.18f }, 12f),
             "paper" or "primary" => (Brass with { W = hover ? 0.34f : 0.22f }, Brass with { W = 0.85f }, 7f),
             _ => (selected ? Brass with { W = 0.22f } : hover ? Ink with { W = 0.13f } : new Vector4(1, 1, 1, 0.05f), selected ? Brass with { W = 0.9f } : Ink with { W = 0.18f }, 7f),
         };

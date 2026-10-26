@@ -187,10 +187,12 @@ sealed partial class PlayerInterface
         var green = new Vector4(0.35f, 1f, 0.45f, 1f);
         var red = new Vector4(1f, 0.4f, 0.35f, 1f);
 
-        // Rings under the selected characters.
+        // Rings under the selected characters, and red ones under those Zeus has picked (any faction).
         foreach (var c in session.CurrentSnapshot.Characters)
         {
-            if (!c.Selected || EditorOpen || !SelectionRings) continue;
+            bool marked = ZeusMarked?.Contains(c.Id) == true;
+            if (!marked && (!c.Selected || EditorOpen || !SelectionRings)) continue;
+            var ringColour = marked ? new Vector4(1f, 0.42f, 0.3f, 1f) : green;
             var centre = where(c);
             // A swimmer is drawn that far down (Speed.WadingHeight) so its body lies in the water: its ring stays on the surface.
             if (centre.Y <= Meitou.Data.World.WorldWater.Height - Meitou.Simulation.Bodies.Speed.DeepWaterDepth + 0.01f) centre.Y = Meitou.Data.World.WorldWater.Height;
@@ -201,7 +203,7 @@ sealed partial class PlayerInterface
                 var point = centre + new Vector3(MathF.Sin(a) * 1.6f, 0.15f, MathF.Cos(a) * 1.6f);
                 var s = Project(point);
                 if (s is null) { previous = null; continue; }
-                if (previous is { } prev) o.Line(prev.X, prev.Y, s.Value.X, s.Value.Y, 2, green);
+                if (previous is { } prev) o.Line(prev.X, prev.Y, s.Value.X, s.Value.Y, 2, ringColour);
                 first ??= s;
                 previous = s;
             }

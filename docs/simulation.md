@@ -1532,7 +1532,7 @@ neither: "Other"). A pick shows see-through figures of it at the ground under th
 Friend (the player's own characters, selectable, in the squad bar), Neutral / Foe (the listed faction when it is already that to the player's, else the first faction that is;
 Foe falls back to the sandbox's hostile pick). Amount 1-100 (a slider, squared) in a block centred on the click, facing away from the camera: `Formation.Line` rows, the front
 about twice the depth. Each placing joins the squad the earlier ones of the same record, faction and side went into while it has members (not kept across a load); an NPC
-squad's first member leads, the others follow it. Delete (Zeus open) sends `DebugRemove` for the character under the pointer, else the selection; the population system
+squad's first member leads, the others follow it. With no unit picked, a left click or box over the world picks characters of any faction (Ctrl adds; red rings); Delete sends `DebugRemove` for the picked ones, else the character under the pointer, else the selection; Esc lets the pick go, then closes Zeus; the population system
 removes them in the next slow world (`CharacterTable.Remove`, as a despawned platoon's), their squads re-lead and the selection moves on as for the dead.
 
 ## Duel
