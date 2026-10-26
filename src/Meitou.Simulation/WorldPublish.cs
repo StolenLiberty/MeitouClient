@@ -199,7 +199,8 @@ public sealed partial class World
 
     /// <summary>The sneaker's watchers of the last <see cref="AggroSystem.WatcherSeconds"/> that are still about, where they stand now.</summary>
     SquadView[] PublishSquads() => [.. SquadManagement.PlayerSquads(this).Select(s => new SquadView(s.Id, s.Name, [.. s.Members])
-        { Autonomy = s.Autonomy, Doing = s.Autonomy is { Enabled: true } ? Ai.AiSystem.AutonomyStatus(this, s) : [], Management = s.Management, Managed = s.Management is null ? [] : ManagedOf(s) })];
+        { Leader = s.Leader, Autonomy = s.Autonomy, Doing = s.Autonomy is { AiRuns: true } ? Ai.AiSystem.AutonomyStatus(this, s) : [], Management = s.Management,
+          Managed = s.Autonomy is { ManagerRuns: true } || s.Management is not null ? ManagedOf(s) : [], ManagerLog = systems.OfType<Management.ManagerSystem>().FirstOrDefault()?.LogOf(s.Id) ?? [] })];
 
     IReadOnlyList<(CharacterId, string, string)> ManagedOf(Squad squad)
     {

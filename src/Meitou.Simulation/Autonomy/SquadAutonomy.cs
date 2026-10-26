@@ -12,6 +12,10 @@ namespace Meitou.Simulation.Autonomy;
 public sealed record AutonomySettings
 {
     public bool Enabled { get; init; }
+    /// <summary>On with behaviours of the old mod (<see cref="Packages"/>): the AI runs the squad from them. On without: its manager does (<see cref="ManagerRuns"/>, Meitou).</summary>
+    [JsonIgnore] public bool AiRuns => Enabled && Packages.Count > 0;
+    /// <summary>On without old-mod behaviours: <see cref="Management.ManagerSystem"/> runs the squad.</summary>
+    [JsonIgnore] public bool ManagerRuns => Enabled && Packages.Count == 0;
     /// <summary>The AI_PACKAGE string ids and the slot each runs at (the plugin's priority 0..5: the blackboard tries the highest slot first).</summary>
     public IReadOnlyList<AutonomyPackage> Packages { get; init; } = [];
     /// <summary>Where the squad rests (<see cref="Construction.BuildSite.Id"/> of a player building, or a town building's key); null: none.</summary>
@@ -141,7 +145,7 @@ public static class AutonomyRules
 
     /// <summary>The squad of a character when it runs on autonomy now (enabled), else null.</summary>
     public static AutonomySettings? Of(World world, CharacterCold c) =>
-        c.IsPlayer && c.SquadId >= 0 && world.Squads.Find(c.SquadId)?.Autonomy is { Enabled: true } s ? s : null;
+        c.IsPlayer && c.SquadId >= 0 && world.Squads.Find(c.SquadId)?.Autonomy is { AiRuns: true } s ? s : null;
 
     /// <summary>
     /// Whether an autonomous character's squad wants a job its packages list (for the first aid and rescue systems, which run those jobs for player characters): the option allows it and

@@ -13,8 +13,8 @@ namespace Meitou.Game;
 // (SetSquadAutonomy), and the AI runs the squad from them.
 sealed partial class CheatMenu
 {
-    enum AutPage { Role, Places, Jobs, Combat, Manager, Building }
-    static readonly string[] AutPageNames = ["Role", "Places & Hours", "Jobs", "Combat & Guard", "Manager", "Building"];
+    enum AutPage { Squad, Priorities, Schedule, Advanced, AdvancedCombat }
+    static readonly string[] AutPageNames = ["Squad", "Priorities", "Schedule", "Advanced", "Advanced: combat"];
 
     bool autoMode;
     AutPage autPage;
@@ -155,17 +155,17 @@ sealed partial class CheatMenu
         const float X = 232, CW = W - 252;
         switch (autPage)
         {
-            case AutPage.Role: DrawRolePage(squad, s, X, CW); break;
-            case AutPage.Places: DrawPlacesPage(squad, s, X, CW); break;
-            case AutPage.Jobs: DrawJobsPage(squad, s, X, CW); break;
-            case AutPage.Manager: DrawManagerPage(squad, s, X, CW); break;
-            case AutPage.Building: DrawBuildingPage(squad, s, X, CW); break;
+            case AutPage.Squad: DrawSquadPage(squad, s, X, CW); break;
+            case AutPage.Priorities: DrawPrioritiesPage(squad, s, X, CW); break;
+            case AutPage.Schedule: DrawPlacesPage(squad, s, X, CW); break;
+            case AutPage.Advanced: DrawRolePage(squad, s, X, CW); break;
             default: DrawCombatPage(squad, s, X, CW); break;
         }
 
         Rect(R(20, H - 46, W - 40, 1), MainInk with { W = 0.12f });
-        string hint = notice.Length > 0 && Environment.TickCount64 - noticeAt < 8000 ? notice : s.Enabled ? "Changes apply right away."
-            : MgmtSettings(squad) is not null ? "A manager runs this squad (Manager page)." : "Autonomy is off: turn it on (top right), or give the squad a manager.";
+        string hint = notice.Length > 0 && Environment.TickCount64 - noticeAt < 8000 ? notice
+            : !s.Enabled ? "Autonomy is off: they only do what you order, as in plain Kenshi. Turn it on (top right) and their manager runs them."
+            : s.AiRuns ? "The old mod's behaviours run this squad (Advanced). Clear them for the manager to run it." : "Changes apply right away.";
         Text(hint, R(20, H - 38, 560, 28), 12, Brass);
         var others = squads.Where(q => q.Id != squad.Id).ToList();
         if (others.Count > 0)
@@ -182,12 +182,12 @@ sealed partial class CheatMenu
 
     string StatusLine(SquadView squad, AutonomySettings s)
     {
-        if (!s.Enabled && MgmtSettings(squad) is { } m)
-        {
-            var doing = squad.Managed.GroupBy(d => d.Doing).OrderByDescending(g => g.Count()).Take(3).Select(g => $"{g.Count()} {g.Key}");
-            return $"Managed by {ManagerName(m)} · " + string.Join(" · ", doing);
-        }
         if (!s.Enabled) return $"{squad.Members.Count} member{(squad.Members.Count == 1 ? "" : "s")} · autonomy off";
+        if (s.ManagerRuns)
+        {
+            var doing = squad.Managed.GroupBy(d => d.Doing.Split(':')[0]).OrderByDescending(g => g.Count()).Take(3).Select(g => $"{g.Count()} {g.Key}");
+            return $"Run by {ManagerName(squad, MgmtSettings(squad))} · " + string.Join(" · ", doing);
+        }
         if (squad.Doing.Count == 0) return "Starting up...";
         var parts = squad.Doing.GroupBy(d => d).OrderByDescending(g => g.Count()).Select(g => $"{g.Count()} {g.Key}");
         return "Now: " + string.Join(" · ", parts);
@@ -230,7 +230,7 @@ sealed partial class CheatMenu
 
     void DrawRolePage(SquadView squad, AutonomySettings s, float x, float w)
     {
-        Header("What should this squad do?", x, 120, w);
+        Header("Advanced: the old Squad Autonomy mod's behaviours (they replace the manager)", x, 120, w);
         bool modLoaded = RolePackages(Roles[0]) is not null;
         float cw = (w - 20) / 3, ch = 84;
         for (int i = 0; i < Roles.Length; i++)
@@ -363,41 +363,6 @@ sealed partial class CheatMenu
         Rect(new(at.X + at.Width * now / 24f, at.Y - 2 * scale, 2 * scale, at.Height + 4 * scale), Good);
     }
 
-    void DrawJobsPage(SquadView squad, AutonomySettings s, float x, float w)
-    {
-        Header("Jobs", x, 120, w);
-        Card(R(x, 166, w, 482));
-        CardTitle("Which work they pick first (Labour at home)", x + 14, 176);
-        Button("All normal", R(x + 14, 198, 110, 26), () => AutSend(squad, s with { Labour = AutonomySettings.DefaultLabour }), size: 12);
-        Button("All off", R(x + 132, 198, 90, 26), () => AutSend(squad, s with { Labour = [.. Enumerable.Repeat(0f, 12)] }), size: 12);
-        Button("Use their best skills", R(x + 230, 198, 170, 26), () => AutSend(squad, s with { Labour = BestSkills(squad) }), size: 12);
-        float y = 236, pipsX = x + 190, pipsW = w - 220;
-        foreach (var (kind, name) in LabourRows)
-        {
-            int value = s.LabourPriority(kind);
-            Text(name, R(x + 14, y, 170, 26), 14, MainInk);
-            float cell = (pipsW - 30) / 11f;
-            for (int v = 0; v <= 10; v++)
-            {
-                int set = v;
-                var at = R(pipsX + v * (cell + 3), y + 5, cell, 16);
-                bool on = v > 0 && v <= value, off = v == 0 && value == 0;
-                Rect(at, off ? Bad with { W = 0.45f } : on ? Brass with { W = 0.75f } : new Vector4(0.10f, 0.08f, 0.07f, 1));
-                Outline(at, MainInk with { W = Hovered(at, null) ? 0.5f : 0.1f });
-                if (v == 0) Text("off", at, 10, off ? LightInk : MutedInk, "Center");
-                hits.Add(new(at, () =>
-                {
-                    var labour = s.Labour.ToArray();
-                    if (labour.Length < 12) labour = [.. labour, .. Enumerable.Repeat(1f, 12 - labour.Length)];
-                    labour[(int)kind] = set;
-                    AutSend(squad, s with { Labour = labour });
-                }));
-            }
-            y += 30;
-        }
-        Text("More bars = picked first. Off = never. Operators also fetch inputs from and take output to your storage nearby.", R(x + 14, y + 4, w - 28, 20), 11, MutedInk);
-    }
-
     /// <summary>The squad's labour priorities from its members' best skills: each group 1 + its best member's level / 10 (engine choice for a quick start).</summary>
     IReadOnlyList<float> BestSkills(SquadView squad)
     {
@@ -464,8 +429,11 @@ sealed partial class CheatMenu
         world().Commands.Enqueue(new Meitou.Simulation.Management.SetSquadManagement(squad.Id, settings) { Tick = Now });
     }
 
-    string ManagerName(Meitou.Simulation.Management.ManagementSettings m) =>
-        Snap.Characters.FirstOrDefault(c => c.Id == m.Manager)?.Name is { Length: > 0 } name ? name : m.ManagerName.Length > 0 ? m.ManagerName : "nobody";
+    /// <summary>The squad's manager as shown: the one picked, else its leader.</summary>
+    string ManagerName(SquadView squad, Meitou.Simulation.Management.ManagementSettings? m) =>
+        m is not null && !m.Manager.IsNone && Snap.Characters.FirstOrDefault(c => c.Id == m.Manager)?.Name is { Length: > 0 } name ? name
+        : m is { ManagerName.Length: > 0 } && m.Manager.IsNone ? m.ManagerName
+        : Snap.Characters.FirstOrDefault(c => c.Id == squad.Leader)?.Name ?? "the leader";
 
     static readonly (Meitou.Simulation.Management.DefenceMode Mode, string Name, string Blurb)[] DefenceModes =
     [
@@ -473,71 +441,6 @@ sealed partial class CheatMenu
         (Meitou.Simulation.Management.DefenceMode.Militia, "Militia", "The men take up arms; the women go inside a building until it's over."),
         (Meitou.Simulation.Management.DefenceMode.Shelter, "Shelter", "Everyone goes inside a building until the enemies are gone."),
     ];
-
-    void DrawManagerPage(SquadView squad, AutonomySettings s, float x, float w)
-    {
-        Header("Manager: keeps everyone in this squad busy", x, 120, w);
-        var m = MgmtSettings(squad);
-        float half = (w - 14) / 2;
-
-        // Who manages.
-        Card(R(x, 166, half, 112));
-        CardTitle("Manager", x + 14, 176);
-        var people = Snap.Characters.Where(c => c.IsPlayer).OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
-        int current = m is null ? 0 : people.FindIndex(c => c.Id == m.Manager) + 1;
-        DropdownButton("mgr-who", R(x + 14, 198, half - 28, 32), ["None", .. people.Select(c => c.Name)], current, k =>
-        {
-            if (k == 0) { MgmtSend(squad, null); Notice($"{squad.Name} has no manager."); return; }
-            var who = people[k - 1];
-            MgmtSend(squad, (m ?? new()) with { Manager = who.Id, ManagerName = "", ManagerSquadIndex = -1 });
-            Notice($"{who.Name} now manages {squad.Name}.");
-        }, caption: m is null ? "Pick a manager..." : null);
-        Text("He works too. He must be up and inside your outpost for it to run.", R(x + 14, 236, half - 28, 34), 11, MutedInk, "Left Top");
-
-        // What he does with them.
-        float gx = x + half + 14;
-        Card(R(gx, 166, half, 112));
-        CardTitle("Work", gx + 14, 176);
-        Check(R(gx + 14, 198, half - 28, 44), "Build and repair", "Idle hands go to unfinished or damaged buildings.", m?.Build ?? true,
-            () => { if (m is not null) MgmtSend(squad, m with { Build = !m.Build }); }, enabled: m is not null);
-        Text("What to build first: the Building page. Hours, jobs, turrets, resting: the other pages.", R(gx + 14, 246, half - 28, 26), 11, MutedInk);
-
-        // When the outpost is attacked.
-        CardTitle("When the outpost is attacked", x, 290);
-        float cw = (w - 20) / 3;
-        for (int i = 0; i < DefenceModes.Length; i++)
-        {
-            var (mode, name, blurb) = DefenceModes[i];
-            var at = R(x + i * (cw + 10), 310, cw, 70);
-            bool chosen = (m?.Defence ?? Meitou.Simulation.Management.DefenceMode.Militia) == mode;
-            bool hover = m is not null && Hovered(at, null);
-            Rect(at, chosen ? Brass with { W = 0.12f } : new Vector4(0, 0, 0, hover ? 0.28f : 0.18f));
-            Outline(at, chosen ? Brass : MainInk with { W = hover ? 0.35f : 0.12f });
-            if (chosen) Rect(at with { Width = 3 * scale }, Brass);
-            Text(name, new(at.X + 14 * scale, at.Y + 6 * scale, at.Width - 28 * scale, 22 * scale), 15, m is null ? MutedInk : LightInk);
-            Text(blurb, new(at.X + 14 * scale, at.Y + 28 * scale, at.Width - 28 * scale, 38 * scale), 11, MutedInk, "Left Top");
-            if (m is not null) hits.Add(new(at, () => MgmtSend(squad, m with { Defence = mode })));
-        }
-
-        // What each one is doing.
-        Card(R(x, 392, w, 256));
-        CardTitle(m is null ? "Members" : $"What {ManagerName(m)}'s people are doing", x + 14, 402);
-        if (s.Enabled) Text("Autonomy is on for this squad: turn it off (top right) for the manager to run it.", R(x + 14, 422, w - 28, 20), 12, Bad);
-        else if (m is null) Text("Pick a manager above.", R(x + 14, 422, w - 28, 20), 12, MutedInk);
-        else
-        {
-            var rows = squad.Managed;
-            float colW = (w - 28) / 3;
-            for (int k = 0; k < rows.Count && k < 33; k++)
-            {
-                var (_, name, doing) = rows[k];
-                var at = R(x + 14 + (k % 3) * colW, 424 + (k / 3) * 20, colW - 10, 20);
-                bool idle = doing.StartsWith("idle", StringComparison.Ordinal) || doing.StartsWith("no ", StringComparison.Ordinal);
-                Text($"{name}: {doing}", at, 11, idle ? Bad : MainInk);
-            }
-            if (rows.Count > 33) Text($"and {rows.Count - 33} more", R(x + 14, 626, 300, 18), 11, MutedInk);
-        }
-    }
 
     static readonly (Meitou.Simulation.Management.BuildGroup Group, string Name, string Examples)[] BuildRows =
     [
@@ -551,48 +454,166 @@ sealed partial class CheatMenu
         (Meitou.Simulation.Management.BuildGroup.Other, "Other", "lights, furniture, doors, signs"),
     ];
 
-    /// <summary>The manager's building priorities: what he has built first when you place something.</summary>
-    void DrawBuildingPage(SquadView squad, AutonomySettings s, float x, float w)
+    // ------------------------------------------------------------------ the Squad and Priorities pages (Meitou's autonomy: the manager runs the squad)
+
+    sealed record WorkRole(string Name, string Blurb, float[] Labour, float[] Build, bool Turrets, Meitou.Simulation.Management.DefenceMode? Defence = null);
+
+    // Labour order: Science, Labouring, Farming, Engineer, Cooking, Robotics, Medic, WeaponSmith, ArmourSmith, CrossbowSmith, AutomaticMachine, Other. Build order: BuildRows.
+    static readonly WorkRole[] WorkRoles =
+    [
+        new("Engineers", "Build and repair whatever you place. They fetch the materials from storage and the ground.", [1, 1, 1, 3, 1, 2, 1, 1, 1, 1, 1, 1], [9, 9, 9, 9, 9, 9, 9, 6], false),
+        new("Workers", "Run every machine in the outpost. Build when nothing else needs doing.", [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], [3, 3, 3, 3, 3, 3, 3, 2], false),
+        new("Farmers", "Plant, tend and harvest the farms; help cook.", [0, 0, 10, 0, 6, 0, 0, 0, 0, 0, 3, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
+        new("Cooks", "Keep the stoves and ovens going; help on the farms.", [0, 0, 4, 0, 10, 0, 0, 0, 0, 0, 3, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
+        new("Miners", "Mine and refine: ore, stone, copper, iron.", [0, 10, 0, 2, 0, 0, 0, 0, 0, 0, 4, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
+        new("Crafters", "Smith weapons, armour and crossbows; make parts.", [0, 0, 0, 3, 0, 3, 0, 10, 10, 10, 0, 2], [0, 0, 0, 0, 0, 0, 0, 0], false),
+        new("Researchers", "Work the research benches.", [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
+        new("Medics", "Run the medical benches.", [0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
+        new("Guards", "Man the turrets and fight off anyone who attacks the outpost.", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], true,
+            Meitou.Simulation.Management.DefenceMode.Fighters),
+    ];
+
+    bool IsRole(WorkRole role, AutonomySettings s, Meitou.Simulation.Management.ManagementSettings m) =>
+        s.Labour.Take(12).SequenceEqual(role.Labour) && m.BuildPriority.Take(8).SequenceEqual(role.Build) && s.ManTurrets == role.Turrets;
+
+    /// <summary>The main page: what the squad does (a role sets the priorities), who runs it, what happens when attacked, and what each one is doing now.</summary>
+    void DrawSquadPage(SquadView squad, AutonomySettings s, float x, float w)
     {
-        Header("Building: what the manager has built first", x, 120, w);
-        var m = MgmtSettings(squad);
-        Card(R(x, 166, w, 482));
-        CardTitle("Place something and he puts his people on it, most important first", x + 14, 176);
-        if (m is null)
+        var m = MgmtSettings(squad) ?? new Meitou.Simulation.Management.ManagementSettings();
+        Header("What should this squad do?", x, 120, w);
+        float cw = (w - 20) / 3, ch = 56;
+        for (int i = 0; i < WorkRoles.Length; i++)
         {
-            Text("This squad has no manager yet: pick one on the Manager page.", R(x + 14, 200, w - 28, 26), 13, MutedInk);
-            return;
+            var role = WorkRoles[i];
+            var at = R(x + (i % 3) * (cw + 10), 162 + (i / 3) * (ch + 8), cw, ch);
+            bool chosen = s.Enabled && IsRole(role, s, m);
+            bool hover = Hovered(at, null);
+            Rect(at, chosen ? Brass with { W = 0.12f } : new Vector4(0, 0, 0, hover ? 0.28f : 0.18f));
+            Outline(at, chosen ? Brass : MainInk with { W = hover ? 0.35f : 0.12f });
+            if (chosen) Rect(at with { Width = 3 * scale }, Brass);
+            Text(role.Name, new(at.X + 12 * scale, at.Y + 4 * scale, at.Width - 24 * scale, 22 * scale), 15, LightInk);
+            Text(role.Blurb, new(at.X + 12 * scale, at.Y + 26 * scale, at.Width - 24 * scale, 28 * scale), 11, MutedInk, "Left Top");
+            hits.Add(new(at, () =>
+            {
+                // A role turns autonomy on for the manager (clearing the old mod's behaviours) and sets every priority.
+                AutSend(squad, s with { Enabled = true, Packages = [], Labour = role.Labour, ManTurrets = role.Turrets });
+                MgmtSend(squad, m with { BuildPriority = role.Build, Build = role.Build.Any(v => v > 0) || m.Build, Defence = role.Defence ?? m.Defence });
+                Notice($"{squad.Name}: {role.Name}. {ManagerName(squad, m)} runs them.");
+            }));
         }
-        Button("Defaults", R(x + 14, 198, 110, 26), () => MgmtSend(squad, m with { BuildPriority = Meitou.Simulation.Management.ManagementSettings.DefaultBuildPriority }), size: 12);
-        Button("Build nothing", R(x + 132, 198, 130, 26), () => MgmtSend(squad, m with { BuildPriority = [.. Enumerable.Repeat(0f, 8)] }), size: 12);
-        float y = 236, pipsX = x + 300, pipsW = w - 330;
+
+        // Who runs them, and when the outpost is attacked.
+        float half = (w - 14) / 2, top = 362;
+        Card(R(x, top, half, 86));
+        CardTitle("Manager", x + 14, top + 8);
+        var people = Snap.Characters.Where(c => c.IsPlayer).OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        string leader = Snap.Characters.FirstOrDefault(c => c.Id == squad.Leader)?.Name ?? "none";
+        int current = m.Manager.IsNone ? 0 : people.FindIndex(c => c.Id == m.Manager) + 1;
+        DropdownButton("mgr-who", R(x + 14, top + 28, half - 28, 30), [$"Squad leader ({leader})", .. people.Select(c => c.Name)], Math.Max(0, current), k =>
+        {
+            var who = k == 0 ? CharacterId.None : people[k - 1].Id;
+            MgmtSend(squad, m with { Manager = who, ManagerName = "", ManagerSquadIndex = -1 });
+        });
+        Text("He works too, and must be up and in your outpost for it to run.", R(x + 14, top + 62, half - 28, 20), 11, MutedInk);
+        float gx = x + half + 14;
+        Card(R(gx, top, half, 86));
+        CardTitle("When the outpost is attacked", gx + 14, top + 8);
+        float bw = (half - 28 - 16) / 3;
+        for (int i = 0; i < DefenceModes.Length; i++)
+        {
+            var (mode, name, _) = DefenceModes[i];
+            Button(name, R(gx + 14 + i * (bw + 8), top + 28, bw, 30), () => MgmtSend(squad, m with { Defence = mode }), selected: m.Defence == mode, size: 13);
+        }
+        Text(DefenceModes.First(d => d.Mode == m.Defence).Blurb, R(gx + 14, top + 62, half - 28, 20), 11, MutedInk);
+
+        // What each one is doing, and the manager's latest decisions.
+        float bottom = 458, rosterW = (w - 14) * 0.6f, logW = w - 14 - rosterW;
+        Card(R(x, bottom, rosterW, 190));
+        CardTitle("What they're doing", x + 14, bottom + 8);
+        if (!s.Enabled) Text("Autonomy is off: they only do what you order.", R(x + 14, bottom + 30, rosterW - 28, 20), 12, MutedInk);
+        else if (s.AiRuns) Text("The old mod's behaviours run them (Advanced page).", R(x + 14, bottom + 30, rosterW - 28, 20), 12, MutedInk);
+        else
+        {
+            var rows = squad.Managed;
+            float colW = (rosterW - 28) / 2;
+            for (int k = 0; k < rows.Count && k < 16; k++)
+            {
+                var (_, name, doing) = rows[k];
+                var at = R(x + 14 + (k % 2) * colW, bottom + 28 + (k / 2) * 19, colW - 8, 19);
+                bool idle = doing.StartsWith("idle", StringComparison.Ordinal) || doing.StartsWith("no ", StringComparison.Ordinal) || doing.Contains("away", StringComparison.Ordinal);
+                Text($"{name}: {doing}", at, 11, idle ? Bad : MainInk);
+            }
+            if (rows.Count > 16) Text($"and {rows.Count - 16} more", R(x + 14, bottom + 182 - 14, 200, 14), 10, MutedInk);
+        }
+        float lx = x + rosterW + 14;
+        Card(R(lx, bottom, logW, 190));
+        CardTitle("Manager's log", lx + 14, bottom + 8);
+        var log = squad.ManagerLog;
+        if (log.Count == 0) Text("Nothing yet.", R(lx + 14, bottom + 30, logW - 28, 20), 12, MutedInk);
+        for (int k = 0; k < log.Count; k++)
+            Text(log[log.Count - 1 - k], R(lx + 14, bottom + 28 + k * 19, logW - 28, 19), 11, k == 0 ? LightInk : MainInk);
+    }
+
+    /// <summary>The pips of a 0..10 priority: "off" then ten bars; a click sets it.</summary>
+    void Pips(UiRect area, int value, Action<int> set)
+    {
+        float cell = (area.Width - 30 * scale) / 11f;
+        for (int v = 0; v <= 10; v++)
+        {
+            int to = v;
+            var at = new UiRect(area.X + v * (cell + 3 * scale), area.Y, cell, area.Height);
+            bool on = v > 0 && v <= value, off = v == 0 && value == 0;
+            Rect(at, off ? Bad with { W = 0.45f } : on ? Brass with { W = 0.75f } : new Vector4(0.10f, 0.08f, 0.07f, 1));
+            Outline(at, MainInk with { W = Hovered(at, null) ? 0.5f : 0.1f });
+            if (v == 0) Text("off", at, 10, off ? LightInk : MutedInk, "Center");
+            hits.Add(new(at, () => set(to)));
+        }
+    }
+
+    /// <summary>Machine work and building on one page: more bars = done first; a building whose bars beat a job's is built before that job is worked.</summary>
+    void DrawPrioritiesPage(SquadView squad, AutonomySettings s, float x, float w)
+    {
+        var m = MgmtSettings(squad) ?? new Meitou.Simulation.Management.ManagementSettings();
+        Header("Priorities: more bars = done first, off = never", x, 120, w);
+        float half = (w - 14) / 2;
+        Card(R(x, 166, half, 482));
+        CardTitle("Machine work", x + 14, 176);
+        Button("Their best skills", R(x + half - 150, 172, 136, 24), () => AutSend(squad, s with { Labour = BestSkills(squad) }), size: 11);
+        float y = 204;
+        foreach (var (kind, name) in LabourRows)
+        {
+            Text(name, R(x + 14, y, 140, 24), 13, MainInk);
+            Pips(R(x + 156, y + 4, half - 170, 16), s.LabourPriority(kind), v =>
+            {
+                var labour = s.Labour.ToArray();
+                if (labour.Length < 12) labour = [.. labour, .. Enumerable.Repeat(1f, 12 - labour.Length)];
+                labour[(int)kind] = v;
+                AutSend(squad, s with { Labour = labour });
+            });
+            y += 30;
+        }
+        Text("Operators fetch inputs from your storage and take the output back.", R(x + 14, y + 2, half - 28, 18), 10, MutedInk);
+
+        float gx = x + half + 14;
+        Card(R(gx, 166, half, 482));
+        CardTitle("Building what you place", gx + 14, 176);
+        y = 204;
         foreach (var (group, name, examples) in BuildRows)
         {
-            int value = m.PriorityOf(group);
-            Text(name, R(x + 14, y, 150, 26), 14, MainInk);
-            Text(examples, R(x + 140, y, 160, 26), 11, MutedInk);
-            float cell = (pipsW - 30) / 11f;
-            for (int v = 0; v <= 10; v++)
+            Text(name, R(gx + 14, y - 2, 140, 18), 13, MainInk);
+            Text(examples, R(gx + 14, y + 13, 140, 14), 9, MutedInk);
+            Pips(R(gx + 156, y + 4, half - 170, 16), m.PriorityOf(group), v =>
             {
-                int set = v;
-                var at = R(pipsX + v * (cell + 3), y + 5, cell, 16);
-                bool on = v > 0 && v <= value, off = v == 0 && value == 0;
-                Rect(at, off ? Bad with { W = 0.45f } : on ? Brass with { W = 0.75f } : new Vector4(0.10f, 0.08f, 0.07f, 1));
-                Outline(at, MainInk with { W = Hovered(at, null) ? 0.5f : 0.1f });
-                if (v == 0) Text("off", at, 10, off ? LightInk : MutedInk, "Center");
-                hits.Add(new(at, () =>
-                {
-                    var list = m.BuildPriority.ToArray();
-                    if (list.Length < 8) list = [.. list, .. Meitou.Simulation.Management.ManagementSettings.DefaultBuildPriority.Skip(list.Length)];
-                    list[(int)group] = set;
-                    MgmtSend(squad, m with { BuildPriority = list });
-                }));
-            }
+                var list = m.BuildPriority.ToArray();
+                if (list.Length < 8) list = [.. list, .. Meitou.Simulation.Management.ManagementSettings.DefaultBuildPriority.Skip(list.Length)];
+                list[(int)group] = v;
+                MgmtSend(squad, m with { BuildPriority = list, Build = true });
+            });
             y += 34;
         }
-        Text("More bars = built first. A building more important than a job's bars on the Jobs page is built before that job is worked. At most 3 builders per building; repairs count too.",
-            R(x + 14, y + 6, w - 28, 40), 11, MutedInk, "Left Top");
-        if (!m.Build) Text("Build and repair is off on the Manager page.", R(x + 14, y + 48, w - 28, 20), 12, Bad);
+        Check(R(gx + 14, y + 6, half - 28, 42), "Build and repair", "They fetch materials from storage and the ground.", m.Build, () => MgmtSend(squad, m with { Build = !m.Build }));
+        Check(R(gx + 14, y + 54, half - 28, 42), "Man turrets", "When nothing above needs them.", s.ManTurrets, () => AutSend(squad, s with { ManTurrets = !s.ManTurrets }));
+        Text("At most 3 builders per building.", R(gx + 14, y + 102, half - 28, 18), 10, MutedInk);
     }
 
     // ------------------------------------------------------------------ pick in world

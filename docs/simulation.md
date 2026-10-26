@@ -1398,7 +1398,9 @@ while enemies come. A guard at its turret fires it ([Ranged](#ranged)).
 Meitou's version of the RE_Kenshi plugin Squad Autonomy (Workshop 3800729618, GPLv3 source by Au2942; its AI packages come from its `SquadAutonomy.mod`, which must be in the mod list).
 `Autonomy/SquadAutonomy.cs` holds a player squad's `AutonomySettings` (`Squad.Autonomy`; the plugin's fields and defaults), set whole by `SetSquadAutonomy` (also while paused) and saved
 on the squad's platoon as the Meitou-only string `meitou autonomy` (JSON; the plugin wrote `SquadAutonomy.save` beside the save).
-- Enabled, `AiSystem` runs the squad like an NPC squad from the listed packages (slot = the plugin's priority); a settings change releases the squad and takes it up again (the
+- Meitou: the switch on with no packages is the squad's manager's (`AutonomySettings.ManagerRuns`, [managers](#managers)); on with packages (the window's Advanced page,
+  `AiRuns`) the AI runs it as below; off is plain Kenshi.
+- With packages, `AiSystem` runs the squad like an NPC squad from the listed packages (slot = the plugin's priority); a settings change releases the squad and takes it up again (the
   plugin's ResetAI / SetAI). A member is the AI's while it has no order (`AiSystem.PlayerHeld`: idle, or still on the task the AI last gave it); a player order wins until the
   character is idle again.
 - The plugin's scoring hooks are `AiSystem.AutonomyDesire` (rest time from the work hours: no guarding, gate, labour or turrets; staying home and sitting x0.0001 in work time;
@@ -1410,15 +1412,17 @@ on the squad's platoon as the Meitou-only string `meitou autonomy` (JSON; the pl
   Close Gate shuts the gate while a guard mans it and opens it for the player's people passing.
 - Engine choices: how healed a character is (the plugin's `restedState`) is hit points over maximum summed over the parts; a player building has no nodes, so posts stand round it.
   Not built: the plugin's shopping change, its equipped-item locks and its gate guards' door repair.
-- UI: the HUD's AUT button (the plugin's default place, 0.69 x 0.788 of the screen) opens `CheatMenu.Autonomy.cs` for the squad on the squad bar: roles (presets of the packages),
-  the packages and slots, places (picked in the world or from the selection), work hours, health thresholds, labour priorities, combat and guard options. No button on the squads
-  screen (the window picks the squad).
+- UI: the HUD's AUT button (the plugin's default place, 0.69 x 0.788 of the screen) opens `CheatMenu.Autonomy.cs` for the squad on the squad bar. Meitou's pages: Squad (work roles,
+  presets of the labour and building priorities and turrets that turn the manager on and clear the packages; the manager, the squad leader by default; when attacked; what each
+  member is doing; the manager's log), Priorities (labour and building bars, Build and repair, Man turrets), Schedule (places, work hours, health thresholds), Advanced (the plugin's
+  roles and packages, its combat and guard options). No button on the squads screen (the window picks the squad).
 
 ## Managers
 
-Meitou-only, engine choices throughout (`Management/Managers.cs`, the Squad Autonomy window's Manager page). A player squad's `ManagementSettings` name a manager (any player
-character; saved as platoon string `meitou management` with his squad's `Index` and his name, resolved on the first check), a `DefenceMode` and Build and repair. Work hours, job
-priorities, Man turrets and the rest thresholds are the squad's `AutonomySettings` with autonomy off; a squad with autonomy on is the AI's. Every 2 s (`ManagerSystem.SlowWorld`), with the
+Meitou-only, engine choices throughout (`Management/Managers.cs`, the Squad Autonomy window's Squad page). A player squad with autonomy on and no packages is run by its manager: the
+one its `ManagementSettings` name (any player character; saved as platoon string `meitou management` with his squad's `Index` and his name, resolved on the first check), else its
+leader; the settings also hold a `DefenceMode`, Build and repair and the building priorities. Work hours, job priorities, Man turrets and the rest thresholds are the squad's
+`AutonomySettings`. Each new decision goes to the squad's log (`ManagerSystem.LogOf`, the last 8, `SquadView.ManagerLog`). Every 2 s (`ManagerSystem.SlowWorld`), with the
 manager up, free and inside one of the player's outposts (`PlayerTown` radius), each member in that outpost:
 - enemies in the outpost (up, hostile to the player's faction, or fighting a player character): Fighters all attack the nearest (`AttackOrder`, defensive); Militia: the men attack, the
   women (`CharacterAppearance.Female`) walk into the nearest complete outpost building with a door and stay; Shelter: everyone does; afterwards they are free again;

@@ -214,6 +214,17 @@ sealed partial class PlayerInterface
         }
 
         DrawGameUi(o, width, height, pass);
+        // Meitou: the box dragged over the squad bar's portraits.
+        if (barBoxFrom is { } bar && Vector2.Distance(bar, mouse) >= DragThreshold)
+        {
+            var edge = new Vector4(0.6f, 1f, 0.6f, 1);
+            float x0 = MathF.Min(bar.X, mouse.X), y0 = MathF.Min(bar.Y, mouse.Y), x1 = MathF.Max(bar.X, mouse.X), y1 = MathF.Max(bar.Y, mouse.Y);
+            o.Rect(x0, y0, x1, y1, new Vector4(0.4f, 1f, 0.5f, 0.15f));
+            o.Line(x0, y0, x1, y0, 1, edge);
+            o.Line(x1, y0, x1, y1, 1, edge);
+            o.Line(x1, y1, x0, y1, 1, edge);
+            o.Line(x0, y1, x0, y0, 1, edge);
+        }
         o.Flush(width, height, null, pass);
     }
 }

@@ -201,7 +201,8 @@ time, each page holding an `item_box_v.layout` ItemBox (vertical, fills the page
 side = min(int(0.9 × box height), int(0.9 × box width) / n), n = members (at least 1; 10 when more than 9), clamped to 60..128 px
 and rounded down to even. Cells fill rows left to right and wrap; the ItemBox scrolls past the last row. Matches the earlier
 observation of frames at ~72% of the page at 1080p (the 128 px cap). Meitou scales the px limits by height / 1080 and scrolls one
-row per wheel notch (the original's step per notch is **Unknown**).
+row per wheel notch (the original's step per notch is **Unknown**). Meitou: a left press on the page dragged into a box selects every member whose cell it touches
+(Shift adds; `PlayerInterface.SquadBarBoxUp`).
 
 ### Portrait cells
 

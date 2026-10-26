@@ -143,7 +143,7 @@ public sealed partial class AiSystem
     /// </summary>
     static bool AutonomyResting(World world, Squad squad)
     {
-        if (squad.Autonomy is not { Enabled: true } s) return false;
+        if (squad.Autonomy is not { AiRuns: true } s) return false;
         foreach (var m in squad.Members)
             if (world.Characters.TryResolveNext(m, out int slot) && world.Characters.Cold(slot) is { } c
                 && (c.InSomething == Locks.HeldState.Bed || c.Medical is { Incapacitated: true } || AutonomyRules.Rested(c) < s.HealedThreshold / 100f)) return true;

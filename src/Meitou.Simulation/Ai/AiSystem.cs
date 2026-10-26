@@ -110,7 +110,7 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
             {
                 // The stance changes only with the role list (a package switch) and the hour.
                 mind.Stance = StanceOf(mind, roles, hour);
-                if (squad.Autonomy is { Enabled: true } autonomy)
+                if (squad.Autonomy is { AiRuns: true } autonomy)
                 {
                     mind.Stance = AutonomyStance(mind.Stance, autonomy, autonomy.IsRestTime(world.GameHours));
                     mind.Protects &= autonomy.ProtectAllies;
@@ -235,7 +235,7 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
             TaskProfiles.Special => 1,
             var d => d,
         };
-        if (squad.Autonomy is { Enabled: true } autonomy) return AutonomyDesire(world, autonomy, behaviour, type, squad, board, mind, self, targeting, desire);
+        if (squad.Autonomy is { AiRuns: true } autonomy) return AutonomyDesire(world, autonomy, behaviour, type, squad, board, mind, self, targeting, desire);
         return desire * Factor(world, behaviour, squad, board, mind, self, targeting);
     }
 
@@ -507,7 +507,7 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
                 }
             }
         }
-        if (mind.Squad.Autonomy is { Enabled: true } && ActAutonomy(world, slot, mind, board, behaviour, type)) return;
+        if (mind.Squad.Autonomy is { AiRuns: true } && ActAutonomy(world, slot, mind, board, behaviour, type)) return;
         switch (behaviour)
         {
             case AiBehaviour.Mill:

@@ -94,6 +94,27 @@ sealed partial class PlayerInterface
     /// <summary>The squad bar's page, its row height and how far its rows are scrolled (the ItemBox scrolls a row per wheel notch).</summary>
     UiRect squadBarPage;
     float squadBarRow, squadBarScroll;
+    /// <summary>Where a press on the squad bar's page began (a box over the portraits once dragged); null: none.</summary>
+    Vector2? barBoxFrom;
+
+    /// <summary>The button let go after a box over the squad bar: every member whose portrait the box touches is selected (Shift: added). Meitou.</summary>
+    void SquadBarBoxUp(Vector2 p, bool shift)
+    {
+        if (barBoxFrom is not { } from) return;
+        barBoxFrom = null;
+        if (Vector2.Distance(from, p) < DragThreshold || squadBarRow <= 0) return;
+        float x0 = MathF.Min(from.X, p.X), y0 = MathF.Min(from.Y, p.Y), x1 = MathF.Max(from.X, p.X), y1 = MathF.Max(from.Y, p.Y);
+        var members = SquadBarMembers();
+        float size = squadBarRow;
+        int columns = Math.Max(1, (int)(squadBarPage.Width / size));
+        var picked = new List<CharacterId>();
+        for (int i = 0; i < members.Count; i++)
+        {
+            float left = squadBarPage.X + i % columns * size, top = squadBarPage.Y + i / columns * size - squadBarScroll;
+            if (left < x1 && left + size > x0 && top < y1 && top + size > y0) picked.Add(members[i].Id);
+        }
+        if (picked.Count > 0) Select(picked, shift);
+    }
 
     /// <summary>The wheel over the squad bar scrolls its rows; clamped when the bar is laid out.</summary>
     bool SquadBarWheel(Vector2 p, float steps)

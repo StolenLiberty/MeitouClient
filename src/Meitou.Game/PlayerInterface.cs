@@ -81,6 +81,8 @@ sealed partial class PlayerInterface(WorldSession session, Func<float, float, fl
         if (button == MouseButton.Right && !OverHud(p) && WallCancel()) return true;
         if (button == MouseButton.Left)
         {
+            // Meitou: a press on the squad bar's page may become a box over its portraits (the press itself still clicks what it is on).
+            barBoxFrom = UiVisible && squadBarRow > 0 && squadBarPage.Contains(p.X, p.Y) && !ModalOpen ? p : null;
             if (UiMouseDown(p)) return true;
             if (CloseContextMenu()) return true;   // a click beside the open menu only closes it
             if (OverHud(p)) return true;
@@ -169,7 +171,7 @@ sealed partial class PlayerInterface(WorldSession session, Func<float, float, fl
     {
         mouse = p;
         EditorPointerUp(button);
-        if (button == MouseButton.Left) { InventoryPointerUp(p); JobDragEnd(p); SquadPointerUp(p, shift); faithfulScreens.PointerUp(); mapDrag = null; }
+        if (button == MouseButton.Left) { InventoryPointerUp(p); JobDragEnd(p); SquadPointerUp(p, shift); faithfulScreens.PointerUp(); mapDrag = null; SquadBarBoxUp(p, shift); }
         if (button == MouseButton.Middle) mapDrag = null;
         if (button == MouseButton.Right && MapRightUp(p)) return;
         if (button == MouseButton.Right) { ContextRelease(); SiteRelease(); RockRelease(); BedRelease(); }

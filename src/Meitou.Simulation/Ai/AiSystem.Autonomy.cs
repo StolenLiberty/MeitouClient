@@ -10,7 +10,7 @@ namespace Meitou.Simulation.Ai;
 // are AutonomyDesire and the stance rule; in a player town its posts, beds, patrols, labour and turrets are the outpost's (the base AI reads only placed towns).
 public sealed partial class AiSystem
 {
-    static bool Autonomous(Squad squad) => squad.Autonomy is { Enabled: true };
+    static bool Autonomous(Squad squad) => squad.Autonomy is { AiRuns: true };
 
     /// <summary>The packages a squad's autonomy lists, at their slots (0..5, the plugin's priorities); ids the data lacks are left out (the plugin would crash on them).</summary>
     IReadOnlyList<SlottedPackage> AutonomyPackages(AutonomySettings settings)
@@ -61,7 +61,7 @@ public sealed partial class AiSystem
     /// </summary>
     public static bool PlayerHeld(in CharacterHot n, CharacterCold cold, AiMind mind)
     {
-        if (mind.Squad.Autonomy is not { Enabled: true } || cold.OrderQueue.Count > 0) return false;
+        if (mind.Squad.Autonomy is not { AiRuns: true } || cold.OrderQueue.Count > 0) return false;
         var task = (CharacterTask)n.Task;
         if (task == CharacterTask.Idle) return true;
         if (cold.InSomething == Locks.HeldState.Bed && mind.Behaviour == AiBehaviour.Sleep && task is CharacterTask.Sleep or CharacterTask.Rest) return true;
@@ -78,7 +78,7 @@ public sealed partial class AiSystem
 
     /// <summary>Whether a player character fights on its own as an NPC would (autonomous, its packages give it a combat stance that is not passive): <see cref="AggroSystem"/>'s look then runs for it.</summary>
     public static bool AutonomyFights(CharacterCold cold) =>
-        cold.IsPlayer && cold.Ai is { HasCombatGoals: true, Stance: not AiStance.Passive } mind && mind.Squad.Autonomy is { Enabled: true };
+        cold.IsPlayer && cold.Ai is { HasCombatGoals: true, Stance: not AiStance.Passive } mind && mind.Squad.Autonomy is { AiRuns: true };
 
     /// <summary>
     /// The plugin's combat options and rest time on the stance its goals give (its <c>Tasker::score</c> rows for 144 / 16 and 15 / 288 / 143): no attacking with Attack Enemies off or in
@@ -156,7 +156,7 @@ public sealed partial class AiSystem
 
     /// <summary>Goals whose act-out in a player town is the autonomy's own, so the planner (which reads placed towns) is not asked about them.</summary>
     internal static bool AutonomyActs(AiMind mind, Blackboard board, TaskType type) =>
-        mind.Squad.Autonomy is { Enabled: true } && TaskBehaviours.Of(type) switch
+        mind.Squad.Autonomy is { AiRuns: true } && TaskBehaviours.Of(type) switch
         {
             AiBehaviour.Work or AiBehaviour.Turret or AiBehaviour.TownNode => board.AutonomyTown > 0,
             AiBehaviour.Post => board.AutonomySite is not null,
@@ -290,7 +290,7 @@ public sealed partial class AiSystem
             var request = mind.Request;
             mind.Request = AiBehaviour.None;
             ref var n = ref table.Next[s];
-            if (!n.Alive || production is null || mind.Squad.Autonomy is not { Enabled: true } settings || mind.Squad.Ai is not { } board || mind.Behaviour != request || !PlayerHeld(n, cold, mind)) continue;
+            if (!n.Alive || production is null || mind.Squad.Autonomy is not { AiRuns: true } settings || mind.Squad.Ai is not { } board || mind.Behaviour != request || !PlayerHeld(n, cold, mind)) continue;
             string? site = request == AiBehaviour.Work
                 ? production.AutonomyLabour(world, s, settings, board.AutonomyTown, board.AutonomySite?.Position)
                 : production.AutonomyTurret(world, s, board.AutonomyTown);

@@ -106,6 +106,27 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
 
     public string? StatusOf(CharacterId id) => status.GetValueOrDefault(id);
 
+    /// <summary>Each managed squad's latest decisions, newest last (at most <see cref="LogLines"/>).</summary>
+    readonly Dictionary<int, List<string>> logs = [];
+    const int LogLines = 8;
+    (int Squad, string Manager) current;
+
+    public IReadOnlyList<string> LogOf(int squad) => logs.TryGetValue(squad, out var log) ? [.. log] : [];
+
+    /// <summary>A decision for the window's log: "{manager} sent {member} to {what}" with the game time.</summary>
+    void Log(World world, CharacterCold member, string what)
+    {
+        if (!logs.TryGetValue(current.Squad, out var log)) logs[current.Squad] = log = [];
+        double h = ((world.GameHours % 24) + 24) % 24;
+        string line = member.Name == current.Manager ? $"{member.Name} went {what}" : $"{current.Manager} sent {member.Name} {what}";
+        if (log.Count > 0 && log[^1].EndsWith(line, StringComparison.Ordinal)) return;   // the same again (an order not taken up yet)
+        log.Add($"{(int)h:00}:{(int)(h % 1 * 60):00}  {line}");
+        if (log.Count > LogLines) log.RemoveAt(0);
+    }
+
+    /// <summary>The name of a site's building, for the log.</summary>
+    string SiteName(World world, string site) => world.Buildings.Find(site) is { } b ? (b.Name.Length > 0 ? b.Name : data?.Db.Find(b.Record)?.Name ?? "a building") : "a building";
+
     public void Inputs(World world, IReadOnlyList<SimCommand> commands)
     {
         foreach (var command in commands)
@@ -143,14 +164,12 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         var building = new Dictionary<string, int>();
         foreach (var squad in world.Squads.All)
         {
-            if (squad.Management is not { } m || squad.Faction != world.Player.Faction) continue;
-            if (m.Manager.IsNone || !table.IsAlive(m.Manager)) squad.Management = m = Resolve(world, m);
-            if (squad.Autonomy is { Enabled: true })
-            {
-                Mark(world, squad, "autonomy runs this squad");
-                continue;
-            }
-            if (!table.TryResolveNext(m.Manager, out int boss) || table.Cold(boss) is not { } manager || manager.Medical is { Dead: true })
+            // Autonomy on (without the old mod's behaviours) is the manager's: the one picked, else the squad's leader. Off is plain Kenshi.
+            if (squad.Faction != world.Player.Faction || squad.Autonomy is not { ManagerRuns: true }) continue;
+            var m = squad.Management ?? new ManagementSettings();
+            if (!m.Manager.IsNone && !table.IsAlive(m.Manager) || m.Manager.IsNone && m.ManagerName.Length > 0) squad.Management = m = Resolve(world, m);
+            var bossId = m.Manager.IsNone ? squad.Leader : m.Manager;
+            if (!table.TryResolveNext(bossId, out int boss) || table.Cold(boss) is not { } manager || manager.Medical is { Dead: true })
             {
                 Mark(world, squad, "no manager");
                 continue;
@@ -163,6 +182,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             if (!threats.TryGetValue(town.Number, out var enemies)) threats[town.Number] = enemies = Enemies(world, combat, town);
             var settings = squad.Autonomy ?? new AutonomySettings();
             bool rest = settings.IsRestTime(world.GameHours);
+            current = (squad.Id, manager.Name);
             foreach (var id in squad.Members)
                 Manage(world, production, m, settings, rest, town, enemies, table.Next[boss].Position, id, beds, building);
         }
@@ -194,12 +214,18 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             {
                 status[id] = "defending";
                 if (!c.InCombat && task != CharacterTask.Attack && Nearest(table, n.Position, enemies) is int foe)
+                {
                     world.Defer(new Combat.AttackOrder([id], table.IdOf(foe)) { Tick = world.Tick + 1, Defensive = true });
+                    Log(world, c, "to fight " + (table.Cold(foe)?.Name ?? "an enemy"));
+                }
                 return;
             }
             status[id] = "sheltering";
             if (sheltering.Add(id) && Shelter(world, town, n.Position) is { } inside)
+            {
                 world.Defer(new MoveOrder([id], inside) { Tick = world.Tick + 1 });
+                Log(world, c, "inside to shelter");
+            }
             return;
         }
         if (sheltering.Remove(id) && task == CharacterTask.GoTo) { MovementSystem.Stop(table, slot); task = CharacterTask.Idle; }
@@ -217,7 +243,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         bool ours = sent.TryGetValue(id, out var job) && (task == CharacterTask.Operate && c.OperateSite == job.Site || task is CharacterTask.Build && c.BuildSite == job.Site);
         if (ours && (rest || wounded))
         {
-            if (Bed(world, town, c, beds) is { } bed) { world.Defer(new Locks.UseBedOrder([id], bed) { Tick = world.Tick + 1 }); status[id] = rest ? "off to bed" : "off to bed (hurt)"; }
+            if (Bed(world, town, c, beds) is { } bed) { world.Defer(new Locks.UseBedOrder([id], bed) { Tick = world.Tick + 1 }); status[id] = rest ? "off to bed" : "off to bed (hurt)"; Log(world, c, rest ? "to bed (shift over)" : "to bed (hurt)"); }
             else status[id] = "no free bed";
             return;
         }
@@ -231,7 +257,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             stuck[(id, last.Site)] = world.Tick + (long)(StuckSeconds / world.TickSeconds);
         if (wounded || rest)
         {
-            if (Bed(world, town, c, beds) is { } bed) { world.Defer(new Locks.UseBedOrder([id], bed) { Tick = world.Tick + 1 }); status[id] = wounded ? "off to bed (hurt)" : "off to bed"; }
+            if (Bed(world, town, c, beds) is { } bed) { world.Defer(new Locks.UseBedOrder([id], bed) { Tick = world.Tick + 1 }); status[id] = wounded ? "off to bed (hurt)" : "off to bed"; Log(world, c, wounded ? "to bed (hurt)" : "to bed (off shift)"); }
             else status[id] = "no free bed";
             return;
         }
@@ -241,35 +267,38 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         int machinePriority = machine is null ? -1 : MachinePriority(world, s, machine);
         if (site is { } first && (machine is null || site.Value.Priority > machinePriority))
         {
-            StartBuild(world, id, first.Site, building);
+            StartBuild(world, id, c, first.Site, building);
             return;
         }
         if (production is not null && machine is not null && production.AutonomyBegin(world, slot, machine))
         {
+            if (!sent.TryGetValue(id, out var was) || was.Site != machine) Log(world, c, "to work the " + SiteName(world, machine));
             sent[id] = (machine, world.Tick);
-            status[id] = "working";
+            status[id] = "working: " + SiteName(world, machine);
             return;
         }
         if (production is not null && s.ManTurrets && production.AutonomyTurret(world, slot, town.Number) is { } turret && !Stuck(world, id, turret) && production.AutonomyBegin(world, slot, turret))
         {
+            if (!sent.TryGetValue(id, out var was) || was.Site != turret) Log(world, c, "to man the " + SiteName(world, turret));
             sent[id] = (turret, world.Tick);
             status[id] = "on a turret";
             return;
         }
         if (site is { } later)
         {
-            StartBuild(world, id, later.Site, building);
+            StartBuild(world, id, c, later.Site, building);
             return;
         }
         status[id] = "idle: nothing to do";
     }
 
-    void StartBuild(World world, CharacterId id, Construction.BuildSite site, Dictionary<string, int> building)
+    void StartBuild(World world, CharacterId id, CharacterCold c, Construction.BuildSite site, Dictionary<string, int> building)
     {
+        if (!sent.TryGetValue(id, out var was) || was.Site != site.Id) Log(world, c, (site.Complete ? "to repair the " : "to build the ") + SiteName(world, site.Id));
         building[site.Id] = building.GetValueOrDefault(site.Id) + 1;
         world.Defer(new Construction.BuildOrder([id], site.Id, Repair: site.Complete && site.Destroyed) { Tick = world.Tick + 1 });
         sent[id] = (site.Id, world.Tick);
-        status[id] = site.Complete ? "repairing" : "building";
+        status[id] = (site.Complete ? "repairing: " : "building: ") + SiteName(world, site.Id);
     }
 
     /// <summary>The job priority (Jobs page) of the machine on a site.</summary>
