@@ -247,7 +247,7 @@ sealed partial class PlayerInterface
     /// </summary>
     static readonly (string Word, CharacterOrders Order)[] OrderWords =
     [
-        ("Block", CharacterOrders.Block), ("Hold", CharacterOrders.Hold), ("Chase", CharacterOrders.Jobs), ("Passive", CharacterOrders.Passive),
+        ("AttackAll", CharacterOrders.AttackAll), ("Block", CharacterOrders.Block), ("Hold", CharacterOrders.Hold), ("Chase", CharacterOrders.Jobs), ("Passive", CharacterOrders.Passive),
         ("Ranged", CharacterOrders.Ranged), ("Taunt", CharacterOrders.Taunt), ("Sneak", CharacterOrders.Sneak), ("Stealth", CharacterOrders.Sneak),
         ("Jobs", CharacterOrders.Jobs),
     ];

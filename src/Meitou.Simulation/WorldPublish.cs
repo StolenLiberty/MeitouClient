@@ -105,6 +105,7 @@ public sealed partial class World
                 // The original skips robots' appearances (FUN_140531820) and animals have none.
                 Build = cold is { Stats: { } buildStats, Medical: { } fed, Race.IsRobot: false, Appearance: { Animal: null } look }
                     ? Meitou.Data.Characters.CharacterShape.BuildFromStats(look.Female, buildStats, static (stats, s) => stats[s], fed.Hunger) : null,
+                Stand = selected ? StandOf(cold!, state[i]) : null,
                 Path = selected && (state[i].Flags & (ushort)MoveFlags.HasPath) != 0 ? cold!.Path.Skip(state[i].PathCursor).ToArray() : [],
                 CarriedBy = cold?.CarriedBy ?? CharacterId.None,
                 Carry = cold is { CarriedBy.IsNone: false } ? cold.CarryAttach ?? Carrying.CarryPose.Fallback : null,
@@ -252,5 +253,20 @@ public sealed partial class World
             else if (float.IsNaN(f)) return f;
         }
         return worst;
+    }
+
+    /// <summary>Where a selected character will stand (<see cref="CharacterSnapshot.Stand"/>).</summary>
+    static (Vector3 At, float Yaw) StandOf(CharacterCold cold, in CharacterHot n)
+    {
+        if (cold.Formation is not null) return (cold.FormationSpot, cold.FormationYaw);
+        float yaw = float.IsNaN(cold.ArriveYaw) ? n.Yaw : cold.ArriveYaw;
+        if (n.Task == (byte)CharacterTask.GoTo)
+        {
+            var goal = cold.OrderQueue.Count > 0 ? cold.OrderQueue[^1] : n.Goal;
+            float y = cold.OrderQueue.Count == 0 && cold.GoalHeightAt == n.Goal && !float.IsNaN(cold.GoalHeight) ? cold.GoalHeight
+                : cold.Path.Length > 0 ? cold.Path[^1].Y : n.Position.Y;
+            return (new Vector3(goal.X, y, goal.Y), yaw);
+        }
+        return (n.Position, n.Yaw);
     }
 }

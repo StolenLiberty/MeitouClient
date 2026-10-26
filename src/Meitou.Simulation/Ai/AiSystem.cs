@@ -110,7 +110,11 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
             {
                 // The stance changes only with the role list (a package switch) and the hour.
                 mind.Stance = StanceOf(mind, roles, hour);
-                if (squad.Autonomy is { Enabled: true } autonomy) mind.Stance = AutonomyStance(mind.Stance, autonomy, autonomy.IsRestTime(world.GameHours));
+                if (squad.Autonomy is { Enabled: true } autonomy)
+                {
+                    mind.Stance = AutonomyStance(mind.Stance, autonomy, autonomy.IsRestTime(world.GameHours));
+                    mind.Protects &= autonomy.ProtectAllies;
+                }
                 (mind.StanceFrom, mind.StanceHour) = (roles, hour);
             }
             ref var n = ref table.Next[i];
@@ -154,17 +158,20 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
     /// </summary>
     internal static AiStance StanceOf(AiMind mind, IReadOnlyList<AiGoal> roles, int hour)
     {
-        bool any = false;
+        bool any = false, protects = false;
         var stance = AiStance.Passive;
         void Take(AiGoal g)
         {
             if (TaskBehaviours.StanceOf(g.Task.Type) is not { } s) return;
             any = true;
-            if (g.InWindow(hour) && s > stance) stance = s;
+            if (!g.InWindow(hour)) return;
+            if (s > stance) stance = s;
+            if (s is AiStance.ProtectSquad or AiStance.Defensive) protects = true;
         }
         for (int k = 0; k < roles.Count; k++) Take(roles[k]);
         for (int k = 0; k < mind.RaceGoals.Count; k++) Take(mind.RaceGoals[k]);
         mind.HasCombatGoals = any;
+        mind.Protects = protects;
         return any ? stance : AiStance.Aggressive;
     }
 

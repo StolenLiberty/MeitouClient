@@ -37,7 +37,11 @@ sealed partial class PlayerInterface
     /// <summary>Once a frame while the button is held: the line to the point under the pointer and the rings on it (also when the camera moves).</summary>
     void UpdateFormationDrag()
     {
-        if (formationDrag is not { } d) return;
+        if (formationDrag is not { } d)
+        {
+            ShowStands();
+            return;
+        }
         if (!d.Active && Vector2.Distance(d.FromPixel, mouse) < FormationDragPixels) return;
         if (Ray(mouse) is not { } ray || MoveHit(ray.Origin, ray.Direction) is not { } hit) return;
         d.Active = true;
@@ -57,7 +61,9 @@ sealed partial class PlayerInterface
         if (Markers is { } markers)
         {
             markers.Rings = [.. d.Spots.Select(s => s + new Vector3(0, 0.6f, 0))];
+            markers.RingFacings = [];
             markers.RingFacing = new Vector3(facing.X, 0, facing.Y);
+            standsShown = false;
         }
     }
 
@@ -67,7 +73,7 @@ sealed partial class PlayerInterface
         if (formationDrag is not { } d) return false;
         UpdateFormationDrag();
         formationDrag = null;
-        if (Markers is { } markers) markers.Rings = [];
+        if (Markers is { } markers) (markers.Rings, markers.RingFacings) = ([], []);
         if (!d.Active || d.Spots.Length != d.Ids.Count)
         {
             Move(d.From, d.Queued);
@@ -78,10 +84,30 @@ sealed partial class PlayerInterface
         return true;
     }
 
+    bool standsShown;
+
+    /// <summary>
+    /// Alt held with characters selected (and no drag): a ring where each will stand (<see cref="CharacterSnapshot.Stand"/>: its formation spot, the end of its walk, or where it
+    /// stands), the notch the way it will face. Cleared when Alt is let go.
+    /// </summary>
+    void ShowStands()
+    {
+        if (Markers is not { } markers) return;
+        var stands = AltHeld && !ModalOpen && !TitleOpen ? Selected().Select(c => c.Stand).OfType<(Vector3 At, float Yaw)>().ToArray() : [];
+        if (stands.Length == 0)
+        {
+            if (standsShown) (markers.Rings, markers.RingFacings, standsShown) = ([], [], false);
+            return;
+        }
+        markers.Rings = [.. stands.Select(s => s.At + new Vector3(0, 0.6f, 0))];
+        markers.RingFacings = [.. stands.Select(s => new Vector3(MathF.Sin(s.Yaw), 0, MathF.Cos(s.Yaw)))];
+        standsShown = true;
+    }
+
     /// <summary>The drag is dropped without an order (the world went away, Escape).</summary>
     void CancelFormationDrag()
     {
         formationDrag = null;
-        if (Markers is { } markers) markers.Rings = [];
+        if (Markers is { } markers) (markers.Rings, markers.RingFacings) = ([], []);
     }
 }

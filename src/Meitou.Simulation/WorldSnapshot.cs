@@ -102,6 +102,11 @@ public sealed record CharacterSnapshot(CharacterId Id, CharacterAppearance? Appe
     public IReadOnlyList<Production.PermaJob> Jobs { get; init; } = [];
     /// <summary>The path being followed from the next waypoint, for selected characters only (the host draws it).</summary>
     public IReadOnlyList<Vector3> Path { get; init; } = [];
+    /// <summary>
+    /// For selected characters only: where it will stand and the yaw it will face there: its formation spot (<see cref="CharacterCold.Formation"/>), else the end of the walk in
+    /// hand, else where it stands now (the interface rings them while Alt is held).
+    /// </summary>
+    public (Vector3 At, float Yaw)? Stand { get; init; }
     /// <summary>Null for a character without a body (an animal).</summary>
     public BodyStatus? Body { get; init; }
     /// <summary>The stat-driven body of a person (not a robot, not an animal), from its current stats and hunger; null for the others.</summary>

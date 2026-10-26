@@ -28,6 +28,11 @@ public enum CharacterOrders : ushort
     Sneak = 64,
     /// <summary>Enables automatic assigned jobs; direct player orders remain available.</summary>
     Jobs = 128,
+    /// <summary>
+    /// Meitou-only (the ATTACK ALL toggle): an attack on a target the player picks spreads over every character of the target's faction within <see cref="Orders.AttackAllRadius"/>
+    /// of it (docs/simulation.md "Order toggles").
+    /// </summary>
+    AttackAll = 256,
 }
 
 /// <summary>How exposed a sneaking character is to the hostile NPCs about (docs/game/perception.md "Spotting a sneaker"); ordered, the most exposed last.</summary>
@@ -75,6 +80,10 @@ public static class Orders
     ];
 
     public const string SpeedModeKey = "speed mode";
+    /// <summary>Meitou's own GAMESTATE_CHARACTER bool for <see cref="CharacterOrders.AttackAll"/> (the original's loader ignores it).</summary>
+    public const string AttackAllKey = "meitou attack all";
+    /// <summary>How far from the picked target the characters of its faction are taken on by an Attack All order (engine choice).</summary>
+    public const float AttackAllRadius = 300;
     /// <summary>The jobs switch as older Meitou saves wrote it (GAMESTATE_CHARACTER): read, never written; the original's key is GAMESTATE_AI <c>jobs</c> (<see cref="Saving.PermaJobSave"/>).</summary>
     public const string JobsKey = "meitou jobs enabled";
     public const CharacterOrders PlayerDefaults = CharacterOrders.Jobs | CharacterOrders.Ranged;
@@ -87,6 +96,8 @@ public static class Orders
         foreach (var (order, key) in SaveKeys) state.Bools[key] = (cold.Orders & order) != 0;
         // The jobs switch is the AI record's (Saving.PermaJobSave); the key older Meitou saves wrote is dropped.
         state.Bools.Remove(JobsKey);
+        if ((cold.Orders & CharacterOrders.AttackAll) != 0) state.Bools[AttackAllKey] = true;
+        else state.Bools.Remove(AttackAllKey);
         state.Ints[SpeedModeKey] = cold.RunSpeed;
     }
 
@@ -95,6 +106,7 @@ public static class Orders
     {
         foreach (var (order, key) in SaveKeys)
             if (state.Bools.TryGetValue(key, out bool on)) cold.Orders = on ? cold.Orders | order : cold.Orders & ~order;
+        if (state.Bools.TryGetValue(AttackAllKey, out bool all)) cold.Orders = all ? cold.Orders | CharacterOrders.AttackAll : cold.Orders & ~CharacterOrders.AttackAll;
         if (state.Bools.TryGetValue(JobsKey, out bool jobs)) cold.Orders = jobs ? cold.Orders | CharacterOrders.Jobs : cold.Orders & ~CharacterOrders.Jobs;
         if (state.Ints.TryGetValue(SpeedModeKey, out int mode) && mode is >= 0 and <= SpeedMode.Group) cold.RunSpeed = (byte)mode;
     }

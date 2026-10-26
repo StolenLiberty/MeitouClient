@@ -282,7 +282,8 @@ chases only within the hold leash; a member shooting a crossbow never walks to c
 a job (any task but Idle, Attack, or the formation's own walk, `FormationWalk`), an attack on a target the player picked (`AttackOrder.Picked`), prison, death, or leaving
 the world. A move order given to exactly one formation's members marches it: the stored shape (`FormationGroup.Offsets`) centred on the target, turned to face the way from
 its centre (kept for a step under `Formation.Spacing`). A march of two or more keeps step (`CharacterCold.MarchSpeed`): each walks at the slowest marcher's speed times its
-share of the longest way, faster behind the block's mean progress and slower ahead of it. Engine choices throughout; formations are not saved.
+share of the longest way, faster behind the block's mean progress and slower ahead of it. Engine choices throughout; formations are not saved. Holding Alt (no drag) rings
+where each selected character will stand (`CharacterSnapshot.Stand`: its formation spot, the end of its walk, or where it stands), the notch its facing.
 
 ### Order toggles
 
@@ -292,6 +293,9 @@ systems; the rules follow [combat](game/combat.md#fight-lifecycle-and-orders). A
 from joining others' defence and from attack on sight. Hold adds attack on sight while Idle (not Passive, sneaking or crawling), and every target of a
 holder (sight, self-defence, re-pick) passes the post test (`Orders.HoldPost`); it walks to a target only within 80 (140 when the target fights it) of
 its hold point (`CharacterCold.HoldPoint`: where Hold was turned on, then each ground move's destination; not saved: a loaded holder holds where it stands, as setStandingOrder 12 does; **Observed**: the loader replays the jobs switch through it, Verified; Hold assumed alike).
+Attack All (Meitou-only, `CharacterOrders.AttackAll`, the HUD's eighth toggle, saved as GAMESTATE_CHARACTER `meitou attack all`): an attack on a target the player picks
+(`AttackOrder.Picked`) spreads over every awake character of the target's faction within `Orders.AttackAllRadius` (300) of it: each attacker with the toggle takes the one with the
+fewest attackers so far, the nearest on a tie (`CombatSystem.AttackAllTargets`), each an assault.
 A toggle (button or hotkey) sets every selected character to the opposite of the first one's state, so a mixed selection ends uniform (engine choice; the original's rule is **Unknown**). Toggles and the run speed arrows also apply while paused ([time model](#time-model)).
 New player characters start with Jobs and Ranged enabled. Jobs gates the job list and automatic rescue (the medic, robotics, splint and attacking-enemies jobs run regardless, as the original); direct orders still run. The saved `chase mode` is this switch. Saved toggles override
 defaults, including explicit false values. Jobs is GAMESTATE_AI `jobs` ([perma-jobs](game/ai-tasks.md#perma-jobs)); Meitou's older `meitou jobs enabled` is read, not written.
@@ -476,7 +480,9 @@ the best `Combat.TargetScore` (the original's attack-on-sight finder), not the n
 Being taken as a target is answered the same tick when it alerts ([being targeted](game/combat.md#fight-lifecycle-and-orders)), the rest every 15 ticks;
 free squad mates within `JoinRange` (250, engine choice; the original's joiner must sense the mate) join an attacked member's defence each check even while it is
 already fighting or down (engine rule), against an attacker within 150 of it (`AI::findAttackerOf`); an NPC with an AI joins this way only with a protect goal
-(143 PROTECT_OWN_SQUAD, PROTECT_ALLIES and the like) and only for a mate that fights, else through its stance or not at all (`RetaliationSystem.ProtectsMates`).
+(143 PROTECT_OWN_SQUAD, PROTECT_ALLIES and the like) in its lists at the hour (`AiMind.Protects`, whatever goal sets its stance: the base patrols, e.g. `Holy Army Patrol`
+and `Starving bandit mob`, hold both Attack enemies and Protect allies, **Verified** by dump of the merged data) and only for a mate that fights, else through its stance or not at all
+(`RetaliationSystem.ProtectsMates`).
 Orders defer to the next tick. Relations are live state and deed/witness effects have distinct
 paths; preserve current ordering.
 Relation events (`FactionDeeds`, built with the aggro part; [factions 3.5](game/factions-squads-towns.md#35-what-fires-relation-changes-observed-decompile)):

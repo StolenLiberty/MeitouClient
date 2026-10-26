@@ -102,6 +102,8 @@ public sealed unsafe class MarkerRenderer : IDisposable
     /// </summary>
     public Vector3[] Rings { get; set; } = [];
     public Vector3 RingFacing { get; set; } = Vector3.UnitZ;
+    /// <summary>Each ring's own facing (as many as <see cref="Rings"/>); empty: all face <see cref="RingFacing"/>.</summary>
+    public Vector3[] RingFacings { get; set; } = [];
     // Bright whatever the light (the shading halves an unlit face; the target clamps): a pale green, over the ground and through it.
     static readonly Vector4 RingVisible = new(1.5f, 2f, 1.4f, 1f), RingHidden = new(1.2f, 1.6f, 1.1f, 0.75f);
 
@@ -228,7 +230,9 @@ public sealed unsafe class MarkerRenderer : IDisposable
         }
         var arrows = Arrows;
         var rings = Rings;
-        var ringTurn = PointAlong(Vector3.Normalize(RingFacing with { Y = 0 } is { } f && f.LengthSquared() > 1e-6f ? f : Vector3.UnitZ));
+        var facings = RingFacings;
+        static Matrix4x4 Turn(Vector3 facing) => PointAlong(Vector3.Normalize(facing with { Y = 0 } is { } f && f.LengthSquared() > 1e-6f ? f : Vector3.UnitZ));
+        var ringTurn = Turn(RingFacing);
         var cmd = gpu.BeginNative("markers");
         var viewport = new PixelViewport(0, 0, width, height, 0, 1);
         var t = PassTargets.Of(msColour, msDepth).At(viewport);
@@ -264,8 +268,8 @@ public sealed unsafe class MarkerRenderer : IDisposable
                 foreach (var a in arrows)
                     Draw(cmd, arrow, a.At - eye, PointAlong(a.Direction), new Vector4(a.Colour, hidden ? ArrowHiddenAlpha : 1));
             if (ring.Count > 0)
-                foreach (var r in rings)
-                    Draw(cmd, ring, r - eye, ringTurn, hidden ? RingHidden : RingVisible);
+                for (int k = 0; k < rings.Length; k++)
+                    Draw(cmd, ring, rings[k] - eye, k < facings.Length ? Turn(facings[k]) : ringTurn, hidden ? RingHidden : RingVisible);
         }
         cmd.EndRendering();
         cmd.Order();

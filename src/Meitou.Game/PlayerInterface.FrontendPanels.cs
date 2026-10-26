@@ -55,6 +55,36 @@ sealed partial class PlayerInterface
         return menu with { Roots = [.. menu.Roots.Select(Walk)] };
     }
 
+    /// <summary>
+    /// The HUD's orders panel with a Meitou toggle under SNEAK, ATTACK ALL (<see cref="CharacterOrders.AttackAll"/>): the tick buttons from BLOCK down are shrunk to share the room the
+    /// seven had above the speed arrows, eight rows instead of seven, the gaps kept in proportion.
+    /// </summary>
+    static MyGuiLayout WithAttackAllButton(MyGuiLayout hud)
+    {
+        MyGuiWidget Walk(MyGuiWidget w)
+        {
+            if (w.Name != "OrdersPanel" || w.Children.FirstOrDefault(c => c.Name == "OrdersSneakButton") is not { } sneak) return w with { Children = [.. w.Children.Select(Walk)] };
+            var ticks = w.Children.Where(c => c.Name.StartsWith("Orders", StringComparison.Ordinal) && c.Skin == sneak.Skin).OrderBy(c => c.Position.Y).ToList();
+            float top = ticks[0].Position.Y, oldStep = (sneak.Position.Y - top) / (ticks.Count - 1);
+            float bottom = w.Children.FirstOrDefault(c => c.Name == "SpeedArrowLeft") is { } arrow ? arrow.Position.Y - 0.01f : sneak.Position.Y + sneak.Position.Height;
+            // Rows 0..count (one more than before) from the top, the last one ending at the bottom: top + count × step + height = bottom, height in the old proportion to the step.
+            float step = (bottom - top) / (ticks.Count + sneak.Position.Height / oldStep);
+            float height = sneak.Position.Height * step / oldStep;
+            var rows = new Dictionary<string, int>();
+            for (int k = 0; k < ticks.Count; k++) rows[ticks[k].Name] = k;
+            var children = new List<MyGuiWidget>();
+            foreach (var c in w.Children)
+                children.Add(rows.TryGetValue(c.Name, out int row) ? c with { Position = c.Position with { Y = top + row * step, Height = height } } : c);
+            children.Add(sneak with { Name = AttackAllButton, Properties = new Dictionary<string, string>(sneak.Properties) { ["Caption"] = "ATTACK ALL" },
+                Position = sneak.Position with { Y = top + ticks.Count * step, Height = height } });
+            return w with { Children = children };
+        }
+        return hud with { Roots = [.. hud.Roots.Select(Walk)] };
+    }
+
+    /// <summary>The ATTACK ALL toggle's widget (bound by its word, <see cref="OrderWords"/>).</summary>
+    internal const string AttackAllButton = "OrdersAttackAllButton";
+
     /// <summary>The load window with a Meitou row under its list: a tick that hides the base game's saves, styled as the reset tick (hidden in Faithful).</summary>
     static MyGuiLayout WithSaveFilter(MyGuiLayout load)
     {

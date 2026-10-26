@@ -432,7 +432,7 @@ public sealed class RetaliationSystem(CombatSystem combat) : ITickSystem
     static bool CanProtect(CharacterTable table, int slot, HashSet<int> taken) => CanFight(table, slot, taken) && ProtectsMates(table.Cold(slot)!, false);
 
     static bool ProtectsMates(CharacterCold cold, bool fights) =>
-        cold.IsPlayer || cold.Ai is not { } mind || fights && mind.Stance is Ai.AiStance.ProtectSquad or Ai.AiStance.Defensive;
+        cold.IsPlayer || cold.Ai is not { } mind || fights && (mind.Protects || mind.Stance is Ai.AiStance.ProtectSquad or Ai.AiStance.Defensive);
 
     static bool Able(CharacterTable table, int slot, HashSet<int> taken, out CharacterCold cold, out byte task)
     {

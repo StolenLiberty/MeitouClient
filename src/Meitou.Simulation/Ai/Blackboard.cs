@@ -454,6 +454,11 @@ public sealed class AiMind
     /// <summary>Whether its lists hold any combat goal at all (else the stance stays the old default).</summary>
     public bool HasCombatGoals { get; set; }
     /// <summary>
+    /// Whether a protect goal (PROTECT_ALLIES, PROTECT_OWN_SQUAD and the like) is in its lists at this hour, whatever goal sets <see cref="Stance"/>: a squad with both Attack enemies and
+    /// Protect allies (most patrols) stands Aggressive and still comes to a mate's defence (<see cref="RetaliationSystem"/>).
+    /// </summary>
+    public bool Protects { get; set; }
+    /// <summary>
     /// Squad autonomy (a player character the AI runs): the task, walk goal and operated site its last act-out left it with. A player order changes them, and the AI leaves the character
     /// alone until it is idle again (<see cref="AiSystem.PlayerHeld"/>). Derived, not hashed.
     /// </summary>

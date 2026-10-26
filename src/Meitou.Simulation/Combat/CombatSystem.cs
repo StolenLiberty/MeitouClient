@@ -142,6 +142,49 @@ public sealed partial class CombatSystem : ITickSystem, IStateHashed
 
     // ------------------------------------------------------------------ inputs
 
+    /// <summary>
+    /// The pairs an Attack All order gives (<see cref="CharacterOrders.AttackAll"/>), or null when none of its attackers has the toggle or the target stands alone: every awake character
+    /// of the target's faction (not the player's) within <see cref="Orders.AttackAllRadius"/> of the target, nearest it first; each attacker with the toggle takes the one with fewest
+    /// attackers so far, the nearest to it on a tie; the others keep the picked target.
+    /// </summary>
+    static List<(CharacterId Attacker, CharacterId Target)>? AttackAllTargets(World world, CharacterTable table, AttackOrder order)
+    {
+        if (!table.TryResolveNext(order.Target, out int picked) || table.Cold(picked) is not { } pc || pc.Faction < 0 || pc.Faction == world.Player.Faction) return null;
+        if (!order.Attackers.Any(id => table.TryResolveNext(id, out int s) && table.Cold(s) is { IsPlayer: true } c && (c.Orders & CharacterOrders.AttackAll) != 0)) return null;
+        var next = table.Next;
+        var at = next[picked].Position;
+        var targets = new List<(int Slot, float D2)>();
+        for (int s = 0; s < table.HighWater; s++)
+        {
+            if (!next[s].Alive || table.Cold(s) is not { IsPlayer: false } c || c.Faction != pc.Faction || c.IsImprisoned || c.Medical is { Incapacitated: true } or { Dead: true }) continue;
+            float dx = next[s].Position.X - at.X, dz = next[s].Position.Z - at.Z, d2 = dx * dx + dz * dz;
+            if (s == picked) d2 = -1;
+            if (d2 <= Orders.AttackAllRadius * Orders.AttackAllRadius) targets.Add((s, d2));
+        }
+        if (targets.Count < 2) return null;
+        targets.Sort((x, y) => x.D2 != y.D2 ? x.D2.CompareTo(y.D2) : x.Slot.CompareTo(y.Slot));
+        var counts = new int[targets.Count];
+        var pairs = new List<(CharacterId, CharacterId)>();
+        foreach (var id in order.Attackers)
+        {
+            if (!table.TryResolveNext(id, out int a) || table.Cold(a) is not { } ac) continue;
+            int best = 0;
+            if (ac.IsPlayer && (ac.Orders & CharacterOrders.AttackAll) != 0)
+            {
+                float bestD = float.MaxValue;
+                for (int k = 0; k < targets.Count; k++)
+                {
+                    var p = next[targets[k].Slot].Position - next[a].Position;
+                    float d = p.X * p.X + p.Z * p.Z;
+                    if (counts[k] < counts[best] || counts[k] == counts[best] && d < bestD) (best, bestD) = (k, d);
+                }
+            }
+            counts[best]++;
+            pairs.Add((id, table.IdOf(targets[best].Slot)));
+        }
+        return pairs;
+    }
+
     public void Inputs(World world, IReadOnlyList<SimCommand> commands)
     {
         var table = world.Characters;
@@ -157,6 +200,14 @@ public sealed partial class CombatSystem : ITickSystem, IStateHashed
                     // A target the player picked takes the attacker out of its formation (it fights where the order leads, not from its spot).
                     if (order.Picked)
                         foreach (var id in order.Attackers) if (table.TryResolveNext(id, out int picker)) MovementSystem.LeaveFormation(table.Cold(picker)!);
+                    // Attack All: the attackers with the toggle spread over the target's faction about it, each its own target (an assault on each).
+                    if (order.Picked && AttackAllTargets(world, table, order) is { } spread)
+                    {
+                        foreach (var (id, target) in spread)
+                            if (Engage(world, table, id, target, now, true) && Crimes is { } spreadCrimes && table.TryResolveNext(target, out int spreadVictim))
+                                spreadCrimes.Assault(world, id.Slot, spreadVictim);
+                        break;
+                    }
                     foreach (var id in order.Attackers)
                         if (Engage(world, table, id, order.Target, now, order.Picked) && !order.Defensive && Crimes is { } crimes && table.TryResolveNext(order.Target, out int victimSlot))
                             crimes.Assault(world, id.Slot, victimSlot);

@@ -36,9 +36,9 @@ public sealed partial class MovementSystem
     public IReadOnlyList<FormationGroup> Formations => formations;
 
     /// <summary>An idle member farther than this from its spot walks back to it (engine choice).</summary>
-    public const float FormationReturnSlack = 6;
+    public const float FormationReturnSlack = 4;
     /// <summary>Seconds between a member's walks back (so a spot it cannot reach is not asked for every tick).</summary>
-    public const float FormationReturnSeconds = 2;
+    public const float FormationReturnSeconds = 1;
     /// <summary>How much faster (per unit of progress) a marcher behind the block walks, and slower one ahead of it (engine choice).</summary>
     const float MarchCatchUp = 3;
     /// <summary>The least share of the march speed a member with a short way to go walks at.</summary>
@@ -171,7 +171,7 @@ public sealed partial class MovementSystem
                 var spot = new Vector2(cold.FormationSpot.X, cold.FormationSpot.Z);
                 if (Vector2.DistanceSquared(new Vector2(n.Position.X, n.Position.Z), spot) > FormationReturnSlack * FormationReturnSlack)
                 {
-                    // Off its spot (it fought, or was pushed): back to it.
+                    // Off its spot (it fought, or was pushed by those walking past): back into the formation.
                     if (tick < group.NextReturn[k]) continue;
                     group.NextReturn[k] = tick + returnTicks;
                     GoToFloor(world, s, cold.FormationSpot, cold.RunSpeed);
