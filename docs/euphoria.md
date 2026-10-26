@@ -50,6 +50,12 @@ Space: Kenshi (x, y, z) units = Delirium (x, −z, y) × 0.1 m, about each body'
   body is held and starts from its last pose), then gets up as from any knockout.
 - **Down hits** (the hit knocked out or killed): the body relaxes (`bodyRelax` 60, no balance) and
   falls as pushed, then goes to the ragdoll (once still, at most after 3 s).
+- **Down without a hit** (bled out, a stealth knockout, knocked down while getting up): a character
+  on its feet last tick and incapacitated now crumples the same way, with a light push in a random
+  direction (**Verified** by probe: down 1 s, then the ragdoll). Characters already down when a game
+  loads are left as they lie.
+- **Off a ledge**: a body whose centre of mass falls faster than 5 m/s starts `highFall` (flails)
+  and lands fallen (probe: pushed off a 4 m drop, flailing from 1.0 s, on the lower ground at 1.7 s).
 - **Cap**: 24 bodies; a new one past it replaces the farthest from the camera focus, or plays the clip.
 - Not for animals, carried or caged characters, ones getting up or crawling on a downed leg.
 
@@ -57,6 +63,9 @@ Deterministic across runs and thread counts (**Verified** by probe: two Greenlan
 30 s, threads 2 and 4). Not saved: a reaction in progress is lost on load.
 Cost (probe): about 0.4 ms per body per 1/60 s step on one thread; bodies step in parallel.
 
-Gaps: no reaction for knockouts and deaths from bleeding, falls, or being dropped; the bodies do
-not collide with each other or with other characters; target scoring does not count a reacting
-character as staggered (it looks for a stumble clip).
+Combat and aggro count a body reacting on its feet as staggered (`IHitReactions.Reacting`), as
+they do a stumble clip.
+
+Gaps: carried and dropped bodies are the ragdoll's (`CarryMode`, and a dropped one falls from the
+shoulder), not euphoria's; only a body already reacting falls off a drop (a walking character is not watched);
+the bodies do not collide with each other or with other characters.

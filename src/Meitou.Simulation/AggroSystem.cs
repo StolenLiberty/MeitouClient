@@ -460,7 +460,7 @@ public sealed class AggroSystem(FactionRelations relations, AggroSettings? setti
         if (s.Hold && !Orders.HoldPost(s.Eye, s.HoldPoint, other.Position, other.Velocity, false, fight.TargetSlot == s.Self)) return null;
         var candidate = new Meitou.Simulation.Combat.TargetCandidate
         {
-            Staggered = fight.StumbleClip >= 0 && (int)s.Tick < fight.StunUntil,
+            Staggered = (fight.StumbleClip >= 0 || s.Combat?.Reactions?.Reacting(new CharacterId(slot, other.Generation)) == true) && (int)s.Tick < fight.StunUntil,
             Attackers = s.Combat?.AttackerCount(s.World, slot) ?? 0,
             Taunt = (c.Orders & CharacterOrders.Taunt) != 0,
             Passive = (c.Orders & CharacterOrders.Passive) != 0,

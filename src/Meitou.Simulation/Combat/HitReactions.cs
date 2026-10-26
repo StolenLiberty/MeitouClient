@@ -19,6 +19,9 @@ public interface IHitReactions
     /// <paramref name="down"/> the hit knocked it out or killed it: it falls physically before its ragdoll takes over.
     /// </summary>
     bool Hit(World world, int slot, in HitPush push, bool down);
+
+    /// <summary>Whether the character is reacting to a hit on its feet now (fighters count it as staggered). Read in the parallel phases: changes only in the serial ones.</summary>
+    bool Reacting(CharacterId id);
 }
 
 public sealed partial class CombatSystem

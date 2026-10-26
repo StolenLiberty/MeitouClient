@@ -71,7 +71,7 @@ public sealed partial class CombatSystem
         var candidate = new TargetCandidate
         {
             Current = c == q.Current,
-            Staggered = o.StumbleClip >= 0 && world.Tick < o.StunUntil,
+            Staggered = (o.StumbleClip >= 0 || Reactions?.Reacting(world.Characters.IdOf(c)) == true) && world.Tick < o.StunUntil,
             Attackers = attackers,
             ChooserAttacks = c == q.Current,
             Taunt = Orders.Has(tc, CharacterOrders.Taunt),

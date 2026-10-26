@@ -26,6 +26,8 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
     public const float CalmEarliest = 0.5f, CalmSpeed = 0.35f, Longest = 4, LieEarliest = 0.6f, LieSpeed = 0.5f, LieLatest = 2, FallKnockOut = 2.5f, DownLongest = 3, Blend = 0.35f;
     /// <summary>World units: the square of ground each body's scene has round where it started (half its edge), its grid, and how far the body may go before it ends.</summary>
     const float GroundHalf = 70, GridStep = 5, Reach = 55;
+    /// <summary>m/s down: a body falling faster is off a ledge (a stumble or a fall to the ground stays under it; about a 1.3 m drop).</summary>
+    const float FallingSpeed = 5;
     /// <summary>
     /// The push of a hit on the part struck, in N s: <see cref="PushBase"/> + <see cref="PushPerStrength"/> x strength (the damage over the stumble threshold, at most
     /// <see cref="StrongestHit"/>), times 0.8 for a cut to 1.2 for a blunt blow, times <see cref="RangedPush"/> for a bolt. Strength 1 staggers a man about a metre, 2 nearly two;
@@ -42,6 +44,7 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
     IAnimationSource? animations;
     CombatSystem? combat;
     PopulationSystem? population;
+    IRagdollState? ragdolls;
 
     readonly Dictionary<CharacterId, Agent> agents = [];
     readonly List<Agent> order = [];
@@ -80,6 +83,8 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
         public float Age;
         /// <summary>When it fell (its age then), null while it is up.</summary>
         public float? FellAt;
+        /// <summary>Falling from a height (<c>highFall</c> started).</summary>
+        public bool Flailing;
         public string? Failed;
         public readonly float[] Parts = new float[EuphoriaData.Parts * 7];
         /// <summary>By part: its bone in world space, last read.</summary>
@@ -101,6 +106,8 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
     // ---- what combat and the ragdolls ask ----
 
     public bool Holds(CharacterId id) => agents.ContainsKey(id);
+
+    public bool Reacting(CharacterId id) => agents.TryGetValue(id, out var a) && !a.Down && a.FellAt is null;
 
     public BonePose? Publish(CharacterId id) =>
         agents.TryGetValue(id, out var a) ? a.Published : handed.TryGetValue(id, out var h) ? h : blends.TryGetValue(id, out var b) ? b.Published : null;
@@ -164,9 +171,13 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
         animations ??= world.Systems.OfType<IAnimationSource>().FirstOrDefault();
         combat ??= world.Systems.OfType<CombatSystem>().FirstOrDefault();
         population ??= world.Systems.OfType<PopulationSystem>().FirstOrDefault();
+        ragdolls ??= world.Systems.OfType<IRagdollState>().FirstOrDefault();
         handed.Clear();
-        if (agents.Count == 0 && pending.Count == 0 && blends.Count == 0) return;
         var table = world.Characters;
+        bool watching = Data is not null && Enabled;
+        if (!watching) up.Clear();
+        bool downs = watching && Downs(world);
+        if (agents.Count == 0 && pending.Count == 0 && blends.Count == 0 && !downs) return;
         var env = environment ??= new WalkabilityEnvironment(world.Walkability);
         float dt = world.TickSeconds;
         int now = (int)world.Tick;
@@ -188,6 +199,18 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
             Push(a, cold, push);
         }
         pending.Clear();
+
+        // Characters on their feet last tick who are down now without a hit (bled out, knocked out by a stealth blow or as they got up): they crumple.
+        if (downs)
+            foreach (int slot in fresh)
+                if (table.Cold(slot) is { } cold && !agents.ContainsKey(table.IdOf(slot)) && ragdolls?.WasWhole(table.IdOf(slot)) != true
+                    && Fits(world, slot, true) is not null && Room(world, slot)
+                    && Start(world, slot, cold, true) is { } a)
+                {
+                    Collapse(a);
+                    float angle = Rng.Float(Rng.Hash(world.Seed, Rng.Key(a.Id), RngPurpose.Euphoria, (ulong)world.Tick ^ 0x436F6C6CUL)) * MathF.Tau;
+                    Push(a, cold, new HitPush(new Vector3(MathF.Sin(angle), 0, MathF.Cos(angle)), 0, 0, -1, false));
+                }
 
         // 3. The step, the bodies on the world's threads (each has its own scene).
         if (order.Count > 0)
@@ -219,6 +242,14 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
             bool lying = a.FellAt is { } fell && (a.Age - fell >= LieEarliest && speed < LieSpeed || a.Age - fell >= LieLatest);
             bool balancing = nm_agent_is_balancing(a.Handle) != 0;
             if (medical.Incapacitated) a.Down = true;
+            // Off a ledge or a roof: falling faster than a stumble ever does, it flails on the way down (and lands fallen).
+            if (!a.Down && !a.Flailing && comVelocity[2] < -FallingSpeed)
+            {
+                a.Flailing = true;
+                nm_msg_begin(a.Handle, "highFall");
+                nm_msg_set_bool(a.Handle, "start", 1);
+                nm_msg_send(a.Handle, a.Scene);
+            }
             if (a.Failed is not null) End(world, a, ref hot, cold, env);
             else if (a.Down)
             {
@@ -242,6 +273,29 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
             b.Published = Pose(b.Setup, b.Body, b.Bones, b.Root, Placement(b.Setup, table.Next[slot]), b.Left / Blend);
         }
     }
+
+    /// <summary>
+    /// Who went down since the last tick: <see cref="fresh"/> gets the slots of characters on their feet then (in <see cref="up"/>) and incapacitated now; <see cref="up"/>
+    /// becomes the ones on their feet now. True when there are any (none on the first look: a loaded game's downed stay as they lie).
+    /// </summary>
+    bool Downs(World world)
+    {
+        var table = world.Characters;
+        fresh.Clear();
+        var next = table.Next;
+        for (int slot = 0; slot < next.Length; slot++)
+        {
+            if (!next[slot].Alive || table.Cold(slot) is not { Medical: { } medical }) continue;
+            var id = table.IdOf(slot);
+            if (!medical.Incapacitated) up.Add(id);
+            else if (up.Remove(id)) fresh.Add(slot);
+        }
+        up.RemoveWhere(id => !table.TryResolveNext(id, out _));
+        return fresh.Count > 0;
+    }
+
+    readonly HashSet<CharacterId> up = [];
+    readonly List<int> fresh = [];
 
     /// <summary>A new body for the character, in the pose its animation has now and moving as it does; null when the library refuses it.</summary>
     Agent? Start(World world, int slot, CharacterCold cold, bool down)
