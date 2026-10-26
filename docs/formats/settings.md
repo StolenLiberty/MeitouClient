@@ -92,6 +92,7 @@ i.e. everything).
 | --- | --- | --- | --- | --- |
 | `camera speed` | float; slider 150 … 1000 | 500 | Camera Move Speed | Pan speed ([camera.md](camera.md)) |
 | `mouse speed pan` | float; slider 2 … 50 | 6 | Camera Rotate Speed X | Rotation speed (+0x04) |
+| (none) | Meitou's Display page "Field of view" slider (35 … 100°, default 50, the original's fixed lens): the game camera's vertical field of view, kept in `meitou.user.json` (`FieldOfView`) |
 | `mouse speed tilt` | float; slider 2 … 50 | 6 | Camera Rotate Speed Y | Tilt speed (+0x08) |
 | `camera zoom` | float; slider 10 … 200 | 125 | Camera Zoom Speed | Zoom step speed (+0x0C) |
 | `invert X` | bool | 0 | Invert mouse X | Stored as a ±1 factor at +0x10 |

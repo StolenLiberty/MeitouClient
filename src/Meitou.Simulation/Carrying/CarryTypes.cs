@@ -21,6 +21,19 @@ public sealed record LootOrder(IReadOnlyList<CharacterId> Looters, CharacterId T
 /// </summary>
 public sealed record LootAllOrder(IReadOnlyList<CharacterId> Looters, CharacterId Target) : SimCommand;
 
+/// <summary>
+/// Dead Check (Meitou-only, the context menu on a body): every checker (none: the selection) goes to one of the living bodies on the ground (knocked out or crawling) within
+/// <see cref="CarrySystem.DeadCheckRadius"/> of <see cref="Target"/>, spread over them, and chops at it until it is dead (<see cref="CarrySystem"/> "Dead Check").
+/// </summary>
+public sealed record DeadCheckOrder(IReadOnlyList<CharacterId> Checkers, CharacterId Target) : SimCommand;
+
+/// <summary>The bodies of one Dead Check order, shared by its checkers (<see cref="CharacterCold.DeadCheck"/>).</summary>
+public sealed class DeadCheckGroup
+{
+    public List<CharacterId> Bodies { get; } = [];
+    public bool Reported { get; set; }
+}
+
 /// <summary>The bodies of one Loot All order, shared by its looters (<see cref="CharacterCold.LootAll"/>).</summary>
 public sealed class LootAllGroup
 {

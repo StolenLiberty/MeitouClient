@@ -26,6 +26,12 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
     Slider CameraRotateSpeed => cameraRotateSpeed ??= new("Camera rotation speed", UserConfig.MinCameraRotateSpeed, UserConfig.MaxCameraRotateSpeed,
         () => config.CameraRotateSpeed, v => { config.CameraRotateSpeed = MathF.Round(v * 2) / 2; CameraRotateSpeedChanged?.Invoke(config.CameraRotateSpeed); },
         "0.#", Faithful: global::Meitou.Data.World.KenshiCamera.DefaultRotateSpeed);
+    Slider? fieldOfView;
+    Slider FieldOfViewSlider => fieldOfView ??= new("Field of view", UserConfig.MinFieldOfView, UserConfig.MaxFieldOfView,
+        () => config.FieldOfView, v => { config.FieldOfView = MathF.Round(v); FieldOfViewChanged?.Invoke(config.FieldOfView); }, "0", Text: v => $"{v:0}°",
+        Faithful: UserConfig.DefaultFieldOfView);
+    /// <summary>Applies a new field of view (<see cref="UserConfig.FieldOfView"/>, degrees) to the game camera.</summary>
+    public Action<float>? FieldOfViewChanged { get; init; }
     Slider[]? audioSliders;
     /// <summary>The seven audio sliders of the original's options (docs/formats/settings.md); each writes <see cref="UserConfig.Audio"/> and calls <see cref="AudioChanged"/>.</summary>
     Slider[] AudioSliders => audioSliders ??= [
@@ -184,8 +190,9 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
                         SkinRacesChanged?.Invoke();
                     }, OnOff: true)));
         if (page == 0) result.Insert(2, new("Frame limit", "Used while vertical sync is off; 0 is unlimited.", Slider: frameLimit));
+        if (page == 0) result.Insert(3, new("Field of view", "How wide the camera sees. Higher shows more around the edges (the game: 50°).", Slider: FieldOfViewSlider));
         if (page == 0)
-            result.Insert(3, new("World tick alongside drawing", "Faithful runs the world, then draws it, as the game does. Meitou runs the next world tick while the frame is drawn "
+            result.Insert(4, new("World tick alongside drawing", "Faithful runs the world, then draws it, as the game does. Meitou runs the next world tick while the frame is drawn "
                 + "whenever the world is busy (big fights, crowds), Always on every frame: much higher frame rates with many characters. "
                 + "Running alongside can add up to 33 ms of input delay (one world tick).",
                 Choice: new(() => ["Faithful (in series)", "Meitou (when busy)", "Always on"], () => (int)config.TickAhead, i => config.TickAhead = (TickAheadMode)i)));
@@ -521,6 +528,7 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
         AudioChanged?.Invoke();
         config.HardwareMouse = false;
         CameraRotateSpeed.Set(global::Meitou.Data.World.KenshiCamera.DefaultRotateSpeed);
+        FieldOfViewSlider.Set(UserConfig.DefaultFieldOfView);
         config.HoverOutline = true;
         config.SelectionRings = true;
         config.LuckyrenMode = false;

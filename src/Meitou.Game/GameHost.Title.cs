@@ -135,6 +135,14 @@ sealed partial class GameHost
     /// The title's own view of the real world (<see cref="TitleComposition.Spot"/>), independent of the gameplay camera rig; the world's renderers
     /// stream round it as round any camera. While the title shows, only its staged actors are drawn.
     /// </summary>
+    /// <summary>The Display settings' field of view (degrees) on the game camera; while the title scene has the camera, on the lens it gives back.</summary>
+    void ApplyFieldOfView(float degrees)
+    {
+        float radians = Math.Clamp(degrees, UserConfig.MinFieldOfView, UserConfig.MaxFieldOfView) * MathF.PI / 180;
+        if (gameplayLens is not null) gameplayLens = radians;
+        else camera.FieldOfView = radians;
+    }
+
     void ApplyTitleCamera()
     {
         if (!TitleVisible)

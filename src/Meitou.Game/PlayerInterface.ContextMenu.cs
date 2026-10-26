@@ -29,7 +29,7 @@ sealed partial class PlayerInterface
     /// </summary>
     static readonly Dictionary<string, int> VerbOrders = new()
     {
-        ["Build"] = 2, ["Steal"] = 3, ["Attack Target"] = 5, ["Talk To"] = 12, ["Attack All"] = 16, ["First Aid"] = 25, ["Inventory"] = 26, ["Trade"] = 26, ["Loot"] = 26, ["Loot All"] = 26 /* Meitou's, listed under Loot */,
+        ["Build"] = 2, ["Steal"] = 3, ["Attack Target"] = 5, ["Talk To"] = 12, ["Attack All"] = 16, ["First Aid"] = 25, ["Inventory"] = 26, ["Trade"] = 26, ["Loot"] = 26, ["Loot All"] = 26 /* Meitou's, listed under Loot */, ["Dead Check"] = 26,
         ["Stand Up"] = 28, ["Follow"] = 31, ["Bodyguard"] = 45, ["Repairs"] = 60, ["Attack Unprovoked"] = 61, ["Put Down"] = 69, ["Open"] = 72, ["Close"] = 73, ["Pick Lock"] = 76,
         ["Lock"] = 77, ["Unlock"] = 78, ["Use"] = 87, ["Repair"] = 95, ["Dismantle"] = 96, ["Training"] = 97, ["Put in Bed"] = 99, ["Get in"] = 107, ["Put in"] = 108,
         ["Knock Out"] = 109, ["Set Free"] = 110, ["Break Out"] = 111, ["Auto-Haul"] = 124, ["Corpse Disposal"] = 136, ["Man Turret"] = 146, ["Capture"] = 166,
@@ -149,6 +149,9 @@ sealed partial class PlayerInterface
     /// All (16) and Attack Target (5), against anyone else Attack Unprovoked (61), Bodyguard (45) and Follow (31); Meitou adds Trade with a trader (its quick order). With the lead on a turret every
     /// attack becomes Shoot At (235). Down: Loot (26) and the pick-up verb (<see cref="PickUpVerb"/>). Not built: Throw out of home / town (223, 273).
     /// </summary>
+    (string, Action) DeadCheckVerb(IReadOnlyList<CharacterId> selection, CharacterId id) =>
+        ("Dead Check", () => Say(new Meitou.Simulation.Carrying.DeadCheckOrder(selection, id) { Tick = session.World.Tick }));
+
     void OtherCharacterVerbs(List<(string, Action)> verbs, CharacterSnapshot target, IReadOnlyList<CharacterId> selection, bool down)
     {
         var id = target.Id;
@@ -158,9 +161,13 @@ sealed partial class PlayerInterface
             verbs.Add(("Loot", () => Say(new Meitou.Simulation.Carrying.OpenLootOrder([], id) { Tick = session.World.Tick })));
             // Meitou: the whole selection goes over the bodies about this one, each taking only what is better for it (CarrySystem.LootAll).
             verbs.Add(("Loot All", () => Say(new Meitou.Simulation.Carrying.LootAllOrder(selection, id) { Tick = session.World.Tick })));
+            // Meitou: the selection spreads over the living bodies about this one and finishes them off (CarrySystem.DeadCheck).
+            if (target.Body is { Dead: false }) verbs.Add(DeadCheckVerb(selection, id));
             verbs.Add(PickUpVerb(target));
             return;
         }
+        // One lying crawling (playing dead) can be dead-checked too.
+        if (target.Body is { Crawling: true }) verbs.Add(DeadCheckVerb(selection, id));
         bool onTurret = Selected().LastOrDefault() is { Turret: not null };
         bool hostile = Hostile(target);
         if (session.World.CanTalk(id, selection[0])) verbs.Add(("Talk To", () => Say(new Meitou.Simulation.Dialogue.TalkOrder(selection[0], id) { Tick = session.World.Tick })));

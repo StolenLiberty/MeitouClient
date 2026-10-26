@@ -512,6 +512,10 @@ body comes round (another faction's) or is lifted. The same window opens on the 
 row (**Observed**, owner's screenshots of the original, 2026-10-24; Meitou: limbs, own bag, own character, theirs, their bag, centred, and a bag the window opened closes with it unless OPEN BAG was pressed); a death item taken butchers only a down body. An animal's inventory and loot windows use `Kenshi_InventoryAnimalWindow` (backpack slot,
 main grid, weight and burden only, grid size from its `inventory w` / `inventory h`; **Observed** in the original). It also runs the stealth knock-out
 (`StealthKo` task, reusing `CarryTarget`/`LiftTime`): [combat](game/combat.md#stealth-knock-out).
+- **Dead Check** (Meitou-only, `DeadCheckOrder`, the body menu's verb, also on a crawling character; `CarrySystem.DeadCheck.cs`, engine choices): the living bodies on the ground (knocked
+  out or crawling, not the player's, not carried) within `DeadCheckRadius` (400) of the clicked one form a `DeadCheckGroup`; each selected character takes the body with the fewest
+  checkers (nearest on a tie), walks to it (a `Loot` task), plays the prisoner killers' chop clip and strikes once per clip (`CombatSystem.Execute`: no block or dodge) until it is dead,
+  then the next; one message when all are dead. Another order drops it.
 - **Loot All** (Meitou-only, `LootAllOrder`, the body menu's verb under Loot; `CarrySystem.LootAll.cs`, engine choices): the bodies (down, with an inventory, not the player's, not
   carried or caged) within `LootAllRadius` (400) of the clicked one form a `LootAllGroup`; each selected looter walks to the nearest one nobody else loots that holds something better for
   it and has not been looted by it, takes it (a `Loot` task; theft and witnesses as a loot), and goes on until none is left ("done looting"); another order drops it. Better

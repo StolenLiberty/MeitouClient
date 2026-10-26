@@ -111,6 +111,9 @@ public sealed class CharacterCold
     public FormationGroup? Formation { get; set; }
     /// <summary>The Loot All order it works through (<see cref="Carrying.LootAllOrder"/>); null: none. Derived from orders, not saved and not hashed.</summary>
     public Carrying.LootAllGroup? LootAll { get; set; }
+    /// <summary>The Dead Check order it works through (<see cref="Carrying.DeadCheckOrder"/>) and the blows struck at the body in hand; null: none. Not saved, not hashed.</summary>
+    public Carrying.DeadCheckGroup? DeadCheck { get; set; }
+    public int DeadCheckBlows { get; set; }
     /// <summary>Its spot in <see cref="Formation"/> (with the clicked height) and the yaw it faces there.</summary>
     public System.Numerics.Vector3 FormationSpot { get; set; }
     public float FormationYaw { get; set; }

@@ -103,6 +103,9 @@ sealed class UserConfig
     /// <c>mouse speed pan</c> / <c>mouse speed tilt</c> (slider 2 … 50, default 6), one value for both here.</summary>
     public float CameraRotateSpeed { get; set; } = Meitou.Data.World.KenshiCamera.DefaultRotateSpeed;
     public const float MinCameraRotateSpeed = 2, MaxCameraRotateSpeed = 50;
+    /// <summary>The game camera's vertical field of view in degrees (Display settings; Meitou's: the original's camera is fixed at 50).</summary>
+    public float FieldOfView { get; set; } = DefaultFieldOfView;
+    public const float DefaultFieldOfView = 50, MinFieldOfView = 35, MaxFieldOfView = 100;
     /// <summary>The Windows cursor instead of the game's drawn pointer (the original's <c>hardware_mouse</c>, default off; Interface settings).</summary>
     public bool HardwareMouse { get; set; }
     /// <summary>Outline and tint the character under the cursor (Advanced settings; Meitou only, the game has none).</summary>

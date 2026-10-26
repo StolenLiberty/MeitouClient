@@ -243,7 +243,7 @@ public sealed partial class World
         med.Blood / MathF.Max(Bodies.MedicalState.BloodCapacity(race, cold.Stats?.Strength ?? 50, med.HasStatsObject, med.ScaleK, med.ScaleZ), 1), WorstPart(med), med.Hunger, med.Unconscious, med.Dead,
         cold.IsPlayer && (med.NeedsAid(race, false) || med.NeedsAid(race, true)),
         task == (byte)CharacterTask.Treat ? CareKind.Treating : task == (byte)CharacterTask.Rest ? CareKind.Resting : CareKind.None, cold.MedicJob, cold.RescueJob,
-        cold.IsPlayer && med.NeedsSplint(race, 50), med.KoTimer);
+        cold.IsPlayer && med.NeedsSplint(race, 50), med.KoTimer, med.Crawling);
 
     /// <summary>The lowest part fraction (1 for a body without parts), the way <c>Enumerable.Min</c> reads floats: a NaN wins.</summary>
     static float WorstPart(Bodies.MedicalState med)

@@ -178,6 +178,7 @@ public static class StandardSystems
             carry = new Meitou.Simulation.Carrying.CarrySystem(data.Bodies.Constants, data.BodyOptions, o.AnimationLengths?.Of(Meitou.Simulation.Carrying.CarrySystem.LiftClip) ?? 1, o.Carry);
             if (Has(StandardParts.Aggro)) carry.Relations = data.Relations;
             carry.Assembly = new CharacterAssembly(data);
+            carry.Fights = combat;
             systems.Add(carry);
             // Raiders lifting the downed and carrying them to a cage of their faction: right after the carry system, whose lift and links it uses; it adds nothing to the hash until one runs.
             if (population is not null) systems.Add(kidnap = new Meitou.Simulation.Kidnap.KidnapSystem(data, population, carry, o.Kidnap) { Deeds = deeds });

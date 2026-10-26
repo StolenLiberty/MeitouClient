@@ -142,6 +142,9 @@ public sealed partial class CarrySystem(GameConstants constants, BodyOptions opt
                 case LootAllOrder all:
                     StartLootAll(world, table, all);
                     break;
+                case DeadCheckOrder check:
+                    StartDeadCheck(world, table, check);
+                    break;
                 case OpenLootOrder open:
                     if (!table.TryResolveNext(open.Target, out int body2) || !CanBeOpened(table.Cold(body2)!)) break;
                     if (Nearest(table, Who(world, open.Looters), body2, s => s != body2 && table.Cold(s) is { Medical.Incapacitated: false, Inventory: not null } c && c.CarriedBy.IsNone) is int opener)
@@ -288,8 +291,10 @@ public sealed partial class CarrySystem(GameConstants constants, BodyOptions opt
             var cold = table.Cold(i)!;
             bool lifting = n.Task == (byte)CharacterTask.PickUp;
             if (cold.Medical is not { Incapacitated: false } || cold.InCombat || !table.TryResolveNext(cold.CarryTarget, out int t)
-                || (lifting ? cold.LiftTime < 0 && !(CanCarry(cold) && CanBeLifted(world, table.Cold(t)!)) : !(Opening(world, i) ? CanBeOpened(table.Cold(t)!) : CanBeLooted(table.Cold(t)!))))
+                || (lifting ? cold.LiftTime < 0 && !(CanCarry(cold) && CanBeLifted(world, table.Cold(t)!))
+                    : cold.DeadCheck is not null ? !CanBeChecked(table.Cold(t)!) : !(Opening(world, i) ? CanBeOpened(table.Cold(t)!) : CanBeLooted(table.Cold(t)!))))
             {
+                if (cold.DeadCheck is not null) (cold.ActionClip, cold.DeadCheckBlows) = (null, 0);
                 if (!(lifting && cold.LiftTime >= 0)) End(table, i);   // a lift under way is finished or broken off in SlowWorld
                 continue;
             }
@@ -339,7 +344,7 @@ public sealed partial class CarrySystem(GameConstants constants, BodyOptions opt
         }
         LootWindow(world);
         KeepLinks(world);
-        if (Settings.AutoEveryTicks > 0 && world.Tick % Settings.AutoEveryTicks == 0) { Rescue(world, table); Forage(world, table); Scavenge(world, table); KeepLootAll(world, table); }
+        if (Settings.AutoEveryTicks > 0 && world.Tick % Settings.AutoEveryTicks == 0) { Rescue(world, table); Forage(world, table); Scavenge(world, table); KeepLootAll(world, table); KeepDeadCheck(world, table); }
     }
 
     void Lift(World world, CharacterTable table, int i, float dt)
@@ -490,6 +495,11 @@ public sealed partial class CarrySystem(GameConstants constants, BodyOptions opt
         var cold = table.Cold(i)!;
         if (!table.TryResolveNext(cold.CarryTarget, out int t) || Gap(table.Next[i], table.Next[t]) > Settings.Reach) return;   // still walking (Schedule ends a loot whose target went)
         var victim = table.Cold(t)!;
+        if (cold.DeadCheck is not null)
+        {
+            DeadCheckStep(world, table, i, t, dt);
+            return;
+        }
         bool opening = Opening(world, i);
         if (cold.Inventory is not { } bag || !(opening ? CanBeOpened(victim) : CanBeLooted(victim)))
         {
