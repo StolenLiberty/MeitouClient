@@ -261,8 +261,14 @@ sealed partial class GameHost
                 if ((k == SilkKey.KeypadEnter ? EngineKey.Enter : KeyMap.Map(k)) is { } pickerKey) sandboxPicker.KeyDown(pickerKey);
                 return;
             }
-            // The cheat menu (opened from the Esc menu): while a text box of it is focused it takes every key, otherwise only Esc.
-            if (KeyMap.Map(k) is { } cheatKey && cheats.KeyDown(k == SilkKey.KeypadEnter ? EngineKey.Enter : cheatKey)) return;
+            // F1 (rebindable) opens and closes the cheat menu (it also opens from the Esc menu); Shift+F1 is the Meitou switch. While a text box of it is focused it
+            // takes every key, otherwise only Esc.
+            if (KeyMap.Map(k) is { } cheatKey)
+            {
+                if (!cheats.TakesKeyboard && !shiftDown && !g.NoPopulation && !player.TitleOpen && !player.EditorOpen && session.World.Player.Exists
+                    && session.Bindings.Get(InputAction.ToggleCheatMenu).Contains(Binding.Of(cheatKey))) { cheats.Open(towns: false); return; }
+                if (cheats.KeyDown(k == SilkKey.KeypadEnter ? EngineKey.Enter : cheatKey)) return;
+            }
             // ' (rebindable) opens the Town Ownership window, the plugin's key.
             if (KeyMap.Map(k) is { } townKey && !TextFieldFocused() && !g.NoPopulation && !player.TitleOpen && !player.EditorOpen && session.World.Player.Exists
                 && session.Bindings.Get(InputAction.ToggleTownOwnership).Contains(Binding.Of(townKey))) { cheats.Open(towns: true); return; }

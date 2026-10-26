@@ -43,7 +43,7 @@ public enum InputAction
     /// <summary>Meitou's own: the selection sits down to rest, and the carriers put their bodies down (no binding in the game).</summary>
     Rest, PutDown,
     Quit,
-    /// <summary>Unused (the cheat menu opens from the Esc menu); kept so the later actions keep their numbers.</summary>
+    /// <summary>Meitou: opens and closes the cheat menu (F1; it also opens from the Esc menu).</summary>
     ToggleCheatMenu,
     /// <summary>Meitou: turns the item on the mouse a quarter (R; the original cannot rotate items). Appended, so the earlier actions keep their numbers.</summary>
     RotateItem,
@@ -160,7 +160,7 @@ public sealed class InputBindings
         Set(InputAction.QuickSave, Key.F5);
         Set(InputAction.QuickLoad, Key.F9);
         Set(InputAction.ToggleDebugMenu, Key.F10);
-        Set(InputAction.ToggleCheatMenu);   // unused: the cheat menu opens from the Esc menu
+        Set(InputAction.ToggleCheatMenu, Key.F1);
         Set(InputAction.ToggleStats, Key.F11);
         Set(InputAction.CycleProfiler, Key.F12);
         Set(InputAction.Quit, Key.Escape);
