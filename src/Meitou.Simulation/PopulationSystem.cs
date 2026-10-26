@@ -108,11 +108,7 @@ public sealed partial class PopulationSystem : ITickSystem, IDisposable
         {
             if (c is FocusCommand f) focus = f.Position;
             else if (c is DebugSpawn spawn) SpawnSandbox(world, spawn.Record, spawn.At, player: false, variant: ++debugSpawns, faction: spawn.Faction);
-            else if (c is DebugSpawnSquad group && group.Offsets.Count > 0)
-            {
-                SpawnSandboxSquad(world, group.Record, group.At, group.Offsets, group.Yaw, debugSpawns + 1, group.Faction);
-                debugSpawns += group.Offsets.Count;
-            }
+            else if (c is DebugSpawnSquad group && group.Offsets.Count > 0) SpawnZeus(world, group);
         }
 
         var ready = new List<BuiltTown>();

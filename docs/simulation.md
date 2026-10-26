@@ -1525,11 +1525,14 @@ name, typed letters filter it, the wheel, Up / Down and PageUp / PageDown scroll
 from the moment it was picked (a technique keeps only its root height, as in the game), drawn by the host in place of the simulation's layers;
 "simulation" gives the hero back. Nothing is sent to the simulation.
 
-**Zeus** (the cheat menu's button under World, `CheatMenu.Zeus.cs`, after Arma 3's Zeus "Create" panel): every CHARACTER and ANIMAL_CHARACTER by faction (the
-factions of the SQUAD_TEMPLATEs whose leader, squad, squad2, choose-from or animal lists hold it, else its own `faction`; neither: "Other"). A pick shows a figure per
-unit at the ground under the pointer; a left click sends `DebugSpawnSquad` (`SpawnSandboxSquad` mid-game: one idle squad, a look per member). Side: Own (the listed
-faction), Friend / Neutral / Foe (the listed faction when it is already that to the player's, else the first faction that is; Friend falls back to the player's,
-Foe to the sandbox's hostile pick). Amount 1-100 in a block centred on the click, facing away from the camera: `Formation.Line` rows, the front about twice the depth.
+**Zeus** (the cheat menu's button under World, or F6; `CheatMenu.Zeus.cs`, after Arma 3's Zeus "Create" panel): every CHARACTER and ANIMAL_CHARACTER of the load order
+(mods' tagged with the mod's name) by faction (the factions of the SQUAD_TEMPLATEs whose leader, squad, squad2, choose-from or animal lists hold it, else its own `faction`;
+neither: "Other"). A pick shows see-through figures of it at the ground under the pointer (the character renderer draws them only into the hover outline's masks,
+`CharacterInstance.MaskOnly`, a colour alpha above 1 filling them); a left click sends `DebugSpawnSquad` (`PopulationSystem.SpawnZeus`). Side: Own (the listed faction),
+Friend (the player's own characters, selectable, in the squad bar), Neutral / Foe (the listed faction when it is already that to the player's, else the first faction that is;
+Foe falls back to the sandbox's hostile pick). Amount 1-100 (a slider, squared) in a block centred on the click, facing away from the camera: `Formation.Line` rows, the front
+about twice the depth. Each placing joins the squad the earlier ones of the same record, faction and side went into while it has members (not kept across a load); an NPC
+squad's first member leads, the others follow it.
 
 ## Duel
 

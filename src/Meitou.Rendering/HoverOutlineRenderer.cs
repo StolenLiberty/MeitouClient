@@ -44,7 +44,8 @@ public sealed class HoverOutlineRenderer
                 float character = linearDepth(texelFetch(uMaskDepth, p, 0).r, uMaskPlanes);
                 float scene = linearDepth(texelFetch(uSceneDepth, ivec2(gl_FragCoord.xy * uDepthScale), 0).r, uScenePlanes);
                 if (character > scene * 1.01 + 1.0) discard;
-                float a = uColour.a * 0.11;
+                // A colour's alpha above 1 marks a figure drawn only into the mask (a placing ghost): filled much more strongly, a see-through body.
+                float a = uColour.a > 1.5 ? 0.42 : uColour.a * 0.11;
                 fragColour = vec4(uColour.rgb * a, a);
                 return;
             }
@@ -57,7 +58,7 @@ public sealed class HoverOutlineRenderer
                 }
             float d = sqrt(nearest);
             if (d > float(uRadius) + 0.5) discard;
-            float a = uColour.a * 0.6 * clamp(1.0 - (d - 1.0) / (float(uRadius) + 0.5), 0.0, 1.0);
+            float a = min(uColour.a, 1.0) * 0.6 * clamp(1.0 - (d - 1.0) / (float(uRadius) + 0.5), 0.0, 1.0);
             fragColour = vec4(uColour.rgb * a, a);
         }
         """;

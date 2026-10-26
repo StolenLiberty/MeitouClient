@@ -29,6 +29,8 @@ public readonly record struct CharacterInstance(long Key, CharacterAppearance Ap
     public float Scale { get; init; } = 1;
     /// <summary>Not drawn in the world (still posed for its portrait): on a floor of a building that the interior view hides (docs/formats/zones.md "Interior view").</summary>
     public bool Hidden { get; init; }
+    /// <summary>Drawn only into the hover masks (a see-through, outlined figure where nothing stands: the cheat menu's Zeus placing); never in the world, its shadows or portraits.</summary>
+    public bool MaskOnly { get; init; }
     /// <summary>Pose every frame regardless of distance, for presentation actors whose animation must stay smooth.</summary>
     public bool FullRateAnimation { get; init; }
     /// <summary>The ragdoll's bones in model space, set over the animation (null: none); the host interpolates them between ticks.</summary>

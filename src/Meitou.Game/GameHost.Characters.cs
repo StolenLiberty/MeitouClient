@@ -58,7 +58,7 @@ sealed partial class GameHost
     void FillDrawList(CharacterDrawList list)
     {
         long f0 = Stopwatch.GetTimestamp();
-        try { FillDrawListCore(list); FillPortraits(); }
+        try { FillDrawListCore(list); AddGhosts(list); FillPortraits(); }
         finally { fillTotal += Stopwatch.GetElapsedTime(f0).TotalMilliseconds; fillCalls++; }
     }
 
@@ -107,6 +107,27 @@ sealed partial class GameHost
         }
     }
 
+
+    /// <summary>Zeus's placing figures this frame (<see cref="CheatMenu.ZeusGhosts"/>), and their looks by unit and faction, made on a worker the first time.</summary>
+    IReadOnlyList<CheatMenu.ZeusGhost> zeusGhosts = [];
+    readonly Dictionary<(string Record, string? Faction), Task<Meitou.Data.Characters.CharacterAppearance?>> ghostLooks = [];
+
+    /// <summary>A placing figure's key in the draw list (apart from every character's).</summary>
+    static long GhostKey(int i) => long.MinValue + 4096 + i;
+
+    /// <summary>Adds Zeus's placing figures, drawn only into the outline masks (<see cref="CharacterInstance.MaskOnly"/>), once their look is made.</summary>
+    void AddGhosts(CharacterDrawList list)
+    {
+        if (zeusGhosts.Count == 0 || popData?.Appearances is not { } looks) return;
+        for (int i = 0; i < zeusGhosts.Count; i++)
+        {
+            var ghost = zeusGhosts[i];
+            var key = (ghost.Record, ghost.FactionId);
+            if (!ghostLooks.TryGetValue(key, out var made)) ghostLooks[key] = made = Task.Run(() => looks.Create(ghost.Record, ghost.FactionId, 1));
+            if (!made.IsCompletedSuccessfully || made.Result is not { } look) continue;
+            list.Add(new CharacterInstance(GhostKey(i), look, ghost.Feet, ghost.Yaw, []) { MaskOnly = true, FullRateAnimation = true });
+        }
+    }
 
     /// <summary>A character's key in the draw list: stable while it exists, new for every world (the renderer keeps its poses by it).</summary>
     long DrawKey(CharacterId id) => (((long)id.Slot << 32 | (uint)id.Generation) + 1) | (long)worldEpoch << 56;

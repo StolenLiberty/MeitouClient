@@ -37,7 +37,7 @@ internal sealed unsafe partial class CharacterRenderer
             int index = -1;
             for (int i = 0; i < liveCount; i++)
                 if (live[i].Key == key) { index = i; break; }
-            if (index < 0 || live[index].PortraitOnly) continue;
+            if (index < 0 || live[index].PortraitOnly && !live[index].MaskOnly) continue;
             ref var l = ref live[index];
             if (HoverOutlineRenderer.Bounds(l.Centre, l.Radius, onScreen, width, height, 0) is null) continue;
             int g = groups.FindIndex(x => x.Colour == colour);

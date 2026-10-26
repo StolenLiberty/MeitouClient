@@ -169,6 +169,8 @@ internal sealed unsafe partial class CharacterRenderer : IDisposable
         public long Key;
         /// <summary>Beyond <see cref="DrawDistance"/> (or <see cref="CharacterInstance.Hidden"/>) but posed for its portrait (<see cref="PortraitRequests"/>): not drawn in the world.</summary>
         public bool PortraitOnly;
+        /// <summary>Drawn only into the hover masks (<see cref="CharacterInstance.MaskOnly"/>); also <see cref="PortraitOnly"/>, so nothing else draws it.</summary>
+        public bool MaskOnly;
         /// <summary>In a loaded building's interior (<see cref="WorldObjectRenderer.InteriorAt"/>), found once a frame for every view.</summary>
         public bool Interior;
     }
@@ -400,7 +402,7 @@ internal sealed unsafe partial class CharacterRenderer : IDisposable
             if (liveCount == live.Length) Array.Resize(ref live, liveCount * 2);
             ref var l = ref live[liveCount++];
             l.Asset = asset;
-            (l.Key, l.PortraitOnly) = (inst.Key, far);
+            (l.Key, l.PortraitOnly, l.MaskOnly) = (inst.Key, far || inst.MaskOnly, inst.MaskOnly && !far);
             // Lowered by the body shape's lift, so a short body's feet stay on the ground (CharacterAsset.GroundOffset); an animal scaled by its size (its node's scale).
             // A carried body's whole rotation lowers it in its own frame (CharacterRigs.Placement, as the simulation poses its ragdoll).
             l.World = inst.Rotation is { } rotation
@@ -494,7 +496,7 @@ internal sealed unsafe partial class CharacterRenderer : IDisposable
                     (l.Repose ? state.Previous : state.Bones).CopyTo(new Span<Matrix4x4>((byte*)previousPointer + (long)l.BoneBase * 64, rig.BoneCount));
                     if (!l.Repose) state.Attach.CopyTo(state.PreviousAttach, 0);
                 }
-                if (!l.PortraitOnly) PlaceParts(in l, eye, motion);
+                if (!l.PortraitOnly || l.MaskOnly) PlaceParts(in l, eye, motion);
             });
         (partStamp, partOrigin, partMotion) = (updateStamp, eye, motion);
         LastPoseMs = poseWatch.Elapsed.TotalMilliseconds;

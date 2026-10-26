@@ -112,6 +112,7 @@ sealed partial class SettingsMenu
         InputAction.Screenshot => "Save an image of the current view.",
         InputAction.ToggleSettings => "Open or close this settings dialog.",
         InputAction.ToggleDebugMenu => "Open or close the debug menu: teleport, spawn, items, money, heal and damage.",
+        InputAction.ToggleZeus => "Open or close Zeus: place any character or animal of the game and its mods, by faction, on the ground.",
         InputAction.ToggleCheatMenu => "Open or close the cheat menu (it also opens from the Esc menu).",
         InputAction.ToggleTownOwnership => "Open the Town Ownership window: how towns are claimed, claim a ruined town, give back a town you own.",
         InputAction.RotateItem => "Turn the item you are holding in the inventory sideways (it goes into weapon and armour slots upright).",

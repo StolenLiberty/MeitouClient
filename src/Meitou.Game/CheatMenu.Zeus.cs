@@ -9,9 +9,9 @@ using Meitou.Simulation;
 
 namespace Meitou.Game;
 
-// Zeus (the cheat menu's button under World; Meitou only, after Arma 3's Zeus "Create" panel): every character and animal of the game by faction in a panel down the
-// right of the screen. Pick one and the ground under the pointer shows a figure where it will stand; a left click spawns one there (a new look each time, of the faction
-// it is listed under), as many as wanted; a right click or Esc puts the pick down. The game keeps running and the camera keeps moving.
+// Zeus (the cheat menu's button under World, or its own key; Meitou only, after Arma 3's Zeus "Create" panel): every character and animal of the game and its mods by
+// faction in a panel down the right of the screen. Pick one and the ground under the pointer shows see-through figures of it where the units will stand (drawn by the
+// character renderer, ZeusGhosts); a left click spawns them there, joining the squad the earlier ones of the same unit and side are in; a right click or Esc puts the pick down.
 sealed partial class CheatMenu
 {
     /// <summary>The window is the Zeus panel.</summary>
@@ -21,18 +21,36 @@ sealed partial class CheatMenu
     List<ZeusFaction>? zeusFactions;
     ZeusUnit? zeusPick;
     int zeusPlaced;
-    /// <summary>Whose side the placed units are on: as listed (their own faction), friend, neutral or foe to you.</summary>
+    /// <summary>Whose side the placed units are on: Own (the faction they are listed under), Friend (yours: your own characters, in a squad of yours), Neutral or Foe to you.</summary>
     int zeusSide;
     /// <summary>How many each click places, in a block (the formation drag's rows).</summary>
     int zeusCount = 1;
     static readonly string[] ZeusSides = ["Own", "Friend", "Neutral", "Foe"];
-    static readonly int[] ZeusCounts = [1, 5, 10, 25, 50];
     const int ZeusMost = 100;
 
-    sealed record ZeusUnit(string Record, string Name, bool Animal, int Faction);
-    sealed record ZeusFaction(int Index, string Name, IReadOnlyList<ZeusUnit> Units);
+    /// <summary>The amount slider: its position (0..1) for a count and back, squared so the small counts get most of its length.</summary>
+    static float CountToSlider(int count) => MathF.Sqrt((Math.Clamp(count, 1, ZeusMost) - 1) / (float)(ZeusMost - 1));
+    static int SliderToCount(float t) => Math.Clamp(1 + (int)MathF.Round(Math.Clamp(t, 0, 1) * Math.Clamp(t, 0, 1) * (ZeusMost - 1)), 1, ZeusMost);
+
+    /// <summary>A unit: its record, name, whether an animal, the faction it is listed under, and the mod that adds it ("" for the base game).</summary>
+    sealed record ZeusUnit(string Record, string Name, bool Animal, int Faction, string Mod);
+    /// <summary>A faction's units; <paramref name="Mod"/> the mod that adds the faction ("" for the base game).</summary>
+    sealed record ZeusFaction(int Index, string Name, IReadOnlyList<ZeusUnit> Units, string Mod);
+
+    /// <summary>The mod a record comes from, "" for the base game's files.</summary>
+    static string ModOf(GameRecord r) => Source(r) is "base game" ? "" : Source(r);
 
     const float ZeusWidth = 360;
+
+    /// <summary>Zeus's key: opens the panel (with the cheat menu behind it), or closes the menu when the panel is open.</summary>
+    public void ToggleZeus()
+    {
+        if (visible && zeusMode) { Visible = false; return; }
+        Visible = false;
+        townsMode = false;
+        Visible = true;
+        OpenZeus();
+    }
 
     void OpenZeus()
     {
@@ -44,8 +62,9 @@ sealed partial class CheatMenu
     }
 
     /// <summary>
-    /// The game's characters and animals by faction: the factions of the squads (SQUAD_TEMPLATE) they are in (most characters name no faction themselves), else the
-    /// faction their own record names; one in no squad and with no faction is under "Other" and spawns hostile to you. A character in squads of several factions is in each.
+    /// The characters and animals of the game and its mods (the load order's records) by faction: the factions of the squads (SQUAD_TEMPLATE) they are in (most characters
+    /// name no faction themselves), else the faction their own record names; one in no squad and with no faction is under "Other" and spawns hostile to you. A character in
+    /// squads of several factions is in each. A mod's units and factions are tagged with its name.
     /// </summary>
     List<ZeusFaction> ZeusFactions()
     {
@@ -75,11 +94,12 @@ sealed partial class CheatMenu
             foreach (int faction in list)
             {
                 if (!byFaction.TryGetValue(faction, out var units)) byFaction[faction] = units = [];
-                units.Add(new ZeusUnit(r.StringId, r.Name.Trim(), r.Type == FcsRecordType.ANIMAL_CHARACTER, faction));
+                units.Add(new ZeusUnit(r.StringId, r.Name.Trim(), r.Type == FcsRecordType.ANIMAL_CHARACTER, faction, ModOf(r)));
             }
         }
         return zeusFactions = [.. byFaction
-            .Select(p => new ZeusFaction(p.Key, p.Key >= 0 ? FactionName(p.Key) : "Other", [.. p.Value.OrderBy(u => u.Animal).ThenBy(u => u.Name, StringComparer.OrdinalIgnoreCase)]))
+            .Select(p => new ZeusFaction(p.Key, p.Key >= 0 ? FactionName(p.Key) : "Other", [.. p.Value.OrderBy(u => u.Animal).ThenBy(u => u.Name, StringComparer.OrdinalIgnoreCase)],
+                p.Key >= 0 && db.Find(data.Factions[p.Key].Id) is { } record ? ModOf(record) : ""))
             .Where(f => f.Name.Length > 0)
             .OrderBy(f => f.Index < 0).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)];
     }
@@ -95,11 +115,12 @@ sealed partial class CheatMenu
         if (button == MouseButton.Right) { zeusPick = null; return true; }
         if (button != MouseButton.Left) return false;
         if (ZeusGround(at) is not { } ground || ZeusSpots(at, ground) is not { } placed) return true;
-        int? faction = ZeusFactionOf(unit);
+        bool mine = zeusSide == 1;
+        int? faction = mine ? population()?.PlayerFaction : ZeusFactionOf(unit);
         var offsets = placed.Spots.Select(p => p - placed.Spots[0]).ToArray();
-        Send(new DebugSpawnSquad(unit.Record, placed.Spots[0], offsets, MathF.Atan2(placed.Facing.X, placed.Facing.Y), faction) { Tick = Now });
+        Send(new DebugSpawnSquad(unit.Record, placed.Spots[0], offsets, MathF.Atan2(placed.Facing.X, placed.Facing.Y), faction, mine) { Tick = Now });
         zeusPlaced += offsets.Length;
-        string side = faction is { } f ? FactionName(f) : "hostile";
+        string side = mine ? "yours" : faction is { } f ? FactionName(f) : "hostile";
         Notice($"Placed {(offsets.Length > 1 ? $"{offsets.Length} x " : "")}{unit.Name} ({side}).");
         return true;
     }
@@ -125,7 +146,8 @@ sealed partial class CheatMenu
         return (spots, facing);
     }
 
-    /// <summary>The faction a pick spawns as: its own (Own, and when that is already on the chosen side), else the first faction on that side of you; null: hostile (the sandbox's pick).</summary>
+    /// <summary>The faction a pick spawns as (Own, Neutral, Foe; Friend is yours): its own (Own, and when that is already on the chosen side), else the first faction on that side of you;
+    /// null: hostile (the sandbox's pick).</summary>
     int? ZeusFactionOf(ZeusUnit unit)
     {
         if (population() is not { } data || data.PlayerFaction < 0) return unit.Faction >= 0 ? unit.Faction : null;
@@ -152,16 +174,9 @@ sealed partial class CheatMenu
         bounds = new(width - pw - MathF.Round(12 * scale), top, pw, Math.Max(240 * scale, height - top - bottom));
         float H = bounds.Height / scale, W = ZeusWidth;
 
-        // The figures where the picks will stand, under the pointer.
-        if (zeusPick is { } pick && ZeusGround(pointer) is { } ground && ZeusSpots(pointer, ground) is { } placing)
-        {
-            var walk = world().Walkability;
-            for (int i = 0; i < placing.Spots.Length; i++)
-            {
-                var s = placing.Spots[i];
-                Ghost(new Vector3(s.X, walk.GroundHeight(s.X, s.Y, ground.Y), s.Y), pick, named: i == 0);
-            }
-        }
+        // The pick's name over its figures (the figures are the character renderer's, ZeusGhosts).
+        if (zeusPick is { } pick && ZeusGround(pointer) is { } ground && player.Project(ground + new Vector3(0, pick.Animal ? 14 : 21, 0)) is { } over)
+            Text(zeusCount > 1 ? $"{zeusCount} x {pick.Name}" : pick.Name, new(over.X - 160, over.Y - 24, 320, 22), 14, LightInk, "Center");
 
         Surface(bounds, "window", alpha: WindowAlpha);
         Text("Zeus", R(16, 6, 200, 32), 22, LightInk);
@@ -170,7 +185,7 @@ sealed partial class CheatMenu
         controls.Add(new("zeus-close", "Button", close, "", "zeus:close", "Kenshi_CloseButtonSkin", true, new Dictionary<string, string>(), Vector4.Zero));
         hits.Add(new(close, () => { zeusMode = false; zeusPick = null; }));
         Rect(R(16, 44, W - 32, 1), MainInk with { W = 0.12f });
-        EditField(zeusSearch, R(16, 54, W - 32, 30), "Search units");
+        EditField(zeusSearch, R(16, 54, W - 32, 30), "Search units or mods");
 
         // The tree: factions, open ones showing their units.
         viewport = R(16, 94, W - 32, H - 94 - 182);
@@ -184,7 +199,8 @@ sealed partial class CheatMenu
         bool InList(UiRect at) => at.Y + at.Height >= viewport.Y && at.Y <= viewport.Y + viewport.Height;
         foreach (var faction in ZeusFactions())
         {
-            var units = search.Length == 0 ? faction.Units : faction.Units.Where(u => u.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+            var units = search.Length == 0 ? faction.Units : faction.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || faction.Mod.Contains(search, StringComparison.OrdinalIgnoreCase) ? faction.Units
+                : faction.Units.Where(u => u.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || u.Mod.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
             if (units.Count == 0) continue;
             bool open = search.Length > 0 || zeusOpen.Contains(faction.Index);
             var header = Row(y);
@@ -193,7 +209,10 @@ sealed partial class CheatMenu
                 bool hovered = Hovered(header, clip);
                 Rect(header, hovered ? MainInk with { W = 0.1f } : new Vector4(0, 0, 0, 0.22f), clip);
                 Text($"{(open ? "v" : ">")}  {faction.Name}", header with { X = header.X + 6 * scale, Width = header.Width - 60 * scale }, 14, faction.Index == population()?.PlayerFaction ? Ally : LightInk, clip: clip);
-                Text(units.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), header with { Width = header.Width - 8 * scale }, 11, MutedInk, "Right VCenter", clip);
+                int modded = units.Count(u => u.Mod.Length > 0);
+                string count = units.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                Text(faction.Mod.Length > 0 ? $"{faction.Mod} · {count}" : modded > 0 ? $"{modded} modded · {count}" : count, header with { Width = header.Width - 8 * scale }, 11,
+                    faction.Mod.Length > 0 || modded > 0 ? Brass : MutedInk, "Right VCenter", clip);
                 int index = faction.Index;
                 if (Clickable(header, clip)) hits.Add(new(header, () => { if (!zeusOpen.Remove(index)) zeusOpen.Add(index); }));
             }
@@ -207,8 +226,9 @@ sealed partial class CheatMenu
                 bool picked = zeusPick is { } p && p.Record == unit.Record && p.Faction == unit.Faction;
                 if (picked) { Rect(at, Brass with { W = 0.22f }, clip); Rect(at with { Width = 3 * scale }, Brass, clip); }
                 else if (Hovered(at, clip)) Rect(at, MainInk with { W = 0.06f }, clip);
-                Text(unit.Name, at with { X = at.X + 26 * scale, Width = at.Width - 90 * scale }, 13, picked ? LightInk : MainInk, clip: clip);
-                if (unit.Animal) Text("animal", at with { Width = at.Width - 8 * scale }, 11, MutedInk, "Right VCenter", clip);
+                Text(unit.Name, at with { X = at.X + 26 * scale, Width = at.Width - 130 * scale }, 13, picked ? LightInk : MainInk, clip: clip);
+                string tag = string.Join(" · ", new[] { unit.Mod, unit.Animal ? "animal" : "" }.Where(t => t.Length > 0));
+                if (tag.Length > 0) Text(tag, at with { X = at.X + at.Width - 128 * scale, Width = 120 * scale }, 11, unit.Mod.Length > 0 ? Brass : MutedInk, "Right VCenter", clip);
                 var chosen = unit;
                 if (Clickable(at, clip)) hits.Add(new(at, () => zeusPick = zeusPick == chosen ? null : chosen));
             }
@@ -227,10 +247,9 @@ sealed partial class CheatMenu
         Text("SIDE", R(16, H - 170, 80, 18), 11, MutedInk);
         Segmented(R(16, H - 150, W - 32, 26), ZeusSides, zeusSide, i => zeusSide = i);
         Text("AMOUNT", R(16, H - 118, 80, 18), 11, MutedInk);
-        Button("-", R(16, H - 98, 30, 26), () => zeusCount = Math.Max(1, zeusCount - 1), size: 14);
-        Text(zeusCount.ToString(System.Globalization.CultureInfo.InvariantCulture), R(48, H - 98, 40, 26), 15, LightInk, "Center");
-        Button("+", R(90, H - 98, 30, 26), () => zeusCount = Math.Min(ZeusMost, zeusCount + 1), size: 14);
-        Segmented(R(130, H - 98, W - 146, 26), [.. ZeusCounts.Select(c => c.ToString(System.Globalization.CultureInfo.InvariantCulture))], Array.IndexOf(ZeusCounts, zeusCount), i => zeusCount = ZeusCounts[i]);
+        float slid = Slider("zeus-count", R(16, H - 96, W - 92, 22), CountToSlider(zeusCount), t => zeusCount = SliderToCount(t));
+        int shown = Dragging("zeus-count") ? SliderToCount(slid) : zeusCount;
+        Text(shown.ToString(System.Globalization.CultureInfo.InvariantCulture), R(W - 70, H - 100, 54, 28), 16, LightInk, "Right VCenter");
 
         Rect(R(16, H - 76, W - 32, 1), MainInk with { W = 0.12f });
         string hint = zeusPick is { } held ? $"{held.Name}: left-click the ground to place, right-click to stop." : "Pick a unit, then click the ground.";
@@ -240,31 +259,25 @@ sealed partial class CheatMenu
         painter.Draw(controls, width, height, pointer, null);
     }
 
-    /// <summary>A see-through figure standing at <paramref name="feet"/> (a man's height), with <paramref name="named"/> the unit's name over it.</summary>
-    void Ghost(Vector3 feet, ZeusUnit unit, bool named)
+    /// <summary>One figure to draw where a pick will stand: its unit, faction (for its look), feet, facing, and outline colour (alpha above 1: a figure drawn see-through).</summary>
+    public readonly record struct ZeusGhost(string Record, string? FactionId, Vector3 Feet, float Yaw, Vector4 Colour);
+
+    /// <summary>The figures of the pick where it would be placed, under the pointer now (none without a pick or over the panel). Once a frame, by the host's draw list.</summary>
+    public IReadOnlyList<ZeusGhost> ZeusGhosts()
     {
-        float tall = unit.Animal ? 12 : 18;
-        if (player.Project(feet) is not { } f || player.Project(feet + new Vector3(0, tall, 0)) is not { } h) return;
-        float px = MathF.Max(8, f.Y - h.Y);
-        if (px > 2000) return;
-        var ink = zeusSide switch { 1 => Ally, 2 => LightInk, 3 => Enemy, _ => unit.Faction == population()?.PlayerFaction ? Ally : Brass } with { W = 0.55f };
-        UiRect Part(float x, float y, float w, float hgt) => new(MathF.Round(f.X + x * px), MathF.Round(f.Y - y * px), MathF.Max(1, MathF.Round(w * px)), MathF.Max(1, MathF.Round(hgt * px)));
-        if (unit.Animal)
+        if (!visible || !zeusMode || zeusPick is not { } pick || ZeusGround(pointer) is not { } ground || ZeusSpots(pointer, ground) is not { } placing) return [];
+        var data = population();
+        int? faction = zeusSide == 1 ? data?.PlayerFaction : ZeusFactionOf(pick);
+        string? factionId = data is not null && faction is int f && f >= 0 && f < data.Factions.Count ? data.Factions[f].Id : null;
+        var colour = zeusSide switch { 1 => Ally, 2 => LightInk, 3 => Enemy, _ => Brass } with { W = 2 };
+        float yaw = MathF.Atan2(placing.Facing.X, placing.Facing.Y);
+        var walk = world().Walkability;
+        var list = new ZeusGhost[placing.Spots.Length];
+        for (int i = 0; i < list.Length; i++)
         {
-            Rect(Part(-0.45f, 0.75f, 0.9f, 0.4f), ink);                 // body
-            Rect(Part(0.32f, 0.95f, 0.25f, 0.25f), ink);                // head
-            foreach (float x in new[] { -0.4f, -0.25f, 0.2f, 0.33f }) Rect(Part(x, 0.36f, 0.07f, 0.36f), ink);
+            var s = placing.Spots[i];
+            list[i] = new ZeusGhost(pick.Record, factionId, new Vector3(s.X, walk.GroundHeight(s.X, s.Y, ground.Y), s.Y), yaw, colour);
         }
-        else
-        {
-            Rect(Part(-0.07f, 1f, 0.14f, 0.14f), ink);                  // head
-            Rect(Part(-0.13f, 0.84f, 0.26f, 0.36f), ink);               // body
-            Rect(Part(-0.21f, 0.82f, 0.07f, 0.34f), ink);               // arms
-            Rect(Part(0.14f, 0.82f, 0.07f, 0.34f), ink);
-            Rect(Part(-0.12f, 0.47f, 0.09f, 0.47f), ink);               // legs
-            Rect(Part(0.03f, 0.47f, 0.09f, 0.47f), ink);
-        }
-        Rect(Part(-0.3f, 0.01f, 0.6f, 0.02f), ink with { W = 0.8f });  // where it stands
-        if (named) Text(zeusCount > 1 ? $"{zeusCount} x {unit.Name}" : unit.Name, new(f.X - 150, h.Y - 26, 300, 22), 14, LightInk, "Center");
+        return list;
     }
 }

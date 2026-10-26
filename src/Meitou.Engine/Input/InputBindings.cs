@@ -49,6 +49,8 @@ public enum InputAction
     RotateItem,
     /// <summary>Meitou: the Town Ownership window (', the RE_Kenshi plugin Town Ownership's key). Appended.</summary>
     ToggleTownOwnership,
+    /// <summary>Meitou: the cheat menu's Zeus panel (F6), placing units by faction. Appended.</summary>
+    ToggleZeus,
 }
 
 /// <summary>The actions of one tick: for each, held, pressed or released this tick, plus the mouse movement and wheel.</summary>
@@ -166,6 +168,7 @@ public sealed class InputBindings
         Set(InputAction.Quit, Key.Escape);
         Set(InputAction.RotateItem, Key.R);   // only while an item is held, when it takes the key before stop_movement
         Set(InputAction.ToggleTownOwnership, Key.Apostrophe);
+        Set(InputAction.ToggleZeus, Key.F6);
     }
 
     /// <summary>

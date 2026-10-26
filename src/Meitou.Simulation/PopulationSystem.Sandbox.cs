@@ -9,6 +9,51 @@ public sealed partial class PopulationSystem
     /// <summary>Characters the F10 debug menu has spawned (<see cref="DebugSpawn"/>): each one's look variant.</summary>
     int debugSpawns;
 
+    /// <summary>Zeus's squads by record, faction and whether the player's: the next placing of the same joins it (not saved: after a load the next placing starts a new one).</summary>
+    readonly Dictionary<(string Record, int Faction, bool Player), int> zeusSquads = [];
+
+    /// <summary>
+    /// Zeus's placing (<see cref="DebugSpawnSquad"/>; the cheat menu): the characters in one new squad, each with a look of its own, which then joins the squad the earlier ones
+    /// of the same record and side are in while it has members. The player's are the player's characters (selectable, in the squad bar); an NPC squad's first member leads and the
+    /// others keep their places on it, as a squad's followers do. Serial Inputs phase.
+    /// </summary>
+    public Squad SpawnZeus(World world, DebugSpawnSquad command)
+    {
+        bool player = command.Player && data.PlayerFaction >= 0;
+        int chosen = player ? data.PlayerFaction : SandboxFaction(false, command.Faction);
+        bool animal = data.Db.Find(command.Record) is { Type: Meitou.Data.Fcs.FcsRecordType.ANIMAL_CHARACTER };
+        var offsets = command.Offsets;
+        var members = new MemberPlan[offsets.Count];
+        var built = new BuiltMember[offsets.Count];
+        for (int i = 0; i < offsets.Count; i++)
+        {
+            members[i] = new MemberPlan(command.Record, i == 0 ? SquadRole.Leader : SquadRole.Squad1, i, offsets[i], animal, 1);
+            built[i] = new BuiltMember(members[i], SandboxLook(world.Seed, command.Record, player, ++debugSpawns, chosen));
+        }
+        var template = new SquadTemplate { Id = "zeus " + command.Record, Name = data.Db.Find(command.Record)?.Name ?? command.Record };
+        var squad = SpawnSquad(world, new BuiltSquad(new SquadPlan(template, members, [], []), command.At, chosen, [.. built]), null, 100, player: player, idle: true, yaw: command.Yaw);
+        var key = (command.Record, chosen, player);
+        if (zeusSquads.TryGetValue(key, out int earlier) && world.Squads.Find(earlier) is { Members.Count: > 0 } into && into.Faction == chosen && into != squad)
+        {
+            SquadManagement.Merge(world, squad, into);
+            squad = into;
+        }
+        else
+        {
+            zeusSquads[key] = squad.Id;
+            // The player's new squad goes last in the squad bar.
+            if (player) squad.Index = SquadManagement.PlayerSquads(world).Where(s => s != squad).Select(s => s.Index + 1).DefaultIfEmpty(0).Max();
+        }
+        // An NPC squad's followers keep their places on its leader.
+        if (!player)
+        {
+            var table = world.Characters;
+            foreach (var id in squad.Members)
+                if (id != squad.Leader && table.TryResolveNext(id, out int slot)) table.Next[slot].Task = (byte)CharacterTask.Follow;
+        }
+        return squad;
+    }
+
     /// <summary>
     /// The animation sandbox's spawn (the game host's <c>--sandbox</c>): one character made from <paramref name="recordId"/> at a place, alone in a squad of its own, standing idle.
     /// <paramref name="player"/> makes it one of the player's (the first call also sets the player faction, as <see cref="StartPlayer"/> does); otherwise it belongs to the

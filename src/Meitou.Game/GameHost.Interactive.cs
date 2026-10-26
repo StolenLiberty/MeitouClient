@@ -267,6 +267,8 @@ sealed partial class GameHost
             {
                 if (!cheats.TakesKeyboard && !shiftDown && !g.NoPopulation && !player.TitleOpen && !player.EditorOpen && session.World.Player.Exists
                     && session.Bindings.Get(InputAction.ToggleCheatMenu).Contains(Binding.Of(cheatKey))) { cheats.Open(towns: false); return; }
+                if (!cheats.TakesKeyboard && !shiftDown && !g.NoPopulation && !player.TitleOpen && !player.EditorOpen && session.World.Player.Exists
+                    && session.Bindings.Get(InputAction.ToggleZeus).Contains(Binding.Of(cheatKey))) { cheats.ToggleZeus(); return; }
                 if (cheats.KeyDown(k == SilkKey.KeypadEnter ? EngineKey.Enter : cheatKey)) return;
             }
             // ' (rebindable) opens the Town Ownership window, the plugin's key.
@@ -589,6 +591,9 @@ sealed partial class GameHost
                 gpu.HoverKeys = [.. player.HighlightTargets(camera.Target, PlayerInterface.HighlightRadius).Select(t => (DrawKey(t.Id), t.Colour))];
             else
                 gpu.HoverKeys = outlining && pointerWorld && player.HoverTarget is { } hover ? [(DrawKey(hover.Id), hover.Colour)] : [];
+            // Zeus's placing figures: drawn only into the outline's masks, see-through (FillDrawListCore adds them to the draw list).
+            zeusGhosts = !Covered && !screenshotRequested && takeFile is null ? cheats.ZeusGhosts() : [];
+            if (zeusGhosts.Count > 0) gpu.HoverKeys = [.. gpu.HoverKeys, .. zeusGhosts.Select((ghost, i) => (GhostKey(i), ghost.Colour))];
             BenchLap(5);
             if (display.BeginFrame(size.X, size.Y))
             {
