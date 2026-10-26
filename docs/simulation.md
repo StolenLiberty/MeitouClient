@@ -282,7 +282,9 @@ chases only within the hold leash; a member shooting a crossbow never walks to c
 a job (any task but Idle, Attack, or the formation's own walk, `FormationWalk`), an attack on a target the player picked (`AttackOrder.Picked`), prison, death, or leaving
 the world. A move order given to exactly one formation's members marches it: the stored shape (`FormationGroup.Offsets`) centred on the target, turned to face the way from
 its centre (kept for a step under `Formation.Spacing`). A march of two or more keeps step (`CharacterCold.MarchSpeed`): each walks at the slowest marcher's speed times its
-share of the longest way, faster behind the block's mean progress and slower ahead of it. Engine choices throughout; formations are not saved. Holding Alt (no drag) rings
+share of the longest way, faster behind the block's mean progress and slower ahead of it. A formation drag given to exactly one formation's members three spacings or more off
+re-forms Total War's way (`ApproachOf`): the block marches in its old shape, turned to face the way it goes, until its front rank is 1.5 spacings short of the new centre, then each
+spreads onto its spot (the new spots handed out again along the new line so nobody crosses; the march keeps step only to the block's places, `FormationGroup.MarchTo`). Engine choices throughout; formations are not saved. Holding Alt (no drag) rings
 where each selected character will stand (`CharacterSnapshot.Stand`: its formation spot, the end of its walk, or where it stands), the notch its facing.
 
 ### Order toggles

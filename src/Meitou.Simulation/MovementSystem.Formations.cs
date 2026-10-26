@@ -15,6 +15,8 @@ public sealed class FormationGroup
     internal List<float> MarchFrom { get; } = [];
     /// <summary>The tick each member may next be sent back to its spot.</summary>
     internal List<long> NextReturn { get; } = [];
+    /// <summary>Where each member's march ends (its spot, or its place in the old block short of the new line, <see cref="MovementSystem"/> "re-forming"); the march keeps step to it.</summary>
+    internal List<Vector2> MarchTo { get; } = [];
     public Vector2 Centre { get; set; }
     public Vector2 Facing { get; set; }
 
@@ -24,6 +26,7 @@ public sealed class FormationGroup
         Offsets.RemoveAt(k);
         MarchFrom.RemoveAt(k);
         NextReturn.RemoveAt(k);
+        MarchTo.RemoveAt(k);
     }
 }
 
@@ -59,7 +62,7 @@ public sealed partial class MovementSystem
     /// Makes <paramref name="slots"/> a formation, each sent onto its spot of <paramref name="spots"/> to face <paramref name="facing"/> (serial). Two or more march in step;
     /// <paramref name="queued"/> walks the spot after the walk in hand.
     /// </summary>
-    void StartFormation(World world, List<int> slots, IReadOnlyList<Vector3> spots, Vector2 facing, bool queued)
+    void StartFormation(World world, List<int> slots, IReadOnlyList<Vector3> spots, Vector2 facing, bool queued, bool reform = false)
     {
         var table = world.Characters;
         int count = Math.Min(slots.Count, spots.Count);
@@ -68,6 +71,9 @@ public sealed partial class MovementSystem
         var centre = Vector2.Zero;
         for (int k = 0; k < count; k++) centre += new Vector2(spots[k].X, spots[k].Z);
         centre /= count;
+        // A formation given a new shape farther off marches there in its old one and spreads into the new one only at the line (Total War's march, then deploy).
+        var approach = reform && !queued ? ApproachOf(table, slots, spots, count, centre, facing) : null;
+        if (approach is { } a) spots = a.Spots;
         var group = new FormationGroup { Centre = centre, Facing = facing };
         var right = RightOf(facing);
         float yaw = MathF.Atan2(facing.X, facing.Y);
@@ -83,8 +89,20 @@ public sealed partial class MovementSystem
             var flat = new Vector2(spot.X, spot.Z);
             var d = flat - centre;
             float from = 0;
+            var marchTo = flat;
             if (queued && n.Task == (byte)CharacterTask.GoTo && (n.Flags & (ushort)MoveFlags.AnyPath) != 0)
                 cold.OrderQueue.Add(flat);   // after the walk in hand, which now leads into the formation's
+            else if (approach is { } block)
+            {
+                // To its place in the marching block, then onto its spot.
+                var via = block.Via[k];
+                GoToFloor(world, s, new Vector3(via.X, spot.Y, via.Y), cold.RunSpeed);
+                cold.ArriveWithin = SpotArrive;
+                cold.ArriveYaw = yaw;
+                cold.OrderQueue.Add(flat);
+                marchTo = via;
+                from = Vector2.Distance(new Vector2(n.Position.X, n.Position.Z), via);
+            }
             else
             {
                 flat = GoToFloor(world, s, spot, cold.RunSpeed);
@@ -101,8 +119,47 @@ public sealed partial class MovementSystem
             group.Offsets.Add(new Vector2(Vector2.Dot(d, right), Vector2.Dot(d, facing)));
             group.MarchFrom.Add(from);
             group.NextReturn.Add(0);
+            group.MarchTo.Add(marchTo);
         }
         formations.Add(group);
+    }
+
+    /// <summary>
+    /// For exactly the members of one formation sent to a new shape at least three spacings off: each one's place in its current block (its <see cref="FormationGroup.Offsets"/>) turned to face
+    /// the way it goes and stopped with its front rank <see cref="Formation.Spacing"/> × 1.5 short of the new centre (<c>Via</c>), and the new spots handed out again so the block spreads without
+    /// crossing over (both sorted along the new line). Null otherwise.
+    /// </summary>
+    static (Vector2[] Via, Vector3[] Spots)? ApproachOf(CharacterTable table, List<int> slots, IReadOnlyList<Vector3> spots, int count, Vector2 centre, Vector2 facing)
+    {
+        if (count < 2 || table.Cold(slots[0])!.Formation is not { } group) return null;
+        int members = 0;
+        foreach (var id in group.Members) if (table.TryResolveNext(id, out int m) && table.Cold(m)!.Formation == group) members++;
+        if (members != count) return null;
+        var offsets = new Vector2[count];
+        var here = Vector2.Zero;
+        for (int k = 0; k < count; k++)
+        {
+            int at = table.Cold(slots[k])!.Formation == group ? group.Members.IndexOf(table.IdOf(slots[k])) : -1;
+            if (at < 0) return null;
+            offsets[k] = group.Offsets[at];
+            here += new Vector2(table.Next[slots[k]].Position.X, table.Next[slots[k]].Position.Z);
+        }
+        here /= count;
+        var way = centre - here;
+        if (way.LengthSquared() < 9 * Formation.Spacing * Formation.Spacing) return null;
+        var ahead = Vector2.Normalize(way);
+        var across = RightOf(ahead);
+        float front = offsets.Max(o => o.Y);
+        var stop = centre - ahead * (front + Formation.Spacing * 1.5f);
+        var via = offsets.Select(o => stop + across * o.X + ahead * o.Y).ToArray();
+        // Along the new line (and a little by depth), so the left of the block takes the left of the line.
+        var right = RightOf(facing);
+        float Key(Vector2 p) => Vector2.Dot(p, right) + Vector2.Dot(p, facing) * 1e-3f;
+        var byVia = Enumerable.Range(0, count).OrderBy(k => Key(via[k])).ToArray();
+        var bySpot = Enumerable.Range(0, count).OrderBy(k => Key(new Vector2(spots[k].X, spots[k].Z))).ToArray();
+        var assigned = new Vector3[count];
+        for (int r = 0; r < count; r++) assigned[byVia[r]] = spots[bySpot[r]];
+        return (via, assigned);
     }
 
     /// <summary>
@@ -199,9 +256,16 @@ public sealed partial class MovementSystem
             if (group.MarchFrom[k] <= 0 || !table.TryResolveNext(group.Members[k], out int s)) continue;
             ref readonly var n = ref table.Next[s];
             var cold = table.Cold(s)!;
+            if (Vector2.DistanceSquared(n.Goal, group.MarchTo[k]) > 1)
+            {
+                // Past its place in the block: spreading onto its spot at its own pace.
+                group.MarchFrom[k] = 0;
+                cold.MarchSpeed = 0;
+                continue;
+            }
             slowest = MathF.Min(slowest, MathF.Min(n.MaxSpeed, SpeedMode.Cap(cold.ModeOverride ?? n.Mode, n.WalkSpeed)));
             longest = MathF.Max(longest, group.MarchFrom[k]);
-            total += Progress(n, cold, group.MarchFrom[k]);
+            total += Progress(n, group.MarchTo[k], group.MarchFrom[k]);
             walking++;
         }
         if (walking == 0) return;
@@ -211,11 +275,11 @@ public sealed partial class MovementSystem
             if (group.MarchFrom[k] <= 0 || !table.TryResolveNext(group.Members[k], out int s)) continue;
             var cold = table.Cold(s)!;
             float share = MathF.Max(MarchLeast, group.MarchFrom[k] / longest);
-            float step = Math.Clamp(1 + (block - Progress(table.Next[s], cold, group.MarchFrom[k])) * MarchCatchUp, 0.5f, 1.5f);
+            float step = Math.Clamp(1 + (block - Progress(table.Next[s], group.MarchTo[k], group.MarchFrom[k])) * MarchCatchUp, 0.5f, 1.5f);
             cold.MarchSpeed = MathF.Max(0.5f, slowest * share * step);
         }
 
-        static float Progress(in CharacterHot n, CharacterCold cold, float from) =>
-            1 - Math.Clamp(Vector2.Distance(new Vector2(n.Position.X, n.Position.Z), new Vector2(cold.FormationSpot.X, cold.FormationSpot.Z)) / from, 0, 1);
+        static float Progress(in CharacterHot n, Vector2 to, float from) =>
+            1 - Math.Clamp(Vector2.Distance(new Vector2(n.Position.X, n.Position.Z), to) / from, 0, 1);
     }
 }

@@ -151,7 +151,7 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
                     members.Add(s);
                     spots.Add(formation.Targets[k]);
                 }
-                StartFormation(world, members, spots, formation.Facing, formation.Queued);
+                StartFormation(world, members, spots, formation.Facing, formation.Queued, reform: true);
                 continue;
             }
             if (command is not MoveOrder order) continue;
