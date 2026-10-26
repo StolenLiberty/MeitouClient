@@ -57,6 +57,8 @@ public sealed class Squad
     public long NextHomeFillTick { get; set; }
     /// <summary>The squad's AI packages and the one running (<see cref="Ai.AiSystem"/>); null for a squad the AI does not run.</summary>
     public Ai.Blackboard? Ai { get; set; }
+    /// <summary>A player squad's autonomy settings (<see cref="Autonomy.AutonomySettings"/>; null: never set). Enabled, the AI runs the squad (<see cref="Ai.AiSystem"/>).</summary>
+    public Autonomy.AutonomySettings? Autonomy { get; set; }
     /// <summary>The dialogue-given AI a save or its stored state held, until the AI attaches a blackboard and applies it (then null).</summary>
     public Saving.AiSave? SavedAi { get; set; }
     /// <summary>The package it ran when it left the world (a kept or saved squad's), until the AI attaches a blackboard: an occupation goes on (<see cref="Ai.AiSystem"/>).</summary>

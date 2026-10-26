@@ -3,6 +3,8 @@ using Meitou.Data.Gameplay;
 using Meitou.Data.Gameplay.Ai;
 using Meitou.Data.World;
 
+using Meitou.Simulation.Autonomy;
+
 namespace Meitou.Simulation.Ai;
 
 /// <summary>Settings of the <see cref="AiSystem"/>; the defaults are the game's (engine choices unless a doc label says otherwise).</summary>
@@ -108,19 +110,24 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
             {
                 // The stance changes only with the role list (a package switch) and the hour.
                 mind.Stance = StanceOf(mind, roles, hour);
+                if (squad.Autonomy is { Enabled: true } autonomy) mind.Stance = AutonomyStance(mind.Stance, autonomy, autonomy.IsRestTime(world.GameHours));
                 (mind.StanceFrom, mind.StanceHour) = (roles, hour);
             }
             ref var n = ref table.Next[i];
             if (!Holds(n, cold)) continue;
             var goal = Choose(world, i, id, mind, squad, board, roles, hour);
             Act(world, i, mind, goal, board);
+            // What the act-out left it doing: a player order changes it (PlayerHeld).
+            if (cold.IsPlayer) (mind.IssuedTask, mind.IssuedGoal) = (n.Task, n.Goal);
         }
     }
 
     /// <summary>Whether the AI runs the character now: it has a mind and nothing else holds it (a fight, a flight, an order, a carry, a trade, a knock-out).</summary>
     public static bool Holds(in CharacterHot n, CharacterCold cold)
     {
-        if (cold.Ai is not { } mind || cold.IsPlayer || cold.InCombat || cold.Fleeing || cold.Engaged || cold.IsImprisoned || !cold.CarriedBy.IsNone || !cold.Carrying.IsNone || cold.Medical is { Incapacitated: true }) return false;
+        if (cold.Ai is not { } mind || cold.IsPlayer && !PlayerHeld(n, cold, mind) || cold.InCombat || cold.Fleeing || cold.Engaged || cold.IsImprisoned || !cold.CarriedBy.IsNone || !cold.Carrying.IsNone || cold.Medical is { Incapacitated: true }) return false;
+        // An autonomous player character the AI holds (PlayerHeld checked its task is the AI's).
+        if (cold.IsPlayer) return true;
         return (CharacterTask)n.Task switch
         {
             CharacterTask.Idle or CharacterTask.Wander or CharacterTask.Follow => true,
@@ -221,7 +228,14 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
             TaskProfiles.Special => 1,
             var d => d,
         };
-        return desire * behaviour switch
+        if (squad.Autonomy is { Enabled: true } autonomy) return AutonomyDesire(world, autonomy, behaviour, type, squad, board, mind, self, targeting, desire);
+        return desire * Factor(world, behaviour, squad, board, mind, self, targeting);
+    }
+
+    /// <summary>The behaviour's part of <see cref="Desire"/>: what its target finder finds (0: nothing).</summary>
+    float Factor(World world, AiBehaviour behaviour, Squad squad, Blackboard board, AiMind mind, CharacterId self, TaskTargetType targeting)
+    {
+        return behaviour switch
         {
             // A goal aimed at the squad's mission follows the contract's target (a bodyguard its employer), wanted only while there is one alive.
             AiBehaviour.Follow when targeting == TaskTargetType.SquadMission => board.MissionTarget.IsNone || board.MissionTarget == self || !world.Characters.IsAlive(board.MissionTarget) ? 0 : 1,
@@ -443,6 +457,12 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
         mind.FollowTarget = CharacterId.None;   // set again below for a follow goal aimed at the squad's mission
         ref var n = ref table.Next[slot];
         bool leader = mind.Squad.Leader == table.IdOf(slot);
+        if (table.Cold(slot)!.IsPlayer)
+        {
+            // An autonomous character off to another goal: its machine or turret first (the operator's place frees), and the hour it got up.
+            if (n.Task == (byte)CharacterTask.Operate && behaviour is not (AiBehaviour.Work or AiBehaviour.Turret)) Production.ProductionSystem.AutonomyEnd(table, slot);
+            if (behaviour != AiBehaviour.Sleep && table.Cold(slot)!.InSomething == Locks.HeldState.Bed) mind.LastSlept = world.GameHours;
+        }
         // Another goal gets it out of its bed (the get-up step's own think, or the goal's act-out where the plan has none); it stands where it lay.
         if (behaviour != AiBehaviour.Sleep && table.Cold(slot)!.InSomething == Locks.HeldState.Bed) world.Fixtures.LeaveBed(world, table.IdOf(slot));
         // Steps of the plan before the goal's own act-out: getting out of bed, sheathing (one think each); the walk and the rest are the goal's.
@@ -480,6 +500,7 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
                 }
             }
         }
+        if (mind.Squad.Autonomy is { Enabled: true } && ActAutonomy(world, slot, mind, board, behaviour, type)) return;
         switch (behaviour)
         {
             case AiBehaviour.Mill:
@@ -810,6 +831,7 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
     {
         foreach (var command in commands)
         {
+            if (command is SetSquadAutonomy autonomy) { SetAutonomy(world, autonomy); continue; }
             var (squadId, packageId) = command switch { StartContract s => (s.SquadId, s.PackageId), ChangeAi a => (a.SquadId, a.PackageId), _ => (-1, "") };
             if (world.Squads.Find(squadId) is not { } squad || data.Ai.Package(packageId) is not { } package) continue;
             if (squad.Ai is null)
@@ -828,6 +850,7 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
         var table = world.Characters;
         if (Interlocked.Exchange(ref placing, 0) != 0) Place(table);
         if (Interlocked.Exchange(ref bedding, 0) != 0) LieDown(world);
+        if (Interlocked.Exchange(ref requesting, 0) != 0) StartRequests(world);
         bool cadence = world.Tick % Math.Max(1, Settings.PackageEveryTicks) == 0;
         // Each town's turrets are claimed once per cadence, by the squads in squad order (derived, not hashed).
         if (cadence) { turretTaken.Clear(); seatTaken.Clear(); ReserveSeats(world); RefreshPlaces(world); }
@@ -843,6 +866,7 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
             var board = squad.Ai!;
             board.Intact = IsIntact(world, squad, board);
             UpdateInTown(world, squad, board);
+            if (Autonomous(squad)) AutonomyCadence(world, squad, board);
             rules.Bind(this, world, squad);
             board.Update(rules, world.GameHours);
             StepPackage(world, squad, board);
@@ -1074,6 +1098,14 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
 
     void Attach(World world, Squad squad)
     {
+        if (Autonomous(squad))
+        {
+            // Squad autonomy: the settings' packages, no home of its own (its places are the settings').
+            squad.Ai = new Blackboard(AutonomyPackages(squad.Autonomy!)) { Size = squad.Members.Count, NextPatrol = world.GameHours };
+            if (LeaderPosition(world, squad) is { } here) (squad.Ai.InTown, squad.Ai.InTownSince) = (CurrentTown(world, here), world.GameHours);
+            AutonomyCadence(world, squad, squad.Ai);
+            return;
+        }
         var (packages, template) = TemplateOf(squad.TemplateId);
         var home = AssignHome(world, squad, template);
         // The template's initial door state applies to the home it is given (docs/game/locks.md "Doors"); the first squad's wins, a saved building keeps its own.
@@ -1107,7 +1139,8 @@ public sealed partial class AiSystem(PopulationData data, AiSettings? settings =
     /// The AI runs a squad that is not the player's, not a roaming platoon's active half (a town's own saved squad, pinned, is run like the town's, a save's wild one like the wild
     /// sites' squads), and whose template lists AI packages.
     /// </summary>
-    bool Runs(World world, Squad squad) => (squad.PlatoonId < 0 || squad.Pinned || squad.Wild) && !IsPlayers(world, squad) && TemplateOf(squad.TemplateId).Packages.Count > 0;
+    bool Runs(World world, Squad squad) => Autonomous(squad) && squad.Faction == world.Player.Faction && squad.Members.Count > 0
+        || (squad.PlatoonId < 0 || squad.Pinned || squad.Wild) && !IsPlayers(world, squad) && TemplateOf(squad.TemplateId).Packages.Count > 0;
 
     bool IsPlayers(World world, Squad squad)
     {

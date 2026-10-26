@@ -407,6 +407,10 @@ public sealed class FirstAidSystem(GameConstants constants, BodyOptions options,
             if (cold.IsPlayer)
             {
                 if (cold.Jobs.Count > 0) RunJobs(world, i, cold, taken);
+                // Squad autonomy: the medic goals of its packages (Do Medic) work as the medic job, while the AI holds it.
+                if (next[i].Task != (byte)CharacterTask.Treat && cold.Ai is { } mind && Ai.AiSystem.PlayerHeld(next[i], cold, mind)
+                    && Autonomy.AutonomyRules.Wants(world, table.IdOf(i), cold, TaskType.JOB_MEDIC, TaskType.JOB_REPAIR_ROBOT))
+                    HealSomeone(world, i, taken, robotics: !Autonomy.AutonomyRules.Wants(world, table.IdOf(i), cold, TaskType.JOB_MEDIC));
                 continue;
             }
             if (!Settings.AutoNpcs) continue;

@@ -735,7 +735,15 @@ public sealed partial class CarrySystem(GameConstants constants, BodyOptions opt
         var taken = Lifting(table);
         for (int i = 0; i < table.HighWater; i++)
         {
-            if (!next[i].Alive || table.Cold(i) is not { RescueJob: true } cold) continue;
+            if (!next[i].Alive || table.Cold(i) is not { } cold) continue;
+            // Squad autonomy: the rescue goals of its packages (Rescue Downed Allies) work as the rescue job, while the AI holds it.
+            if (cold.IsPlayer && cold.Ai is { } mind && Ai.AiSystem.PlayerHeld(next[i], cold, mind) && CanCarry(cold) && !cold.Fleeing
+                && Autonomy.AutonomyRules.Wants(world, table.IdOf(i), cold, Meitou.Data.Gameplay.Ai.TaskType.FIND_AND_RESCUE, Meitou.Data.Gameplay.Ai.TaskType.FIND_AND_RESCUE_IF_THERES_BEDS, Meitou.Data.Gameplay.Ai.TaskType.FIND_AND_RESCUE_LEADER))
+            {
+                RescueSomeone(world, i, taken);
+                continue;
+            }
+            if (!cold.RescueJob) continue;
             if (cold.IsPlayer && !Orders.Has(cold, CharacterOrders.Jobs)) continue;
             // Free, or on a list job below the rescue job (which ranks above it).
             int rescue = cold.Jobs.FindIndex(j => j.Type == Meitou.Data.Gameplay.Ai.TaskType.FIND_AND_RESCUE_IF_THERES_BEDS);

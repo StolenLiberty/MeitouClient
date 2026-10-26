@@ -2,6 +2,8 @@ using System.Numerics;
 using Meitou.Data.Gameplay;
 using Meitou.Data.Gameplay.Ai;
 
+using Meitou.Simulation.Autonomy;
+
 namespace Meitou.Simulation.Ai;
 
 /// <summary>
@@ -133,7 +135,20 @@ public sealed partial class AiSystem
     /// town that is not public at once. Engine choice: a town's own squad never starts it (Meitou unloads a town's squads with their town, so one away from home would vanish when it unloads).
     /// </summary>
     bool TraderCanStart(World world, Squad squad, Blackboard board) =>
-        !squad.TownOwn && (InPrivateOutpost(world, board) || board.TraderState != 2 || ReadyToLeave(world, board));
+        !squad.TownOwn && (InPrivateOutpost(world, board) || board.TraderState != 2 || ReadyToLeave(world, board)) && !AutonomyResting(world, squad);
+
+    /// <summary>
+    /// Squad autonomy's hold on wandering (the plugin's <c>Package_WanderingTrader::signalStart</c> hook): an autonomous squad does not set off while a member sleeps, is down or is less
+    /// rested than the healed threshold.
+    /// </summary>
+    static bool AutonomyResting(World world, Squad squad)
+    {
+        if (squad.Autonomy is not { Enabled: true } s) return false;
+        foreach (var m in squad.Members)
+            if (world.Characters.TryResolveNext(m, out int slot) && world.Characters.Cold(slot) is { } c
+                && (c.InSomething == Locks.HeldState.Bed || c.Medical is { Incapacitated: true } || AutonomyRules.Rested(c) < s.HealedThreshold / 100f)) return true;
+        return false;
+    }
 
     /// <summary>
     /// Ready to go on (<c>FUN_1402868c0</c>): in a player town that is not public (<see cref="Construction.PlayerTown.Public"/>) at once; else after its stay

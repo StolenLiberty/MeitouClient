@@ -329,4 +329,9 @@ public interface IProjectileSource
 }
 
 /// <summary>One of the player's squads as the squad tabs and the squads screen show it.</summary>
-public sealed record SquadView(int Id, string Name, IReadOnlyList<CharacterId> Members);
+public sealed record SquadView(int Id, string Name, IReadOnlyList<CharacterId> Members)
+{
+    /// <summary>Its autonomy settings (null: never set) and what each member does under them (<see cref="Ai.AiSystem.AutonomyStatus"/>; empty while autonomy is off).</summary>
+    public Autonomy.AutonomySettings? Autonomy { get; init; }
+    public IReadOnlyList<string> Doing { get; init; } = [];
+}

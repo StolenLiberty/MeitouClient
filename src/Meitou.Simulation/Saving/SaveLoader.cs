@@ -126,6 +126,9 @@ public static class SaveLoader
         // What the player's squads remembered (of the characters made so far; an NPC not made yet is not named again).
         if (context.Memory is { } memory)
             foreach (var lp in loaded.PlayerPlatoons) memory.Restore(lp.Squad.Id, MemorySave.Read(lp.Platoon.Record, context.CharacterOf));
+        // Squad autonomy, taken up by the AI on its first serial step.
+        foreach (var lp in loaded.PlayerPlatoons)
+            if (lp.Platoon.Record.Strings.GetValueOrDefault(SaveCapture.AutonomyKey) is { Length: > 0 } text) lp.Squad.Autonomy = Autonomy.AutonomySettings.Read(text);
 
         // The selection.
         var selected = new List<Hand> { camera.SelectedCharacter };

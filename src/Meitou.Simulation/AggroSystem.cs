@@ -285,7 +285,7 @@ public sealed class AggroSystem(FactionRelations relations, AggroSettings? setti
             }
             if (task is (byte)CharacterTask.Attack or (byte)CharacterTask.Treat || task == (byte)CharacterTask.Rest && !AiSleeper(table.Cold(i))) continue;
             if (table.Cold(i) is not { InCombat: false, Fleeing: false, IsImprisoned: false, SlaveState: not 1, Fighter.CanAttack: true, Medical.Incapacitated: false, Carrying.IsNone: true } cold
-                || !Relations.Contains(cold.Faction) || cold.IsPlayer && !HuntsEnemies(cold, task) && !HoldsGround(cold, task)) continue;
+                || !Relations.Contains(cold.Faction) || cold.IsPlayer && !HuntsEnemies(cold, task) && !HoldsGround(cold, task) && !Ai.AiSystem.AutonomyFights(cold)) continue;
             var stance = cold.Ai?.Stance ?? Ai.AiStance.Aggressive;
             var war = cold.SquadId >= 0 && world.Squads.Find(cold.SquadId) is { War.IsSet: true } assaulting ? assaulting.War : WarTargets.None;
             if (stance == Ai.AiStance.Passive || !hasEnemy[cold.Faction] && stance != Ai.AiStance.AggressiveNeutrals && !war.IsSet && !(Memory?.AnyTempEnemy(cold.SquadId) ?? false)) continue;
