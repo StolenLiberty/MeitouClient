@@ -171,10 +171,15 @@ public static class Orders
     }
 
     /// <summary>The point a holding character holds (<see cref="CharacterCold.HoldPoint"/>, else where it stands).</summary>
-    public static Vector2 HoldPointOf(CharacterCold cold, Vector3 at) => cold.HoldPoint ?? new Vector2(at.X, at.Z);
+    public static Vector2 HoldPointOf(CharacterCold cold, Vector3 at) =>
+        cold.Formation is not null ? new Vector2(cold.FormationSpot.X, cold.FormationSpot.Z) : cold.HoldPoint ?? new Vector2(at.X, at.Z);
 
-    /// <summary>The Hold toggle (standing order 12): holding, the character not sneaking (<c>CharStats::holdPositionMode</c>).</summary>
-    public static bool Holding(CharacterCold? cold) => cold is not null && (cold.Orders & (CharacterOrders.Hold | CharacterOrders.Sneak)) == CharacterOrders.Hold;
+    /// <summary>
+    /// The Hold toggle (standing order 12): holding, the character not sneaking (<c>CharStats::holdPositionMode</c>). A formation member (<see cref="CharacterCold.Formation"/>)
+    /// holds its spot as if on Hold (Meitou-only).
+    /// </summary>
+    public static bool Holding(CharacterCold? cold) =>
+        cold is not null && (cold.Orders & CharacterOrders.Sneak) == 0 && ((cold.Orders & CharacterOrders.Hold) != 0 || cold.Formation is not null);
 
     /// <summary>Applies the order commands (the player system's inputs).</summary>
     internal static void Apply(World world, SimCommand command)

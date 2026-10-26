@@ -53,6 +53,7 @@ public sealed partial class PopulationSystem
         c.DrawnWeapon = default;
         c.ModeOverride = null;
         c.SpeedOverride = 0;
+        MovementSystem.LeaveFormation(c);
         c.InCombat = false;
         c.Fleeing = false;
         c.Engaged = false;

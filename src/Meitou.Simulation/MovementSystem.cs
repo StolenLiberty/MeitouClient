@@ -32,7 +32,7 @@ namespace Meitou.Simulation;
 /// speed is scaled by the cosine of what is left of the turn (none beyond 90 degrees), so a character turns about on the spot before it runs off.</item>
 /// Queued orders (<see cref="CharacterCold.OrderQueue"/>) and the formation (<see cref="Formation"/>) exist.
 /// </summary>
-public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
+public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDisposable
 {
     /// <summary>The fights the steering reads (null: no fight steering, as in worlds without combat; the world's combat system unless set).</summary>
     public Combat.CombatSystem? Fights { get; set; }
@@ -142,20 +142,16 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
             }
             if (command is FormationOrder formation)
             {
+                var members = new List<int>();
+                var spots = new List<Vector3>();
                 for (int k = 0; k < formation.Characters.Count && k < formation.Targets.Count; k++)
                 {
                     if (!table.TryResolveNext(formation.Characters[k], out int s) || table.Cold(s)!.IsImprisoned) continue;
-                    var fc = table.Cold(s)!;
-                    if (fc.InSomething == Locks.HeldState.Bed) world.Fixtures.LeaveBed(world, formation.Characters[k]);
-                    fc.FollowOrder = CharacterId.None;
-                    var spot = formation.Targets[k];
-                    ref var fn = ref table.Next[s];
-                    if (formation.Queued && fn.Task == (byte)CharacterTask.GoTo && (fn.Flags & (ushort)MoveFlags.AnyPath) != 0) { fc.OrderQueue.Add(new Vector2(spot.X, spot.Z)); continue; }
-                    var flat = GoToFloor(world, s, spot, fc.RunSpeed);
-                    fc.ArriveWithin = SpotArrive;   // onto the spot, not the move's arrival ring short of it
-                    fc.ArriveYaw = MathF.Atan2(formation.Facing.X, formation.Facing.Y);
-                    if ((fc.Orders & CharacterOrders.Hold) != 0) fc.HoldPoint = flat;
+                    if (table.Cold(s)!.InSomething == Locks.HeldState.Bed) world.Fixtures.LeaveBed(world, formation.Characters[k]);
+                    members.Add(s);
+                    spots.Add(formation.Targets[k]);
                 }
+                StartFormation(world, members, spots, formation.Facing, formation.Queued);
                 continue;
             }
             if (command is not MoveOrder order) continue;
@@ -168,6 +164,12 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
                 if (table.Cold(found)!.InSomething == Locks.HeldState.Bed) world.Fixtures.LeaveBed(world, id);   // an order gets a sleeper up
                 slots.Add(found);
             }
+            // A whole formation ordered somewhere marches there as a block, keeping its shape, turned to face the way it goes (Total War's right click).
+            if (!order.Queued && MarchOf(table, slots, new Vector3(order.Target.X, order.Target.Y, order.Target.Z)) is { } march)
+            {
+                StartFormation(world, slots, march.Spots, march.Facing, false);
+                continue;
+            }
             var targets = Formation.Place([.. slots.Select(s => new Vector2(table.Next[s].Position.X, table.Next[s].Position.Z))], new Vector2(order.Target.X, order.Target.Z));
             for (int k = 0; k < slots.Count; k++)
             {
@@ -176,6 +178,7 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
                 var cold = table.Cold(slot)!;
                 var target = targets[k];
                 cold.FollowOrder = CharacterId.None;
+                LeaveFormation(cold);
                 bool busy = n.Task == (byte)CharacterTask.GoTo && (n.Flags & (ushort)MoveFlags.AnyPath) != 0;
                 if (order.Queued && busy)
                 {
@@ -261,6 +264,8 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
         cold.OrderQueue.Clear();
         cold.ArriveWithin = 0;
         cold.ArriveYaw = float.NaN;
+        cold.FormationWalk = false;
+        cold.MarchSpeed = 0;
         cold.BlockedRepaths = 0;
         n.Task = (byte)CharacterTask.GoTo;
         n.Goal = target;
@@ -327,6 +332,7 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
     public void Schedule(World world)
     {
         Fights ??= world.Systems.OfType<Combat.CombatSystem>().FirstOrDefault();
+        KeepFormations(world);
         var table = world.Characters;
         var next = table.Next;
         for (int i = 0; i < next.Length; i++)
@@ -626,6 +632,7 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
                     if (cold.InCombat && !cold.CombatRunning && n.Task == (byte)CharacterTask.Attack) desired = MathF.Min(desired, Combat.CombatTuning.FootworkSpeed);
                     if (mode == SpeedMode.Group && cold.SpeedOverride <= 0 && n.Task != (byte)CharacterTask.Follow) desired = MathF.Min(desired, SlowestOfSquad(world, cold));
                     if ((cold.Orders & CharacterOrders.Sneak) != 0 && cold.SpeedOverride <= 0) desired = MathF.Min(desired, Orders.SneakSpeed(desired, Orders.Stealth(cold)));
+                    if (cold.MarchSpeed > 0 && cold.SpeedOverride <= 0) desired = MathF.Min(desired, cold.MarchSpeed);   // in step with its formation (KeepFormations)
                 }
                 // On the provisional part of a long route: ask again (the zones ahead may have loaded), following this one until the answer comes.
                 if (n.PathCursor >= cold.PathExact) Reroute(world, ref n, cold);

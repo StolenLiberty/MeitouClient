@@ -104,6 +104,18 @@ public sealed class CharacterCold
     public float ArriveWithin { get; set; }
     /// <summary>The yaw a formation move turns the character to when it arrives (<see cref="FormationOrder"/>); NaN: none. A new walk clears it.</summary>
     public float ArriveYaw { get; set; } = float.NaN;
+    /// <summary>
+    /// The formation the character stands in (<see cref="FormationOrder"/>, docs/simulation.md "Formations"): it holds <see cref="FormationSpot"/>, fights what comes close and goes back
+    /// to the spot; null: none. Derived from orders, not saved and not hashed.
+    /// </summary>
+    public FormationGroup? Formation { get; set; }
+    /// <summary>Its spot in <see cref="Formation"/> (with the clicked height) and the yaw it faces there.</summary>
+    public System.Numerics.Vector3 FormationSpot { get; set; }
+    public float FormationYaw { get; set; }
+    /// <summary>Its walk is the formation's (to its spot); <see cref="MovementSystem.GoTo"/> clears it, so any other walk takes it out of the formation.</summary>
+    public bool FormationWalk { get; set; }
+    /// <summary>The speed a marching formation keeps it to this tick (units/s; 0: none), so the block arrives together.</summary>
+    public float MarchSpeed { get; set; }
     /// <summary>Animation layers in play (made by <see cref="AnimationSystem"/>; null before the first tick it runs).</summary>
     public CharacterAnimation? Animation { get; set; }
     /// <summary>The kind of weapon drawn in the right hand (None while sheathed): the stance animations are chosen for.</summary>
