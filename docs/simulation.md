@@ -338,11 +338,14 @@ never moved, by contact or separation (**Observed**: the original pushes no sitt
 is not stopped, and an unwalkable result falls back to its own step.
 
 **Dynamic movement** (Meitou, Settings, Advanced; `MovementSystem.Dynamic` / `CombatSystem.Dynamic`, off in the tests): a body turns at
-5.2 rad/s standing down to 2.6 at full speed (the game's 4π is near instant), a walker gathers speed over about 0.35 s from its last speed (a sharp
-turn slows it, `Turn` scales speed by the cosine of what is left of the turn); a fighter turns to its target at 4.2 rad/s, 0.8 once its swing has
+5.2 rad/s standing down to 2.6 at full speed (the game's 4π is near instant), and every move has weight: after the steering (paths, following, fight
+footwork) its velocity goes toward the wanted one at most top speed / 0.45 s faster (a fighter's / 0.2 s) or top / 0.3 s slower or turned, so a body
+gathers speed, carries on a little round a corner and comes to a stop; a walker slows into its last point (speed at most sqrt(2 x braking x distance
+left) + 6), so it stops there; a carried or sitting body is left alone. A fighter turns to its target at 4.2 rad/s, 0.8 once its swing has
 started (it commits to the blow), starts a swing only within 30 degrees of its target, and neither blocks nor dodges a blow from more than 110 degrees
-off where it faces. **Observed** (probe): a 180-degree new target is swung at after about 0.75 s of turning instead of at once; 12 one-on-one duels
-take about as long as without it.
+off where it faces. **Observed** (probes): a walker sent behind itself turns for 0.4 s, sets off as it comes round, is at full speed 0.6 s later and stops 7 units short of
+its point over 0.25 s; in a one-against-two with the movement and combat systems, swings start within 27 degrees of the target (149 without) at
+about the same rate; 12 one-on-one duels take about as long as without it.
 
 ## Navmesh
 

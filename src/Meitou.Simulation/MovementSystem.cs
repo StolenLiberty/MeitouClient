@@ -95,7 +95,11 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
     /// reaches its speed in about <see cref="DynamicStartSeconds"/>. The combat system's half: <see cref="Combat.CombatSystem.Dynamic"/>.
     /// </summary>
     public bool Dynamic { get; set; }
-    public const float DynamicTurnStanding = 5.2f, DynamicTurnRunning = 2.6f, DynamicFightTurn = 4.2f, DynamicSwingTurn = 0.8f, DynamicStartSeconds = 0.35f;
+    public const float DynamicTurnStanding = 5.2f, DynamicTurnRunning = 2.6f, DynamicFightTurn = 4.2f, DynamicSwingTurn = 0.8f,
+        DynamicStartSeconds = 0.45f, DynamicFightStart = 0.2f, DynamicStopSeconds = 0.3f;
+
+    /// <summary>The deceleration (units/s²) of a body whose top speed is <paramref name="top"/>: it stops from full speed in <see cref="DynamicStopSeconds"/>.</summary>
+    static float Brake(float top) => MathF.Max(top, 10) / DynamicStopSeconds;
 
     /// <summary>How fast a body turns at <paramref name="speed"/> of its top <paramref name="top"/> (rad/s): the game's at once, or the dynamic movement's.</summary>
     float TurnRateFor(float speed, float top) =>
@@ -599,7 +603,7 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
                 n.Flags = (ushort)(n.Flags & ~(ushort)MoveFlags.AnyPath);
                 continue;
             }
-            float speed = MathF.Sqrt(p.Velocity.X * p.Velocity.X + p.Velocity.Z * p.Velocity.Z);
+            float speed = MathF.Sqrt(p.Velocity.X * p.Velocity.X + p.Velocity.Z * p.Velocity.Z), moving = speed;
             var dir = Vector2.Zero;
             bool facing = false;
             float desired = 0;
@@ -650,6 +654,9 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
                     if (mode == SpeedMode.Group && cold.SpeedOverride <= 0 && n.Task != (byte)CharacterTask.Follow) desired = MathF.Min(desired, SlowestOfSquad(world, cold));
                     if ((cold.Orders & CharacterOrders.Sneak) != 0 && cold.SpeedOverride <= 0) desired = MathF.Min(desired, Orders.SneakSpeed(desired, Orders.Stealth(cold)));
                     if (cold.MarchSpeed > 0 && cold.SpeedOverride <= 0) desired = MathF.Min(desired, cold.MarchSpeed);   // in step with its formation (KeepFormations)
+                    // Dynamic movement: it slows into its last point so that its weight carries it there and no further.
+                    if (Dynamic && last)
+                        desired = MathF.Min(desired, MathF.Sqrt(2 * Brake(n.MaxSpeed) * MathF.Max(dist - (cold.ArriveWithin > 0 ? cold.ArriveWithin : ArriveRadius), 0)) + 6);
                 }
                 // On the provisional part of a long route: ask again (the zones ahead may have loaded), following this one until the answer comes.
                 if (n.PathCursor >= cold.PathExact) Reroute(world, ref n, cold);
@@ -706,9 +713,7 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
             else
             {
                 // A path is followed at the top speed at once (the nav agent sets its velocity to top speed x direction); the 15 / s ramp is the combat steering's.
-                // Dynamic movement: one setting off gathers speed (its last speed, lowered by a turn it made, is where it starts from).
-                speed = cold.InCombat && desired > speed ? MathF.Min(speed + Acceleration * dt, desired)
-                    : Dynamic && desired > speed ? MathF.Min(speed + MathF.Max(desired / DynamicStartSeconds, 40) * dt, desired) : desired;
+                speed = cold.InCombat && desired > speed ? MathF.Min(speed + Acceleration * dt, desired) : desired;
                 if (dir != Vector2.Zero && FaceOf(prev, n, cold) is { } face)
                 {
                     // In its footwork a fighter walks its path whichever way it lies and turns to face its target (the side steps, docs/animation.md "Side steps").
@@ -718,9 +723,26 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
                 }
                 else if (dir != Vector2.Zero)
                 {
-                    (dir, speed) = Turn(p.Yaw, dir, speed, dt, TurnRateFor(speed, n.MaxSpeed));
+                    (dir, speed) = Turn(p.Yaw, dir, speed, dt, TurnRateFor(moving, n.MaxSpeed));   // the turn rate of how fast it is going now
                     n.Yaw = MathF.Atan2(dir.X, dir.Y);   // also while it turns on the spot
                 }
+            }
+
+            // Dynamic movement: the body's weight. Its velocity goes toward the one wanted at most so fast: speeding up over DynamicStartSeconds (a fighter's
+            // footwork quicker), slowing, stopping or changing direction over DynamicStopSeconds; so it carries on a little round a turn and comes to a stop.
+            if (Dynamic && cold.CarriedBy.IsNone && !Seated(n, cold))
+            {
+                var current = new Vector2(p.Velocity.X, p.Velocity.Z);
+                var wanted = dir * speed;
+                float top = MathF.Max(n.MaxSpeed, 10);
+                bool slowing = wanted.LengthSquared() < current.LengthSquared() || Vector2.Dot(wanted, current) < 0;
+                float limit = (slowing ? Brake(top) : top / (steering || cold.InCombat ? DynamicFightStart : DynamicStartSeconds)) * dt;
+                var change = wanted - current;
+                float length = change.Length();
+                if (length > limit) change *= limit / length;
+                var velocity = current + change;
+                float vs = velocity.Length();
+                (dir, speed) = vs > 0.05f ? (velocity / vs, vs) : (Vector2.Zero, 0f);
             }
 
             // Separation from the neighbours of the last tick, visited in the grid's fixed order.
