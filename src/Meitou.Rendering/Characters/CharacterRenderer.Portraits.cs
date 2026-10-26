@@ -19,7 +19,8 @@ internal sealed unsafe partial class CharacterRenderer
     /// 128 px faithfully, the whole 256 px enhanced (the squad bar shows them 120 to 230 px wide from 1080 to 4K lines, so a 128 px one is stretched and soft).
     /// The pitch stays when the look changes, so the interface keeps the same atlas.
     /// </summary>
-    public const int PortraitCell = 256, FaithfulPortraitSize = 128, PortraitColumns = 16, PortraitRows = 2;
+    /// The atlas holds 128 cells: a squad of 100 shows every portrait, with room for the squads screen and the conversation's two.
+    public const int PortraitCell = 256, FaithfulPortraitSize = 128, PortraitColumns = 16, PortraitRows = 8;
     /// <summary>How much of its cell a portrait fills under <paramref name="look"/> (<see cref="PortraitCell"/>).</summary>
     public static int PortraitSizeFor(PreviewLook look) => look.Enhanced ? PortraitCell : FaithfulPortraitSize;
     /// <summary>The enhanced portraits' supersampling each way (<see cref="PreviewLook"/>): a still drawn once, so 16 samples a pixel cost nothing that matters.</summary>

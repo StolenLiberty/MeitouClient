@@ -78,7 +78,8 @@ time in `MeitouHudArt.cs`: a white rounded plate, rim and ring nine-sliced under
   hunger, load, state and goal, the hurt parts, six skills; Skills; Jobs, rows drag to reorder); minimise / maximise in its corner
   (`HudCardMinimised`, kept in the settings). A selected building shows its own card (status, condition rows, its lines and buttons).
 - Bottom centre: the orders in groups (stance, engage, move, duties) with their keys, over the squad tabs and portraits (number,
-  hungry and first-aid marks, knockout time, health strip; up to two rows, then the wheel scrolls); shrinks to the room left.
+  hungry and first-aid marks, knockout time, health strip): up to 100 members at once, the cells shrinking (names dropped below 52 px)
+  to keep the portraits within 150 px; past that the wheel scrolls. The orders are drawn at 0.86 of full size and shrink further to the room left.
 - Bottom right: Bag, Stats, Map, Faction, Tech, Craft, Squads, Build.
 - At the pointer: another faction's character's name, faction, health and what a right click does.
 - Build mode hides the HUD, as the original's bar.

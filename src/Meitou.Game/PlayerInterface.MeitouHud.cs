@@ -737,19 +737,24 @@ sealed partial class PlayerInterface
         if (PlayerCharacters().Count == 0) { squadBarRow = 0; return; }
         float space = right - 24 - (left + 24), centre = (left + right) / 2;
 
-        // The portraits: up to two rows, cells shrinking to fit.
-        const float gap = 8;
-        int n = Math.Max(1, members.Count);
-        float cell = 72;
-        int columns = Math.Max(1, (int)((space - 28 + gap) / (cell + gap)));
-        if (n > columns)
+        // The portraits: every member up to 100 at once, the cells shrinking (and dropping their names) until they fit a page no taller than PortraitPage; past 100
+        // the wheel scrolls.
+        int n = Math.Max(1, members.Count), fitAll = Math.Min(n, 100);
+        float cell, gap, pitch;
+        int columns, rows;
+        bool named;
+        for (cell = 72; ; cell -= 2)
         {
-            float fit = (space - 28 + gap) / MathF.Ceiling(n / 2f) - gap;
-            cell = Math.Clamp(fit, 48, 72);
+            named = cell >= 52;
+            gap = named ? 8 : 4;
+            pitch = cell + (named ? 26 : 8);
             columns = Math.Max(1, (int)((space - 28 + gap) / (cell + gap)));
+            rows = (fitAll + columns - 1) / columns;
+            if (rows * pitch <= PortraitPage || cell <= 24) break;
         }
-        int rows = (n + columns - 1) / columns, shownRows = Math.Min(rows, 2);
-        float pitch = cell + 26, rowWidth = Math.Min(n, columns) * (cell + gap) - gap;
+        int shownRows = rows;
+        rows = (n + columns - 1) / columns;
+        float rowWidth = Math.Min(n, columns) * (cell + gap) - gap;
 
         // The tabs' row.
         float tabsWidth = 0;
@@ -765,7 +770,7 @@ sealed partial class PlayerInterface
             if (tabsWidth + 28 <= space || longest <= 30) break;
         }
         float dockWidth = MathF.Min(space, MathF.Max(rowWidth, tabsWidth) + 28);
-        float dockHeight = 10 + 26 + 8 + shownRows * pitch - 4 + 12;
+        float dockHeight = 10 + 26 + 8 + shownRows * pitch - (named ? 4 : 2) + 10;
         float dx = MathF.Round(centre - dockWidth / 2), dy = HudHeight - 24 - dockHeight;
         HudPlate(dx, dy, dockWidth, dockHeight);
         float tx = dx + 14;
@@ -812,15 +817,18 @@ sealed partial class PlayerInterface
         {
             float cx = px + i % columns * (cell + gap), cy = py + i / columns * pitch - squadBarScroll / hs;
             if (cy < py - 1 || cy + pitch > py + shownRows * pitch + 1) continue;
-            HudMember(members[i], i, cx, cy, cell, PortraitStateOf(members[i], camera.Eye, camera.Target));
+            HudMember(members[i], i, cx, cy, cell, named, PortraitStateOf(members[i], camera.Eye, camera.Target));
         }
 
         // The orders over the dock.
         HudOrders(centre, dy - 10, space);
     }
 
+    /// <summary>The tallest the squad's portraits may stand together (layout units): a bigger squad shrinks its cells to stay within it.</summary>
+    const float PortraitPage = 150;
+
     /// <summary>A squad member's cell: its portrait, number, marks (hungry, needs first aid, knocked out with the time left, dead), name and health strip; the click selects.</summary>
-    void HudMember(CharacterSnapshot m, int index, float x, float y, float size, PortraitState state)
+    void HudMember(CharacterSnapshot m, int index, float x, float y, float size, bool named, PortraitState state)
     {
         bool down = m.Body is { Unconscious: true }, dead = m.Body is { Dead: true };
         HudRound(x, y, size, size, (state & PortraitState.Hurt) != 0 ? HudBadFill with { W = 0.55f * PortraitFlash(m.Id, state) } : HudTile, 4);
@@ -829,20 +837,22 @@ sealed partial class PlayerInterface
         hudControls.Add(new(HudId("member-image"), "ImageBox", V(x, y, size, size), "", "", "", true, portrait, Vector4.Zero, Pickable: false));
         if (m.Selected) HudImage(MeitouHudArt.Ring, V(x - 2, y - 2, size + 4, size + 4), HudBrass, 6);
         else HudImage(MeitouHudArt.Rim, V(x, y, size, size), down || dead ? HudEnemy with { W = 0.5f } : HudRimTint, 4);
-        if (index < 10) HudText(index == 9 ? "0" : (index + 1).ToString(CultureInfo.InvariantCulture), x + 4, y + 2, 16, 14, 11, HudMuted);
-        float badge = x + size - 20;
-        if ((state & PortraitState.Hunger) != 0) { HudRound(badge, y + 4, 16, 16, HudHunger, 8); HudIcon("food", badge + 2, y + 6, 12, Rgb(20, 8, 6)); badge -= 18; }
-        if (m.Body is { NeedsAid: true } && !dead) { HudRound(badge, y + 4, 16, 16, HudBadFill, 8); HudIcon("drop", badge + 2, y + 6, 12, Rgb(20, 8, 6)); }
+        if (index < 10 && size >= 40) HudText(index == 9 ? "0" : (index + 1).ToString(CultureInfo.InvariantCulture), x + 4, y + 2, 16, 14, 11, HudMuted);
+        // The marks shrink with the cell.
+        float mark = MathF.Min(16, MathF.Round(size * 0.3f)), badge = x + size - mark - 4;
+        if ((state & PortraitState.Hunger) != 0) { HudRound(badge, y + 4, mark, mark, HudHunger, mark / 2); HudIcon("food", badge + mark * 0.12f, y + 4 + mark * 0.12f, mark * 0.76f, Rgb(20, 8, 6)); badge -= mark + 2; }
+        if (m.Body is { NeedsAid: true } && !dead) { HudRound(badge, y + 4, mark, mark, HudBadFill, mark / 2); HudIcon("drop", badge + mark * 0.12f, y + 4 + mark * 0.12f, mark * 0.76f, Rgb(20, 8, 6)); }
         if (down || dead)
         {
-            HudRound(x, y + size - 20, size, 20, new Vector4(8 / 255f, 6 / 255f, 5 / 255f, 0.8f), 4);
-            string text = dead ? Loc.Tr("DEAD") : m.Body is { KoTimer: > 0 } b ? $"{Loc.Tr("OUT")} {(int)b.KoTimer / 60}:{(int)b.KoTimer % 60:00}" : Loc.Tr("OUT");
-            HudText(text, x, y + size - 20, size, 20, 11, HudDanger, "Center");
+            float band = MathF.Min(20, MathF.Round(size * 0.32f));
+            HudRound(x, y + size - band, size, band, new Vector4(8 / 255f, 6 / 255f, 5 / 255f, 0.8f), 4);
+            string text = dead ? Loc.Tr("DEAD") : size < 48 ? Loc.Tr("OUT") : m.Body is { KoTimer: > 0 } b ? $"{Loc.Tr("OUT")} {(int)b.KoTimer / 60}:{(int)b.KoTimer % 60:00}" : Loc.Tr("OUT");
+            HudText(text, x, y + size - band, size, band, size < 48 ? 9 : 11, HudDanger, "Center");
         }
-        HudText(HudFit(m.Name, 12, size + 6), x - 4, y + size + 2, size + 8, 14, 12, m.Selected ? HudLight : down || dead ? HudMuted : HudInk, "Center");
+        if (named) HudText(HudFit(m.Name, 12, size + 6), x - 4, y + size + 2, size + 8, 14, 12, m.Selected ? HudLight : down || dead ? HudMuted : HudInk, "Center");
         float health = m.Body is { } h ? MathF.Min(h.WorstPart, h.Blood) : 1;
-        HudBar(x, y + size + 18, size, 4, MathF.Max(health, 0.03f), dead ? HudOut : HealthColour(health));
-        hudControls.Add(new("hud-member-" + index.ToString(CultureInfo.InvariantCulture), "Button", V(x, y, size, size + 22), "", "meitou:member", "", true,
+        HudBar(x, y + size + (named ? 18 : 3), size, named ? 4 : 3, MathF.Max(health, 0.03f), dead ? HudOut : HealthColour(health));
+        hudControls.Add(new("hud-member-" + index.ToString(CultureInfo.InvariantCulture), "Button", V(x, y, size, size + (named ? 22 : 6)), "", "meitou:member", "", true,
             UiTooltips.TextProperties(Loc.Tr("{1}: click selects, double-click follows", m.Name)), Vector4.Zero, Argument: index.ToString(CultureInfo.InvariantCulture), Pickable: true));
     }
 
@@ -870,8 +880,8 @@ sealed partial class PlayerInterface
         ];
         float ButtonWidth((string Icon, string Name, string Action, bool On, InputAction? Key, string? Label) b) => b.Label is { } l ? 12 + 20 + 6 + HudMeasure(l, 13) + 12 : 44;
         float width = 10 + groups.Sum(g => g.Items.Sum(ButtonWidth) + (g.Items.Length - 1) * 4) + (groups.Length - 1) * 10 + 10;
-        // Narrow screens: the strip keeps its order and shrinks to the room between the card and the windows.
-        float k = Math.Clamp(space / width, 0.6f, 1);
+        // A compact strip (0.86 of its full size); on narrow screens it keeps its order and shrinks to the room between the card and the windows.
+        float k = Math.Clamp(space / width, 0.6f, 0.86f);
         float height = 10 + 14 + 4 + 44 + 10;
         float x = MathF.Round(centre - width * k / 2), y = bottom - height * k;
         HudPlate(x, y, width * k, height * k);

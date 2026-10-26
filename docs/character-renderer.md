@@ -83,8 +83,8 @@ picture. Atlas cells are 256 px apart; enhanced portraits fill them (the origina
 squad bar's 120-230 px from 1080 to 4K lines and looked soft), faithful ones keep 128 px in the corner. Portraits keep the
 fixed plain light: a still drawn under the live sky would depend on the hour it was drawn. Faithful
 keeps the original's direct 8-bit stage and 128 px plain portraits. No SSAO, shadows or GI (no scene).
-Atlas layout (Meitou): squad members take cells 0-29; the conversation window's speaker and player
-character take the last two (30, 31) while a conversation is open.
+Atlas layout (Meitou): 16 x 8 cells; squad members take cells 0-125 (a squad of 100 shows every portrait); the conversation
+window's speaker and player character take the last two (126, 127) while a conversation is open.
 Item icons (`CharacterRenderer.Icons.cs`) are the same: an item's mesh drawn through the item shader into a texture of its own, as a pseudo-instance that the world and shadow views skip;
 the camera, lighting and sizes are in [game/ui-screens.md](game/ui-screens.md) "Item icons".
 Harness `--crowd` exercises instance scaling; compare pose/upload/draw/shadow separately.
