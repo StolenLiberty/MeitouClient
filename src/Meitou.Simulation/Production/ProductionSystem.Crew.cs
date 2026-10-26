@@ -20,7 +20,7 @@ public sealed partial class ProductionSystem
         return 0;
     }
 
-    internal static string MaterialName(int material) => material switch
+    public static string MaterialName(int material) => material switch
     {
         ResourceField.StoneResource => "stone", ResourceField.IronResource => "iron", ResourceField.CopperResource => "copper", _ => "any",
     };

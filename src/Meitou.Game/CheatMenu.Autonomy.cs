@@ -44,7 +44,7 @@ sealed partial class CheatMenu
 
     static readonly (LabourKind Kind, string Name)[] LabourRows =
     [
-        (LabourKind.Labouring, "Mining"), (LabourKind.Farming, "Farming"), (LabourKind.Cooking, "Cooking"), (LabourKind.Science, "Research"), (LabourKind.Engineer, "Engineering"),
+        (LabourKind.Labouring, "Mining, refining"), (LabourKind.Farming, "Farming"), (LabourKind.Cooking, "Cooking"), (LabourKind.Science, "Research"), (LabourKind.Engineer, "Engineering bench"),
         (LabourKind.Robotics, "Robotics"), (LabourKind.Medic, "Medical"), (LabourKind.WeaponSmith, "Weapon smithing"), (LabourKind.ArmourSmith, "Armour smithing"),
         (LabourKind.CrossbowSmith, "Crossbow smithing"), (LabourKind.AutomaticMachine, "Automatic machines"), (LabourKind.Other, "Other"),
     ];
@@ -616,7 +616,9 @@ sealed partial class CheatMenu
             });
             y += 30;
         }
-        Text("Operators fetch inputs from your storage and take the output back.", R(x + 14, y + 2, half - 28, 18), 10, MutedInk);
+        Text(m.Material != 0 ? $"A {Meitou.Simulation.Production.ProductionSystem.MaterialName(m.Material)} crew: only that material's mines and processors."
+            : s.Labour.All(v => v <= 0) ? "No machine work: building only (the right side)." : "Operators fetch inputs from your storage and take the output back.",
+            R(x + 14, y + 2, half - 28, 18), 10, m.Material != 0 || s.Labour.All(v => v <= 0) ? Brass : MutedInk);
 
         float gx = x + half + 14;
         Card(R(gx, 166, half, 482));

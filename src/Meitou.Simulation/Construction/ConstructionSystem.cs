@@ -853,6 +853,13 @@ public sealed class ConstructionSystem : ITickSystem
     }
 
     /// <summary>The character carries a unit of something the site still needs.</summary>
+    /// <summary>The material a site waits for that the character neither carries nor can fetch (storage, ground, a machine's output in range), or null (Meitou: the manager's check).</summary>
+    internal string? Missing(World world, int slot, BuildSite site)
+    {
+        if (!site.Stalled || world.Characters.Cold(slot) is not { } cold || Carries(cold, site) || Source(world, slot, cold, site) is not null) return null;
+        return site.Materials.FirstOrDefault(m => m.Required > m.Delivered)?.Item;
+    }
+
     static bool Carries(CharacterCold cold, BuildSite site)
     {
         foreach (var m in site.Materials)

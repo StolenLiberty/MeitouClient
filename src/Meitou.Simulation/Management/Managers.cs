@@ -339,7 +339,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             if (world.Buildings.Find(siteId) is not { } site || site.Owner != world.Player.Faction || Stuck(world, id, siteId)) continue;
             if (!site.Complete || site.Destroyed)
             {
-                if (!m.Build || site.Paused || site.Dismantling || site.Ruined || Builders(world, siteId) + building.GetValueOrDefault(siteId) >= BuildersPerSite) continue;
+                if (!m.Build || site.Paused || site.Dismantling || site.Ruined || Builders(world, siteId) + building.GetValueOrDefault(siteId) >= BuildersPerSite || Lacks(world, slot, site)) continue;
                 StartBuild(world, id, c, site, building);
                 return true;
             }
@@ -417,6 +417,22 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         double h = ((world.GameHours % 24) + 24) % 24;
         log.Add($"{(int)h:00}:{(int)(h % 1 * 60):00}  ! {text}");
         if (log.Count > LogLines) log.RemoveAt(0);
+    }
+
+    /// <summary>Sites waiting for a material none of the squad can get, and the item (said once in the log until it can be had).</summary>
+    readonly Dictionary<string, string> lacking = new(StringComparer.Ordinal);
+
+    /// <summary>Whether a site waits for a material the member cannot get (none carried, in storage, on the ground or in a machine's output in range); notes it once.</summary>
+    bool Lacks(World world, int slot, Construction.BuildSite site)
+    {
+        if (world.SystemOf<Construction.ConstructionSystem>()?.Missing(world, slot, site) is not { } item) { lacking.Remove(site.Id); return false; }
+        if (!lacking.TryGetValue(site.Id, out var said) || said != item)
+        {
+            lacking[site.Id] = item;
+            string name = data?.Db.Find(item)?.Name ?? "a material";
+            Note(world, $"{SiteName(world, site.Id)} needs {name}: none in storage or on the ground");
+        }
+        return true;
     }
 
     void StartBuild(World world, CharacterId id, CharacterCold c, Construction.BuildSite site, Dictionary<string, int> building)
@@ -637,7 +653,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             if (site.Town != town.Number || site.Owner != world.Player.Faction || site.Paused || site.Dismantling || site.Ruined) continue;
             if (site.Complete && !site.Destroyed) continue;
             int p = m.PriorityOf(GroupOfRecord(site.Record));
-            if (p <= 0 || p < bestP || Stuck(world, id, site.Id)) continue;
+            if (p <= 0 || p < bestP || Stuck(world, id, site.Id) || table.TryResolveNext(id, out int me) && Lacks(world, me, site)) continue;
             float d = Vector3.DistanceSquared(at, site.Position);
             if (p == bestP && d >= bestD) continue;
             int builders = building.GetValueOrDefault(site.Id);
