@@ -1459,7 +1459,7 @@ Meitou-only, engine choices throughout (`Slavery/SlaverySystem.cs`); the origina
 shackles) gets the context verb "Join me or die" with its chance: 35 %, plus up to 45 % the more hurt it is (`AutonomyRules.Rested`), 20 % when starving (hunger below 40 %), 10 % in
 shackles, at most 95 % (roll `RngPurpose.Enslave`, keyed by the captive and the tick). The first selected non-slave walks within 60 (twice that once its walk ends at the bars) and says it.
 Giving in: out of the cage (`FixtureRegistry.Release`), into the player's squad "Slaves" (a new one when none has room; `DialogueSystem.JoinSquad`, as recruits join) with slave state 1
-owned by the player's faction (saved by `SlaveSave`), shackles kept on; refusing: "Never!" / "I'd rather die." and not asked again for a game hour (not saved). A slave of a managed
+owned by the player's faction (saved by `SlaveSave`), renamed "Slave", shackles kept on; refusing: "Never!" / "I'd rather die." and not asked again for a game hour (not saved). A slave of a managed
 squad shelters when the outpost is attacked. Not built: slaves escaping, any relation or crime cost. **Observed** in a temporary probe (a caged captive at 55 % joined the Slaves squad).
 
 ## New-game difficulty

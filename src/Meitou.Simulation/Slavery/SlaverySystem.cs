@@ -17,6 +17,8 @@ public sealed class SlaverySystem(PopulationData data) : ITickSystem
     /// <summary>The talker speaks from this close (engine: a cage's bars between them).</summary>
     public const float Reach = 60;
     public const string SquadName = "Slaves";
+    /// <summary>The name a captive who gives in is given.</summary>
+    public const string SlaveName = "Slave";
 
     /// <summary>Threats under way: the talker walking to the captive.</summary>
     readonly SortedDictionary<int, (CharacterId Talker, CharacterId Captive)> walking = [];
@@ -112,7 +114,9 @@ public sealed class SlaverySystem(PopulationData data) : ITickSystem
         (captive.SlaveState, captive.SlaveOwner) = (1, world.Player.Faction);
         refused.Remove(captiveId);
         world.Bark(captiveId, "...I'll work.");
-        world.Post($"{captive.Name} is now your slave ({squad.Name}).");
+        string was = captive.Name;
+        captive.Name = SlaveName;   // renamed, as the slavers' own slaves are
+        world.Post($"{was} is now your slave ({squad.Name}).");
     }
 
     static float Gap(Vector3 a, Vector3 b) => Vector2.Distance(new(a.X, a.Z), new(b.X, b.Z));
