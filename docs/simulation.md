@@ -1357,6 +1357,27 @@ no enemy is near (list A `isNoEnemiesInVicinity`, [combat.md](game/combat.md#tur
 (the relations) is within `AiSystem.EnemyVicinity` 1000 (engine choice: the original's radius is Unknown), so guards man the turrets only
 while enemies come. A guard at its turret fires it ([Ranged](#ranged)).
 
+## Squad autonomy
+
+Meitou's version of the RE_Kenshi plugin Squad Autonomy (Workshop 3800729618, GPLv3 source by Au2942; its AI packages come from its `SquadAutonomy.mod`, which must be in the mod list).
+`Autonomy/SquadAutonomy.cs` holds a player squad's `AutonomySettings` (`Squad.Autonomy`; the plugin's fields and defaults), set whole by `SetSquadAutonomy` (also while paused) and saved
+on the squad's platoon as the Meitou-only string `meitou autonomy` (JSON; the plugin wrote `SquadAutonomy.save` beside the save).
+- Enabled, `AiSystem` runs the squad like an NPC squad from the listed packages (slot = the plugin's priority); a settings change releases the squad and takes it up again (the
+  plugin's ResetAI / SetAI). A member is the AI's while it has no order (`AiSystem.PlayerHeld`: idle, or still on the task the AI last gave it); a player order wins until the
+  character is idle again.
+- The plugin's scoring hooks are `AiSystem.AutonomyDesire` (rest time from the work hours: no guarding, gate, labour or turrets; staying home and sitting x0.0001 in work time;
+  turrets only with Man Turrets; no following a sleeping or relaxing leader; beds by Rest Until Healed and Allow Sleep) and the stance rule (Attack Enemies, Protect Allies).
+  Medic and rescue goals of the packages run the first aid and rescue jobs (Do Medic, Rescue Downed Allies). Wandering does not start while a member sleeps, is down or is not healed.
+- In a player town the AI's town lookups (placed towns only) are replaced: posts at the place (a wall gate's leaf, 15 out or inside with Stay Inside Gate), beds of the place,
+  then of the outpost, then of the placed town it is in (others' beds with Use Paid Beds; no rent is charged), patrols between the outpost's buildings, labour as an operator
+  (`ProductionSystem.AutonomyLabour`: priority by the machine's `stat used`, automatic machines through their hauling job, the operating job's blocked test), turrets as a gunner;
+  Close Gate shuts the gate while a guard mans it and opens it for the player's people passing.
+- Engine choices: how healed a character is (the plugin's `restedState`) is hit points over maximum summed over the parts; a player building has no nodes, so posts stand round it.
+  Not built: the plugin's shopping change, its equipped-item locks and its gate guards' door repair.
+- UI: the HUD's AUT button (the plugin's default place, 0.69 x 0.788 of the screen) opens `CheatMenu.Autonomy.cs` for the squad on the squad bar: roles (presets of the packages),
+  the packages and slots, places (picked in the world or from the selection), work hours, health thresholds, labour priorities, combat and guard options. No button on the squads
+  screen (the window picks the squad).
+
 ## New-game difficulty
 
 `NewGameSettings` in the game host binds seven numeric options to each new world: body hunger/death/damage,

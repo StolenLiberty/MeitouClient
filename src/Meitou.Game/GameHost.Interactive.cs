@@ -651,7 +651,7 @@ sealed partial class GameHost
                     profiler?.Draw(overlay, size.X, size.Y);
                     profiler?.DrawVram(overlay, size.X, size.Y);
                 }
-                if (ui && !g.NoPopulation) cheats.Draw(size.X, size.Y);
+                if (ui && !g.NoPopulation) { cheats.DrawHudButton(size.X, size.Y); cheats.Draw(size.X, size.Y); }
                 if (ui) panel?.Draw(size.X, size.Y);
                 // Over everything: the letterbox and the cinema's editor (F6, also with F7); the game hides its status line.
                 if (overlay is not null && !covered) cinema.Draw(overlay, size.X, size.Y, shot || take || (interfaceHidden && !cinema.EditorVisible), showStatus: false);

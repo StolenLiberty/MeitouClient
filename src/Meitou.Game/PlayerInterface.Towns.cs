@@ -37,3 +37,20 @@ sealed partial class PlayerInterface
         Confirm("Town Ownership", text, () => { townPromptOpen = false; Say(new AnswerTownClaim(id, true) { Tick = session.World.Tick }); }, "YES", null, "NO");
     }
 }
+
+sealed partial class PlayerInterface
+{
+    /// <summary>The selected building's instance (a player site's id, a town building's key), or null: what Squad Autonomy's Pick in world takes.</summary>
+    internal string? SelectedBuildingInstance => BuildingFocus()?.Instance;
+
+    /// <summary>The name of a building by instance (a player site's catalogue name, else a town building's), or null when the world has no such building.</summary>
+    internal string? PlaceName(string instance, PopulationData? data)
+    {
+        if (session.CurrentSnapshot.Buildings.FirstOrDefault(b => b.Id == instance) is { } site) return SiteName(site);
+        if (data is not null)
+            foreach (var s in data.Sites)
+                foreach (var b in s.Buildings)
+                    if (b.Key == instance) return b.Name.Length > 0 ? $"{b.Name}, {s.Town.Name}" : s.Town.Name;
+        return null;
+    }
+}

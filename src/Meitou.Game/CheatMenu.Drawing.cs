@@ -172,9 +172,9 @@ sealed partial class CheatMenu
         if (Clickable(at, clip)) hits.Add(new(at, () => { focused = field; openDropdown = null; }));
     }
 
-    void DropdownButton(string id, UiRect at, IReadOnlyList<string> options, int current, Action<int> choose, UiRect? clip = null, Vector4? ink = null)
+    void DropdownButton(string id, UiRect at, IReadOnlyList<string> options, int current, Action<int> choose, UiRect? clip = null, Vector4? ink = null, string? caption = null)
     {
-        string label = current >= 0 && current < options.Count ? options[current] : "None";
+        string label = caption ?? (current >= 0 && current < options.Count ? options[current] : "None");
         Button(label + "   v", at, () =>
         {
             openDropdown = new Dropdown(id, at, options, current, choose);
@@ -233,6 +233,7 @@ sealed partial class CheatMenu
         if (!visible || player.SettingsPainter is not { } painter) return;
         art.Ensure(painter, MeitouLook, player.UiAtlas);
         if (townsMode) { DrawTownWindow(width, height, painter); return; }
+        if (autoMode) { DrawAutonomyWindow(width, height, painter); return; }
         scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
         bounds = new(MathF.Round((width - 1120 * scale) / 2), MathF.Round((height - 720 * scale) / 2), MathF.Round(1120 * scale), MathF.Round(720 * scale));
         controls.Clear(); hits.Clear();

@@ -62,7 +62,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
             if (visible == value) return;
             visible = value;
             dragging = null; focused = null; openDropdown = null;
-            if (!value) townsMode = false;
+            if (!value) { townsMode = false; autoMode = false; picking = null; }
             if (value) { scroll = scrollTarget = 0; RefreshFields(); }
         }
     }
@@ -70,7 +70,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
     /// <summary>True while a text box has the keyboard (the host then routes every key and character here).</summary>
     public bool TakesKeyboard => visible && focused is not null;
 
-    public bool Contains(Vector2 at) => visible && (bounds.Contains(at.X, at.Y) || openDropdown is not null);
+    public bool Contains(Vector2 at) => visible && (bounds.Contains(at.X, at.Y) || openDropdown is not null) || !visible && autButton.Width > 0 && autButton.Contains(at.X, at.Y);
 
     void Notice(string text) { notice = text; noticeAt = Environment.TickCount64; }
 
@@ -113,7 +113,9 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
 
     public bool MouseDown(Vector2 at, MouseButton button = MouseButton.Left)
     {
-        if (!visible) return false;
+        if (!visible) return button == MouseButton.Left && AutButtonDown(at);
+        // Pick in world: only the banner is the window's; a click elsewhere selects the building.
+        if (picking is not null && !bounds.Contains(at.X, at.Y)) return false;
         pointer = at;
         if (button != MouseButton.Left) return Contains(at);
         pointerDown = true;
@@ -161,7 +163,8 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
         if (!visible) return false;
         if (key == Key.Escape)
         {
-            if (openDropdown is not null) openDropdown = null;
+            if (picking is not null) picking = null;
+            else if (openDropdown is not null) openDropdown = null;
             else if (focused is not null) focused = null;
             else Visible = false;
             return true;
