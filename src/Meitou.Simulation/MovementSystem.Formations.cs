@@ -19,6 +19,10 @@ public sealed class FormationGroup
     internal List<Vector2> MarchTo { get; } = [];
     public Vector2 Centre { get; set; }
     public Vector2 Facing { get; set; }
+    /// <summary>The tick until which the formation counts as in a fight (a member fought within <see cref="MovementSystem.FormationCalmSeconds"/>).</summary>
+    internal long FightUntil { get; set; }
+    /// <summary>In a fight: its members chase the enemies about it instead of holding their spots, and go back once it is over (<see cref="Orders.Holding"/>).</summary>
+    public bool Engaged { get; internal set; }
 
     internal void RemoveAt(int k)
     {
@@ -198,9 +202,19 @@ public sealed partial class MovementSystem
         var table = world.Characters;
         long tick = world.Tick;
         long returnTicks = Math.Max(1, (long)MathF.Round(FormationReturnSeconds / world.TickSeconds));
+        var combat = world.SystemOf<Combat.CombatSystem>();
         for (int g = 0; g < formations.Count; g++)
         {
             var group = formations[g];
+            // In a fight while any member fights (and a few seconds after): nobody goes back to his spot until it is over.
+            foreach (var member in group.Members)
+                if (table.TryResolveNext(member, out int m) && table.Cold(m) is { } mc && (mc.InCombat || table.Next[m].Task == (byte)CharacterTask.Attack))
+                {
+                    group.FightUntil = tick + (long)MathF.Round(FormationCalmSeconds / world.TickSeconds);
+                    break;
+                }
+            group.Engaged = tick < group.FightUntil;
+            var foes = group.Engaged && combat is not null ? Foes(world, combat, group) : null;
             for (int k = group.Members.Count - 1; k >= 0; k--)
             {
                 var cold = table.TryResolveNext(group.Members[k], out int s) ? table.Cold(s) : null;
@@ -225,6 +239,21 @@ public sealed partial class MovementSystem
                     cold.MarchSpeed = 0;
                 }
                 if (task != CharacterTask.Idle || cold.InCombat || cold.Medical is { Incapacitated: true } || !cold.CarriedBy.IsNone) continue;
+                if (group.Engaged)
+                {
+                    // The fight is on: a free melee member takes the nearest enemy about the formation (a crossbowman shoots from its spot, Fighting.cs); none left near, he waits.
+                    if (tick < group.NextReturn[k] || cold.Fighter is not { CanAttack: true } || cold.Fighter.Crossbow is not null || foes is not { Count: > 0 }) continue;
+                    group.NextReturn[k] = tick + returnTicks;
+                    int best = -1;
+                    float bestD = FormationEngageRange * FormationEngageRange;
+                    foreach (int f in foes)
+                    {
+                        float d = Vector2.DistanceSquared(new(n.Position.X, n.Position.Z), new(table.Next[f].Position.X, table.Next[f].Position.Z));
+                        if (d < bestD) (best, bestD) = (f, d);
+                    }
+                    if (best >= 0) world.Defer(new Combat.AttackOrder([group.Members[k]], table.IdOf(best)) { Tick = tick + 1, Defensive = true });
+                    continue;
+                }
                 var spot = new Vector2(cold.FormationSpot.X, cold.FormationSpot.Z);
                 if (Vector2.DistanceSquared(new Vector2(n.Position.X, n.Position.Z), spot) > FormationReturnSlack * FormationReturnSlack)
                 {
@@ -241,6 +270,32 @@ public sealed partial class MovementSystem
             March(table, group);
         }
         formations.RemoveAll(f => f.Members.Count == 0);
+    }
+
+    /// <summary>A formation is in a fight until none of its members has fought for this long (engine choice).</summary>
+    public const float FormationCalmSeconds = 4;
+    /// <summary>How far from a member an enemy may be for it to go after it in a fight (engine choice).</summary>
+    public const float FormationEngageRange = 400;
+
+    /// <summary>
+    /// The enemies of a formation in a fight: awake characters a member fights, or who fight one of the player's, within <see cref="FormationEngageRange"/> of the formation's centre.
+    /// </summary>
+    static List<int> Foes(World world, Combat.CombatSystem combat, FormationGroup group)
+    {
+        var table = world.Characters;
+        var foes = new List<int>();
+        var targets = new HashSet<int>();
+        foreach (var member in group.Members)
+            if (table.TryResolveNext(member, out int m) && combat.StateOf(member).TargetSlot is >= 0 and var t) targets.Add(t);
+        float range2 = FormationEngageRange * FormationEngageRange;
+        for (int i = 0; i < table.HighWater; i++)
+        {
+            if (!table.Next[i].Alive || table.Cold(i) is not { IsPlayer: false, Medical.Incapacitated: false } c) continue;
+            if (Vector2.DistanceSquared(new(table.Next[i].Position.X, table.Next[i].Position.Z), group.Centre) > range2) continue;
+            bool fightsOurs = c.InCombat && combat.StateOf(table.IdOf(i)).TargetSlot is >= 0 and var their && table.Cold(their) is { IsPlayer: true };
+            if (targets.Contains(i) || fightsOurs) foes.Add(i);
+        }
+        return foes;
     }
 
     /// <summary>

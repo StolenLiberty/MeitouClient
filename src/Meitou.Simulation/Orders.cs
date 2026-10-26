@@ -191,7 +191,7 @@ public static class Orders
     /// holds its spot as if on Hold (Meitou-only).
     /// </summary>
     public static bool Holding(CharacterCold? cold) =>
-        cold is not null && (cold.Orders & CharacterOrders.Sneak) == 0 && ((cold.Orders & CharacterOrders.Hold) != 0 || cold.Formation is not null);
+        cold is not null && (cold.Orders & CharacterOrders.Sneak) == 0 && ((cold.Orders & CharacterOrders.Hold) != 0 || cold.Formation is { Engaged: false });
 
     /// <summary>Applies the order commands (the player system's inputs).</summary>
     internal static void Apply(World world, SimCommand command)

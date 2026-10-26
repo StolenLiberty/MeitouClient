@@ -573,7 +573,8 @@ sealed partial class PlayerInterface
         {
             if (machine.IsStorage)
                 verbs.Add(("Auto-Haul", () => Say(new Meitou.Simulation.Production.AddJob(selection, Meitou.Data.Gameplay.Ai.TaskType.OPERATE_STORAGE, site.Id) { Tick = session.World.Tick })));
-            if (machine.IsStorage || machine.Function == MachineData.ItemFurnaceFunction) verbs.Add(("Inventory", () => OpenStorage(site)));
+            // A research bench too (Meitou): its window holds the books research costs, opened with the inventory beside it.
+            if (machine.IsStorage || machine.Function == MachineData.ItemFurnaceFunction || machine is { TechLevel: > 0, Storage: not null }) verbs.Add(("Inventory", () => OpenStorage(site)));
             if (machine.Function == Meitou.Data.World.ObjectRanges.TurretFunction)
                 verbs.Add(("Man Turret", () => Say(new Meitou.Simulation.Production.UseTurretOrder(selection, site.Id) { Tick = session.World.Tick })));
         }
