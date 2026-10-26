@@ -87,8 +87,8 @@ public sealed unsafe class MarkerRenderer : IDisposable
     // The markers drawn multisampled with a depth of their own, at the picture's size, and resolved.
     GpuTexture? msColour, msDepth, resolved;
     int samples;
-    // The vertex ranges of the two meshes in the buffer (count 0: the mesh is missing).
-    readonly (int First, int Count) marker, arrow;
+    // The vertex ranges of the meshes in the buffer (count 0: the mesh is missing); the ring is made here.
+    readonly (int First, int Count) marker, arrow, ring;
 
     /// <summary>Where the movement marker stands (the ground point of the move order).</summary>
     public Vector3 At { get; set; }
@@ -96,12 +96,20 @@ public sealed unsafe class MarkerRenderer : IDisposable
     public float Strength { get; set; }
     /// <summary>This frame's stealth arrows, replaced whole each frame (empty: none; ignored without <c>arrow.mesh</c>).</summary>
     public Arrow[] Arrows { get; set; } = [];
+    /// <summary>
+    /// Meitou's formation drag (a right-button drag with Alt, as Total War's): a ring on the ground at each spot, its notch towards <see cref="RingFacing"/> (X/Z); empty: none.
+    /// The interface sets them while the drag lasts and clears them when the order is given.
+    /// </summary>
+    public Vector3[] Rings { get; set; } = [];
+    public Vector3 RingFacing { get; set; } = Vector3.UnitZ;
+    static readonly Vector4 RingVisible = new(0.78f, 0.86f, 0.62f, 0.9f), RingHidden = new(0.45f, 0.5f, 0.36f, 0.45f);
 
-    MarkerRenderer(IGpuContext gpu, float[] data, (int, int) marker, (int, int) arrow)
+    MarkerRenderer(IGpuContext gpu, float[] data, (int, int) marker, (int, int) arrow, (int, int) ring)
     {
         this.gpu = gpu;
         this.marker = marker;
         this.arrow = arrow;
+        this.ring = ring;
         program = LegacyProgram.Create(gpu, Vertex, Fragment, "markers");
         segment = new NativeSegment(gpu, program, PrimitiveType.Triangles, "markers");
         viewProjection = program.Uniform("uViewProjection");
@@ -137,7 +145,29 @@ public sealed unsafe class MarkerRenderer : IDisposable
         var data = new List<float>();
         var marker = Append(data, find, "position.mesh", MarkerScale);
         var arrow = Append(data, find, "arrow.mesh", 1);
-        return data.Count == 0 ? null : new MarkerRenderer(gpu, [.. data], marker, arrow);
+        var ring = AppendRing(data);
+        return new MarkerRenderer(gpu, [.. data], marker, arrow, ring);
+    }
+
+    /// <summary>A flat ring of radius 3.2 to 4 (a character's footprint) with a notch out on −X (the way it faces, as the arrow's tip), both sides, normals up.</summary>
+    static (int First, int Count) AppendRing(List<float> data)
+    {
+        int first = data.Count / 6;
+        const int Segments = 40;
+        const float Inner = 3.2f, Outer = 4f;
+        void Tri(Vector3 a, Vector3 b, Vector3 c)
+        {
+            foreach (var p in new[] { a, b, c, a, c, b }) data.AddRange([p.X, p.Y, p.Z, 0, 1, 0]);
+        }
+        for (int i = 0; i < Segments; i++)
+        {
+            float a0 = i * MathF.Tau / Segments, a1 = (i + 1) * MathF.Tau / Segments;
+            Vector3 P(float r, float a) => new(r * MathF.Cos(a), 0, r * MathF.Sin(a));
+            Tri(P(Outer, a0), P(Inner, a0), P(Outer, a1));
+            Tri(P(Inner, a0), P(Inner, a1), P(Outer, a1));
+        }
+        Tri(new Vector3(-Outer - 2.2f, 0, 0), new Vector3(-Outer + 0.2f, 0, 1.3f), new Vector3(-Outer + 0.2f, 0, -1.3f));
+        return (first, data.Count / 6 - first);
     }
 
     /// <summary>Appends a mesh's triangles (position and normal, scaled) to <paramref name="data"/>: its vertex range there.</summary>
@@ -176,7 +206,7 @@ public sealed unsafe class MarkerRenderer : IDisposable
     }
 
     /// <summary>Whether anything is to be drawn this frame.</summary>
-    public bool Active => Strength > 0 && marker.Count > 0 || Arrows.Length > 0 && arrow.Count > 0;
+    public bool Active => Strength > 0 && marker.Count > 0 || Arrows.Length > 0 && arrow.Count > 0 || Rings.Length > 0 && ring.Count > 0;
 
     /// <summary>
     /// Draws over the finished <paramref name="picture"/> (after the tone map, so the colours come out as the material gives them, whatever the
@@ -196,6 +226,8 @@ public sealed unsafe class MarkerRenderer : IDisposable
             resolved = samples > 1 ? gpu.CreateTexture(new TextureDesc(InternalFormat.Rgba8, width, height, Use: TextureUse.Sampled | TextureUse.TransferDst, Name: "markers resolved")) : msColour;
         }
         var arrows = Arrows;
+        var rings = Rings;
+        var ringTurn = PointAlong(Vector3.Normalize(RingFacing with { Y = 0 } is { } f && f.LengthSquared() > 1e-6f ? f : Vector3.UnitZ));
         var cmd = gpu.BeginNative("markers");
         var viewport = new PixelViewport(0, 0, width, height, 0, 1);
         var t = PassTargets.Of(msColour, msDepth).At(viewport);
@@ -230,6 +262,9 @@ public sealed unsafe class MarkerRenderer : IDisposable
             if (arrow.Count > 0)
                 foreach (var a in arrows)
                     Draw(cmd, arrow, a.At - eye, PointAlong(a.Direction), new Vector4(a.Colour, hidden ? ArrowHiddenAlpha : 1));
+            if (ring.Count > 0)
+                foreach (var r in rings)
+                    Draw(cmd, ring, r - eye, ringTurn, hidden ? RingHidden : RingVisible);
         }
         cmd.EndRendering();
         cmd.Order();

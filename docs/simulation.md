@@ -267,6 +267,11 @@ relation/research semantics remain partly unknown. Picking/HUD are host responsi
 Squads: `SquadManagement` orders the player's squads (`Squad.Index`), keeps `PlayerState.Squad` the active one and applies the squads screen's
 commands with the original's limits ([Squads tab](game/ui-screens.md#squads-tab)); the snapshot's `PlayerSquads` lists them for the UI.
 
+Formation drag (Meitou-only, after Total War): Alt + right button dragged on the ground draws the selection's front line (`PlayerInterface.FormationDrag.cs`, `Formation.Line`):
+as many per row as the line holds at `Formation.Spacing`, spread over its length, further rows behind, front-most characters in front and each row keeping its left-to-right order;
+they face across the line, away from the camera. Rings (`MarkerRenderer.Rings`) show the spots while the button is held; on release a `FormationOrder` sends each to its spot
+and turns it to the facing on arrival (`CharacterCold.ArriveYaw`); Shift queues it (a queued spot keeps no facing). A press let go without dragging is the plain move.
+
 ### Order toggles
 
 Passive/Hold/Block/Taunt/Jobs state belongs to the character (medic and rescue are job-list entries, [job lists](#production)) and relevant

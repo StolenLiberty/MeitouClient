@@ -22,6 +22,16 @@ public sealed record MoveOrder(IReadOnlyList<CharacterId> Characters, Vector3 Ta
 }
 
 /// <summary>
+/// Meitou's formation move (a right-button drag on the ground, as Total War's): each character walks to its own spot and, arrived, turns to <see cref="Facing"/> (X/Z, unit).
+/// <see cref="Targets"/> pairs with <see cref="Characters"/>.
+/// </summary>
+public sealed record FormationOrder(IReadOnlyList<CharacterId> Characters, IReadOnlyList<Vector3> Targets, Vector2 Facing) : SimCommand
+{
+    /// <summary>Added to the characters' order lists (Shift) instead of replacing them; a queued spot keeps no facing.</summary>
+    public bool Queued { get; init; }
+}
+
+/// <summary>
 /// The context menu's Follow (order 31, <c>Task_Follow</c>; docs/game/ui-input.md "Context menu verbs"): the characters (the selection when empty) keep a formation place behind
 /// <see cref="Target"/> until another order replaces it or the target is gone (<see cref="CharacterCold.FollowOrder"/>). <b>Engine</b>: the squad follower's slot rule, not saved.
 /// </summary>

@@ -210,6 +210,42 @@ public static class Formation
     /// One target per character, in the order of <paramref name="positions"/> (X/Z where they stand now). One character goes to the
     /// point itself. Ties (equal positions) break by the order given, so the result is a pure function of the input.
     /// </summary>
+    /// <summary>
+    /// Total War's drag formation (engine choice, after its right-button drag): the drag from <paramref name="from"/> to <paramref name="to"/> is the front line (with
+    /// <paramref name="fromCentre"/> the drag starts at the line's middle and reaches one end); the characters face across it, to the side <paramref name="away"/> points to (the
+    /// camera's look, so a drag left to right faces away from the camera). As many stand in a row as the line holds at <paramref name="spacing"/>, spread over its whole length;
+    /// the other rows stand behind, a short last row centred. The front-most characters take the front row, and each row keeps their order from left to right, so nobody crosses.
+    /// </summary>
+    public static (Vector2[] Spots, Vector2 Facing) Line(IReadOnlyList<Vector2> positions, Vector2 from, Vector2 to, Vector2 away, bool fromCentre = false, float spacing = Spacing)
+    {
+        int n = positions.Count;
+        if (fromCentre) from -= to - from;
+        var axis = to - from;
+        float length = axis.Length();
+        axis = length > 1e-3f ? axis / length : away.LengthSquared() > 1e-6f ? Vector2.Normalize(new Vector2(away.Y, -away.X)) : Vector2.UnitX;
+        var facing = new Vector2(-axis.Y, axis.X);
+        if (Vector2.Dot(facing, away) < 0) facing = -facing;
+        var spots = new Vector2[n];
+        if (n == 0) return (spots, facing);
+        int perRow = Math.Clamp((int)MathF.Floor(length / spacing) + 1, 1, n);
+        int rows = (n + perRow - 1) / perRow;
+        float step = perRow > 1 ? length / (perRow - 1) : 0;
+        var centre = Vector2.Zero;
+        foreach (var p in positions) centre += p;
+        centre /= n;
+        var order = Enumerable.Range(0, n).OrderByDescending(i => Vector2.Dot(positions[i] - centre, facing)).ThenBy(i => i).ToArray();
+        int next = 0;
+        for (int row = 0; row < rows; row++)
+        {
+            int inRow = Math.Min(perRow, n - next);
+            var members = order.Skip(next).Take(inRow).OrderBy(i => Vector2.Dot(positions[i] - centre, axis)).ThenBy(i => i).ToArray();
+            next += inRow;
+            var start = from - facing * (row * spacing) + axis * ((perRow - inRow) * step / 2);
+            for (int c = 0; c < inRow; c++) spots[members[c]] = start + axis * (c * step);
+        }
+        return (spots, facing);
+    }
+
     public static Vector2[] Place(IReadOnlyList<Vector2> positions, Vector2 target, float spacing = Spacing)
     {
         int n = positions.Count;

@@ -101,6 +101,7 @@ sealed partial class PlayerInterface
         dragFrom = null;
         dragging = false;
         steering = false;
+        CancelFormationDrag();
         mapDrag = null;
         (held, liftPress, lifting, heldSerial) = (null, null, null, 0);
         selectedFor = null;

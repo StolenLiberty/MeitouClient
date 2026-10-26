@@ -140,6 +140,23 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
                 Follow(world, follow);
                 continue;
             }
+            if (command is FormationOrder formation)
+            {
+                for (int k = 0; k < formation.Characters.Count && k < formation.Targets.Count; k++)
+                {
+                    if (!table.TryResolveNext(formation.Characters[k], out int s) || table.Cold(s)!.IsImprisoned) continue;
+                    var fc = table.Cold(s)!;
+                    if (fc.InSomething == Locks.HeldState.Bed) world.Fixtures.LeaveBed(world, formation.Characters[k]);
+                    fc.FollowOrder = CharacterId.None;
+                    var spot = formation.Targets[k];
+                    ref var fn = ref table.Next[s];
+                    if (formation.Queued && fn.Task == (byte)CharacterTask.GoTo && (fn.Flags & (ushort)MoveFlags.AnyPath) != 0) { fc.OrderQueue.Add(new Vector2(spot.X, spot.Z)); continue; }
+                    var flat = GoToFloor(world, s, spot, fc.RunSpeed);
+                    fc.ArriveYaw = MathF.Atan2(formation.Facing.X, formation.Facing.Y);
+                    if ((fc.Orders & CharacterOrders.Hold) != 0) fc.HoldPoint = flat;
+                }
+                continue;
+            }
             if (command is not MoveOrder order) continue;
             // An empty list orders the selection (the UI sends orders for whatever is selected when the click happens).
             var who = order.Characters.Count > 0 ? order.Characters : world.Player.Selection.ToArray();
@@ -242,6 +259,7 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
         var cold = table.Cold(slot)!;
         cold.OrderQueue.Clear();
         cold.ArriveWithin = 0;
+        cold.ArriveYaw = float.NaN;
         cold.BlockedRepaths = 0;
         n.Task = (byte)CharacterTask.GoTo;
         n.Goal = target;
@@ -638,7 +656,12 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
                         cold.OrderQueue.RemoveAt(0);
                         n.Flags |= (ushort)MoveFlags.NeedPath;
                     }
-                    else n.Task = (byte)CharacterTask.Idle;
+                    else
+                    {
+                        n.Task = (byte)CharacterTask.Idle;
+                        // A formation move's facing (FormationOrder).
+                        if (!float.IsNaN(cold.ArriveYaw)) { n.Yaw = cold.ArriveYaw; cold.ArriveYaw = float.NaN; }
+                    }
                 }
                 else if (!replaced && n.Task == (byte)CharacterTask.Attack) n.TaskTime = PursuitSystem.RepathSeconds;   // a fighter at the end of its path to a moving target asks for the next one soon (PursuitSystem)
                 else if (!replaced)

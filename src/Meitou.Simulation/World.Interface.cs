@@ -17,7 +17,7 @@ public sealed partial class World
             or Carrying.TakeLootItem or Carrying.PutLootItem or Production.PutInMachine or Production.TakeFromMachine
             or Trading.BuyItem or Trading.SellItem or Trading.ArrangeStock or Trading.CloseTrade or Dialogue.DialogueChoice or Dialogue.EndConversation or Dialogue.ConfirmCharacterTrade or Dialogue.CloseCharacterTrade
             or Construction.PlaceBuildings or Construction.CancelSite or Construction.PauseSite or Editing.EditCharacter or Editing.FinishCreation
-            or MoveOrder or FollowOrder or StopCommand or FirstAid.TreatOrder or FirstAid.SplintOrder or FirstAid.RestOrder or Combat.AttackOrder or Combat.ShootAtOrder
+            or MoveOrder or FormationOrder or FollowOrder or StopCommand or FirstAid.TreatOrder or FirstAid.SplintOrder or FirstAid.RestOrder or Combat.AttackOrder or Combat.ShootAtOrder
             or Locks.PickLockOrder or Locks.GetOutOrder or Locks.ShackleOrder or Locks.PutShacklesOrder or Locks.ToggleDoorsOrder or Locks.ToggleDoorLocksOrder
             or Locks.DoorOrder or Locks.SetFreeOrder or Locks.GetInCageOrder or DebugCommand or Towns.TownCommand or Autonomy.SetSquadAutonomy);
         if (due.Count == 0) return;

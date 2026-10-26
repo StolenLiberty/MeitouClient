@@ -114,6 +114,7 @@ sealed partial class PlayerInterface(WorldSession session, Func<float, float, fl
             else if (kind == Picked.Cage && CageClick(p)) { }
             else if (kind == Picked.Rock && RockPress(p)) { }
             else if (kind is Picked.Site or Picked.None && SitePress(p)) { }
+            else if (alt && FormationPress(p, shift)) { }   // Alt + right drag: a formation line (PlayerInterface.FormationDrag.cs)
             else if (Ray(p) is { } ray && MoveHit(ray.Origin, ray.Direction) is { } hit)
             {
                 Move(hit, shift);
@@ -172,6 +173,7 @@ sealed partial class PlayerInterface(WorldSession session, Func<float, float, fl
         if (button == MouseButton.Middle) mapDrag = null;
         if (button == MouseButton.Right && MapRightUp(p)) return;
         if (button == MouseButton.Right) { ContextRelease(); SiteRelease(); RockRelease(); BedRelease(); }
+        if (button == MouseButton.Right && FormationRelease()) return;
         if (button == MouseButton.Right && steering)
         {
             Steer(final: true);
@@ -224,6 +226,7 @@ sealed partial class PlayerInterface(WorldSession session, Func<float, float, fl
         UpdateBed();
         UpdateMap();
         if (!final) UpdateBuild();
+        UpdateFormationDrag();
         if (!steering || OverHud(mouse)) return;
         if (Ray(mouse) is not { } ray || MoveHit(ray.Origin, ray.Direction) is not { } hit) return;
         PlaceMarker(hit);   // the marker follows the cursor every frame; the order only once a tick

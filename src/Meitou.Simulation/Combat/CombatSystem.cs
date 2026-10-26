@@ -172,6 +172,9 @@ public sealed partial class CombatSystem : ITickSystem, IStateHashed
                 case MoveOrder move:
                     foreach (var id in move.Characters.Count > 0 ? move.Characters : world.Player.Selection.ToArray()) LeaveFight(table, id);
                     break;
+                case FormationOrder formation:
+                    foreach (var id in formation.Characters) LeaveFight(table, id);
+                    break;
                 case FollowOrder follow:
                     foreach (var id in follow.Characters.Count > 0 ? follow.Characters : world.Player.Selection.ToArray())
                         if (id != follow.Target) LeaveFight(table, id);

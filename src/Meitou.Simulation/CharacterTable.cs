@@ -102,6 +102,8 @@ public sealed class CharacterCold
     /// or gun (<see cref="MovementSystem.SpotArrive"/>), which ends on the spot; <see cref="MovementSystem.GoTo"/> clears it. Derived from the AI and not hashed.
     /// </summary>
     public float ArriveWithin { get; set; }
+    /// <summary>The yaw a formation move turns the character to when it arrives (<see cref="FormationOrder"/>); NaN: none. A new walk clears it.</summary>
+    public float ArriveYaw { get; set; } = float.NaN;
     /// <summary>Animation layers in play (made by <see cref="AnimationSystem"/>; null before the first tick it runs).</summary>
     public CharacterAnimation? Animation { get; set; }
     /// <summary>The kind of weapon drawn in the right hand (None while sheathed): the stance animations are chosen for.</summary>
