@@ -1166,7 +1166,7 @@ crafting benches, generators and batteries. Facts: [production](game/buildings-p
   - Implicit jobs (`ImplicitPick`): with no list job to run, the switch on and not a slave, the squad AI options (`PlayerState.SquadAi`, the
     overview's AI tab, on by default) start, in this order: Ditch items (242: carried items some player machine makes go to the nearest
     storage within `HaulRange` that takes them, as a Haul trip; only with no queued orders), Sleep when injured (153: a body part below full
-    health lies in the bed the bed search finds, a `BedSystem` trip (task Sleep, the bed id in `OperateSite`), until healed; job lists are then looked at
+    health lies in the bed the bed search finds, a `BedSystem` trip (task Sleep, the bed id in `OperateSite`), until healed; Meitou: only for a squad with autonomy on and its "Rest until healed" box, never with autonomy off; job lists are then looked at
     even with no machine), Sit when idle (275: the nearest free player chair or
     throne within `SeatRange` 600). The one running is kept while it holds; any list job preempts it. Distances are from the character, or its
     squad leader while it follows, so it gets up when the leader walks off. Sitters are put on the seat's origin facing its way;
