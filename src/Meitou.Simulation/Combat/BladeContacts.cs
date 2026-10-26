@@ -126,8 +126,10 @@ public sealed class BladeContactSystem : ITickSystem, IRagdollSource, IBladeCont
             releaseTicks = Math.Max(1, (int)MathF.Round(Release / world.TickSeconds));
         var focus = population?.Focus;
 
+        // A swing ends with its fighter: gone, down (knocked out or dead: its ragdoll is its pose now), carried or laid in something.
         foreach (var id in swings.Keys.ToArray())
-            if (!table.TryResolveNext(id, out _)) swings.Remove(id);
+            if (!table.TryResolveNext(id, out int at) || table.Cold(at) is not { Medical: { Incapacitated: false }, InSomething: Locks.HeldState.None } held || !held.CarriedBy.IsNone)
+                swings.Remove(id);
 
         var next = table.Next;
         for (int slot = 0; slot < next.Length; slot++)
