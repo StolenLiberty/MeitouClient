@@ -177,7 +177,7 @@ public static class DdsReader
         return format switch
         {
             DdsFormat.Bc1 or DdsFormat.Bc4 => blocks * 8,
-            DdsFormat.Bc2 or DdsFormat.Bc3 or DdsFormat.Bc5 => blocks * 16,
+            DdsFormat.Bc2 or DdsFormat.Bc3 or DdsFormat.Bc5 or DdsFormat.Bc7 => blocks * 16,
             DdsFormat.Uncompressed => (long)width * height * masks!.BytesPerPixel,
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
         };
@@ -190,6 +190,7 @@ public static class DdsReader
         76 or 77 or 78 => (DdsFormat.Bc3, null),
         79 or 80 => (DdsFormat.Bc4, null),            // BC4_TYPELESS / UNORM (SNORM 81 not supported)
         82 or 83 => (DdsFormat.Bc5, null),            // BC5_TYPELESS / UNORM (SNORM 84 not supported)
+        97 or 98 or 99 => (DdsFormat.Bc7, null),      // BC7_TYPELESS / UNORM / UNORM_SRGB
         27 or 28 or 29 => (DdsFormat.Uncompressed, new DdsPixelMasks(32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000)), // R8G8B8A8
         87 or 90 or 91 => (DdsFormat.Uncompressed, new DdsPixelMasks(32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)), // B8G8R8A8
         88 or 92 or 93 => (DdsFormat.Uncompressed, new DdsPixelMasks(32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0)),          // B8G8R8X8

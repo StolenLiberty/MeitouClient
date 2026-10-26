@@ -37,6 +37,7 @@ public static class MetalConventions
         InternalFormat.Rgba32i => MTLPixelFormat.RGBA32Sint,
         InternalFormat.CompressedRedRgtc1 => MTLPixelFormat.BC4RUnorm,
         InternalFormat.CompressedRGRgtc2 => MTLPixelFormat.BC5RGUnorm,
+        InternalFormat.CompressedRgbaBptcUnorm => MTLPixelFormat.BC7RGBAUnorm,
         InternalFormat.DepthComponent24 or InternalFormat.DepthComponent32f => MTLPixelFormat.Depth32Float,
         InternalFormat.Depth24Stencil8 or InternalFormat.Depth32fStencil8 => MTLPixelFormat.Depth32FloatStencil8,
         InternalFormat.CompressedRgbS3TCDxt1Ext or InternalFormat.CompressedRgbaS3TCDxt1Ext => MTLPixelFormat.BC1RGBA,
@@ -69,6 +70,7 @@ public static class MetalConventions
         InternalFormat.Rgba32ui or InternalFormat.Rgba32i => 16,
         InternalFormat.CompressedRedRgtc1 => 8,
         InternalFormat.CompressedRGRgtc2 => 16,   // BC5: two channels
+        InternalFormat.CompressedRgbaBptcUnorm => 16,   // BC7
         InternalFormat.Rgba8 or InternalFormat.Srgb8Alpha8 => 4,
         _ => throw new NotSupportedException($"no texel size for {f}"),
     };
@@ -76,7 +78,7 @@ public static class MetalConventions
     /// <summary>4 for the block formats (BC1's 4x4), else 1.</summary>
     public static int BlockWidth(InternalFormat f) =>
         f is InternalFormat.CompressedRgbS3TCDxt1Ext or InternalFormat.CompressedRgbaS3TCDxt1Ext or InternalFormat.CompressedRgbaS3TCDxt3Ext
-            or InternalFormat.CompressedRgbaS3TCDxt5Ext or InternalFormat.CompressedRedRgtc1 or InternalFormat.CompressedRGRgtc2 ? 4 : 1;
+            or InternalFormat.CompressedRgbaS3TCDxt5Ext or InternalFormat.CompressedRedRgtc1 or InternalFormat.CompressedRGRgtc2 or InternalFormat.CompressedRgbaBptcUnorm ? 4 : 1;
 
     public static MTLSamplerMinMagFilter Filter(TextureMinFilter f) =>
         f is TextureMinFilter.Nearest or TextureMinFilter.NearestMipmapNearest or TextureMinFilter.NearestMipmapLinear

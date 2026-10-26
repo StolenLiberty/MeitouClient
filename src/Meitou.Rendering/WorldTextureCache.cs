@@ -479,7 +479,7 @@ public sealed unsafe class WorldTextureCache : IDisposable
     readonly StepCosts stepCosts = new();
     const int SlabBytes = 512 << 10;
 
-    // DDS textures in BC1, BC2, BC3, BC4 or BC5 with a full mip chain go to the GPU as they are stored (BC4 through a swizzle that shows it as grey);
+    // DDS textures in BC1, BC2, BC3, BC4, BC5 or BC7 with a full mip chain go to the GPU as they are stored (BC4 through a swizzle that shows it as grey);
     // the rest is decoded to RGBA8 on the CPU.
     static TextureData Load(string path, int dropMips, float need, bool streaming, float perDistance, float bias, int extra)
     {
@@ -515,7 +515,7 @@ public sealed unsafe class WorldTextureCache : IDisposable
     }
 
     static bool CanUploadCompressed(DdsFile dds) =>
-        dds.Format is DdsFormat.Bc1 or DdsFormat.Bc2 or DdsFormat.Bc3 or DdsFormat.Bc4 or DdsFormat.Bc5 && !dds.IsCubemap && !dds.IsVolume && dds.ImageCount == 1 && dds.Width > 0 && dds.Height > 0
+        dds.Format is DdsFormat.Bc1 or DdsFormat.Bc2 or DdsFormat.Bc3 or DdsFormat.Bc4 or DdsFormat.Bc5 or DdsFormat.Bc7 && !dds.IsCubemap && !dds.IsVolume && dds.ImageCount == 1 && dds.Width > 0 && dds.Height > 0
         && dds.MipCount == 1 + (int)Math.Log2(Math.Max(dds.Width, dds.Height)) && dds.Surfaces.Count == dds.MipCount;
 
     /// <summary>The number of levels down to 1 × 1 (the chain VkGl allocated for a texture's level 0).</summary>
@@ -540,6 +540,7 @@ public sealed unsafe class WorldTextureCache : IDisposable
             DdsFormat.Bc2 => InternalFormat.CompressedRgbaS3TCDxt3Ext,
             DdsFormat.Bc4 => InternalFormat.CompressedRedRgtc1,
             DdsFormat.Bc5 => InternalFormat.CompressedRGRgtc2,
+            DdsFormat.Bc7 => InternalFormat.CompressedRgbaBptcUnorm,
             _ => InternalFormat.CompressedRgbaS3TCDxt5Ext,
         };
         int blockBytes = BlockCompression.BlockBytes(dds.Format);

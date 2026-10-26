@@ -45,6 +45,7 @@ chain from largest to smallest. Level *n* is `max(1, w >> n)` × `max(1, h >> n)
 | BC2 | `DXT2`, `DXT3`, DXGI 73–75 | 16 per block |
 | BC3 | `DXT4`, `DXT5`, DXGI 76–78 | 16 per block |
 | BC4 / BC5 | `ATI1`/`BC4U`, `ATI2`/`BC5U`, DXGI 79–80 / 82–83 | 8 / 16 per block |
+| BC7 | DXGI 97–99 (DX10 header only) | 16 per block |
 | uncompressed | masks in the pixel format, or DXGI 27–29, 85–93, 115, 61, 65 | `w × h × bitCount / 8`, no row padding |
 
 The mip count is 1 unless `DDSD_MIPMAPCOUNT` is set and the count is non-zero (the same rule as Ogre's
@@ -61,6 +62,20 @@ DDS codec, Observed (source)).
   interpolated values (8 total); otherwise 4 interpolated values plus 0 and 255.
 - Interpolated values are rounded to nearest (the spec allows small hardware differences).
 - BC4 decodes to grey (R = G = B); BC5 to (R, G, 0) with alpha 255.
+- **BC7** (`Bc7`): the block is a 128-bit little-endian number read from bit 0. Mode m (0–7) is m zero bits then a one; all-zero
+  mode bits are reserved and decode to transparent black (0, 0, 0, 0). Per mode (subsets, partition / rotation / index-selection
+  bits, colour / alpha endpoint bits, p-bit per endpoint (E) or per subset (S), primary / secondary index bits): 0: 3, 4/0/0, 4/0,
+  E, 3/0; 1: 2, 6/0/0, 6/0, S, 3/0; 2: 3, 6/0/0, 5/0, none, 2/0; 3: 2, 6/0/0, 7/0, E, 2/0; 4: 1, 0/2/1, 5/6, none, 2/3; 5: 1,
+  0/2/0, 7/8, none, 2/2; 6: 1, 0/0/0, 7/7, E, 4/0; 7: 2, 6/0/0, 5/5, E, 2/0. After the header fields come the endpoints channel by
+  channel (red of every endpoint, then green, blue, alpha), the p-bits (appended as each endpoint's low bit), the primary indices
+  pixel by pixel, then the secondary ones. An endpoint of n bits widens to 8 by bit replication; no alpha bits means alpha 255.
+  Each subset's anchor pixel (subset 0: pixel 0; the others from the spec's anchor tables) stores its index with one bit less.
+  Weights: 2-bit 0, 21, 43, 64; 3-bit 0, 9, 18, 27, 37, 46, 55, 64; 4-bit 0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64;
+  value `((64 − w) e0 + w e1 + 32) >> 6`. With a second index set, the index-selection bit 1 gives colour the secondary and alpha
+  the primary. Rotation 1–3 swaps alpha with red, green or blue afterwards. **Verified** against Pillow 12.3's decoder: identical on
+  four 4096² BC7 skins of Workshop 3778037542 (modes 4–7) and on 262,144 random blocks of every mode (all eight; Pillow decodes a
+  reserved block as opaque black, the spec says zero). No base game file is BC7; Meitou reads it for mods (`DdsFile.Format` `Bc7`,
+  uploaded as BC7 on Vulkan and Metal).
 
 ## Base game survey (Verified, `DdsReaderTests.Reads_every_base_game_dds`)
 

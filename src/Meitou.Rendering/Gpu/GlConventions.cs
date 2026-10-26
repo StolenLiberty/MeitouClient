@@ -48,6 +48,7 @@ public static class GlConventions
         (GLEnum)InternalFormat.CompressedRgbaS3TCDxt5Ext => Format.BC3UnormBlock,
         GLEnum.CompressedRedRgtc1 => Format.BC4UnormBlock,
         GLEnum.CompressedRGRgtc2 => Format.BC5UnormBlock,
+        (GLEnum)InternalFormat.CompressedRgbaBptcUnorm => Format.BC7UnormBlock,
         _ => throw new NotSupportedException($"texture format {f}"),
     };
 
@@ -433,6 +434,8 @@ public enum InternalFormat : int
     Rgba32i = 0x8D82,
     CompressedRedRgtc1 = 0x8DBB,
     CompressedRGRgtc2 = 0x8DBD,
+    /// <summary>BC7 (GL_COMPRESSED_RGBA_BPTC_UNORM).</summary>
+    CompressedRgbaBptcUnorm = 0x8E8C,
     Depth16 = 0x81A5,
     Depth32fStencil8 = 0x8CAD,
 }

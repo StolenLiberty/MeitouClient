@@ -6,7 +6,7 @@ namespace Meitou.Data.Textures;
 /// <summary>
 /// CPU decoding of DDS surfaces to RGBA8. Block formats follow the public BC1–BC5 descriptions (Microsoft,
 /// "Block Compression (Direct3D 10)"); interpolated values are rounded to nearest, which is within the
-/// tolerance the specification allows hardware.
+/// tolerance the specification allows hardware. BC7: <see cref="Bc7"/>.
 /// </summary>
 public static class DdsDecoder
 {
@@ -81,6 +81,9 @@ public static class DdsDecoder
                             block[i * 4 + 2] = 0;
                             block[i * 4 + 3] = 255;
                         }
+                        break;
+                    case DdsFormat.Bc7:
+                        Bc7.DecodeBlock(src, block);
                         break;
                     default:
                         throw new ArgumentOutOfRangeException(nameof(format), format, null);

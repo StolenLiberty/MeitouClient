@@ -86,6 +86,8 @@ public enum DdsFormat
     Bc5,
     /// <summary>Uncompressed pixels with channel bit masks (<see cref="DdsFile.Masks"/>), 8 to 32 bits per pixel.</summary>
     Uncompressed,
+    /// <summary>BC7 (BPTC): 16-byte blocks, eight modes of RGB or RGBA endpoints (<see cref="Textures.Bc7"/>). DX10 header only (DXGI 97 to 99).</summary>
+    Bc7,
 }
 
 /// <summary>Channel bit masks of an uncompressed format. A zero mask means the channel is absent.</summary>
