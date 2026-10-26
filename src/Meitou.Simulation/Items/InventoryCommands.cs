@@ -9,6 +9,15 @@ public sealed record ArrangeInventory(CharacterId Character) : SimCommand;
 
 public static class InventoryCommands
 {
+    /// <summary>No free cell left in the main grid (Meitou's "my inventory is full": a worker that cannot take anything more).</summary>
+    public static bool Cramped(Inventory inv)
+    {
+        for (int y = 0; y < inv.Height; y++)
+            for (int x = 0; x < inv.Width; x++)
+                if (inv.IsFree("main", x, y, 1, 1)) return false;
+        return true;
+    }
+
     public static bool IsEquipmentSection(string section) => section is "back" or "hip" or "shirt" or "head" or "legs" or "boots" or "armour" or "belt" or "backpack_attach";
     public static bool IsMovableSection(string section) => section is "main" or "backpack_content" || IsEquipmentSection(section);
     /// <summary>A fitted prosthetic's section (<see cref="Meitou.Data.Gameplay.Bodies.LimbReplacement.SlotOf"/>): the limbs window's slots; not traded, not saved with the inventory.</summary>

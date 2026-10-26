@@ -975,7 +975,12 @@ public sealed class ConstructionSystem : ITickSystem
             }
         }
         if (taken > 0) BackToSite(ref n, cold);
-        else End(table, slot);
+        else
+        {
+            // Meitou: the material was there but the builder had no room for it: it stops and says so.
+            if (cold.Inventory is { } full && Items.InventoryCommands.Cramped(full)) Production.ProductionSystem.InventoryFull(world, table.IdOf(slot), cold);
+            End(table, slot);
+        }
     }
 
     void DeliverStep(World world, int slot, CharacterCold cold, BuildSite site, float dt)

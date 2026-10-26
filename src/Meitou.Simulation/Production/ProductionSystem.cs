@@ -505,6 +505,14 @@ public sealed partial class ProductionSystem : ITickSystem
 
     // ------------------------------------------------------------------ the tick
 
+    /// <summary>"My inventory is full." over the character's head, at most once every 30 s.</summary>
+    internal static void InventoryFull(World world, CharacterId id, CharacterCold cold)
+    {
+        if ((world.Tick - cold.FullBarkTick) * world.TickSeconds < 30) return;
+        cold.FullBarkTick = world.Tick;
+        world.Bark(id, "My inventory is full.");
+    }
+
     public void SlowWorld(World world)
     {
         ProspectStep(world);
@@ -571,7 +579,15 @@ public sealed partial class ProductionSystem : ITickSystem
                 if (!StartHaul(world, cold, site, m) && n.Velocity.X == 0 && n.Velocity.Z == 0) n.Yaw = FacingTo(n, site);
                 continue;
             }
-            if (Settings.AutoHaul && StartHaul(world, cold, site, m)) continue;
+            bool full = false;
+            if (Settings.AutoHaul && StartHaul(world, cold, site, m, out full)) continue;
+            if (full)
+            {
+                // Meitou: its inventory is too full to carry the output away: it stops and says so.
+                InventoryFull(world, table.IdOf(i), cold);
+                End(table, i);
+                continue;
+            }
             if (n.Velocity.X == 0 && n.Velocity.Z == 0) n.Yaw = FacingTo(n, site);
             m.Operators++;
             var stat = (StatsEnumerated)m.Data.Stat;

@@ -114,6 +114,8 @@ public sealed class CharacterCold
     /// <summary>The Dead Check order it works through (<see cref="Carrying.DeadCheckOrder"/>) and the blows struck at the body in hand; null: none. Not saved, not hashed.</summary>
     public Carrying.DeadCheckGroup? DeadCheck { get; set; }
     public int DeadCheckBlows { get; set; }
+    /// <summary>When it last said "My inventory is full." (Meitou: a worker that cannot take what its work needs stops; not saved).</summary>
+    public long FullBarkTick { get; set; } = long.MinValue;
     /// <summary>Its spot in <see cref="Formation"/> (with the clicked height) and the yaw it faces there.</summary>
     public System.Numerics.Vector3 FormationSpot { get; set; }
     public float FormationYaw { get; set; }

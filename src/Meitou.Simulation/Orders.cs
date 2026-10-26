@@ -218,6 +218,8 @@ public static class Orders
                     if (!table.TryResolveNext(id, out int slot) || table.Cold(slot) is not { IsPlayer: true } cold) continue;
                     mode ??= ((cold.RunSpeed + speed.Step) % SpeedMode.Count + SpeedMode.Count) % SpeedMode.Count;
                     cold.RunSpeed = (byte)mode.Value;
+                    // Meitou: one on the move (an order's walk, queued legs included) changes pace at once, not from its next order.
+                    if (table.Next[slot].Task == (byte)CharacterTask.GoTo) table.Next[slot].Mode = cold.RunSpeed;
                 }
                 break;
         }

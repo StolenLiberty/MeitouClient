@@ -13,8 +13,8 @@ namespace Meitou.Game;
 // (SetSquadAutonomy), and the AI runs the squad from them.
 sealed partial class CheatMenu
 {
-    enum AutPage { Squad, Priorities, Schedule, Advanced, AdvancedCombat }
-    static readonly string[] AutPageNames = ["Squad", "Priorities", "Schedule", "Advanced", "Advanced: combat"];
+    enum AutPage { Squad, Priorities, Buildings, Schedule, Advanced, AdvancedCombat }
+    static readonly string[] AutPageNames = ["Squad", "Priorities", "Buildings", "Schedule", "Advanced", "Advanced: combat"];
 
     bool autoMode;
     AutPage autPage;
@@ -52,9 +52,9 @@ sealed partial class CheatMenu
     /// <summary>Opens the window for a player squad (the HUD's AUT button: the active squad); pressed again for the same squad it closes.</summary>
     public void OpenAutonomy(int squadId)
     {
-        if (visible && autoMode && autSquad == squadId && picking is null) { Visible = false; return; }
+        if (visible && autoMode && autSquad == squadId && picking is null && assigning is null) { Visible = false; return; }
         Visible = false;
-        (autoMode, townsMode, autSquad, picking) = (true, false, squadId, null);
+        (autoMode, townsMode, autSquad, picking) = (true, false, squadId, null); assigning = null;
         Visible = true;
     }
 
@@ -116,6 +116,7 @@ sealed partial class CheatMenu
         scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
         controls.Clear(); hits.Clear();
         if (picking is { } pick) { DrawPicking(width, height, painter, pick); return; }
+        if (assigning is { } assign) { DrawAssigning(width, height, painter, assign); return; }
         bounds = new(MathF.Round((width - W * scale) / 2), MathF.Round((height - H * scale) / 2), MathF.Round(W * scale), MathF.Round(H * scale));
         Surface(bounds, "window");
         Text("Squad Autonomy", R(20, 6, 400, 32), 22, LightInk);
@@ -157,6 +158,7 @@ sealed partial class CheatMenu
         {
             case AutPage.Squad: DrawSquadPage(squad, s, X, CW); break;
             case AutPage.Priorities: DrawPrioritiesPage(squad, s, X, CW); break;
+            case AutPage.Buildings: DrawBuildingsPage(squad, s, X, CW); break;
             case AutPage.Schedule: DrawPlacesPage(squad, s, X, CW); break;
             case AutPage.Advanced: DrawRolePage(squad, s, X, CW); break;
             default: DrawCombatPage(squad, s, X, CW); break;
@@ -416,7 +418,7 @@ sealed partial class CheatMenu
         {
             bool arrived = p.Settings is null ? squad.Management is null
                 : squad.Management is { } m && m.Manager == p.Settings.Manager && m.Defence == p.Settings.Defence && m.Build == p.Settings.Build
-                    && m.BuildPriority.SequenceEqual(p.Settings.BuildPriority);
+                    && m.BuildPriority.SequenceEqual(p.Settings.BuildPriority) && m.Buildings.SequenceEqual(p.Settings.Buildings);
             if (arrived || Environment.TickCount64 - p.At > 3000) mgmtPending = null;
             else return p.Settings;
         }
@@ -614,6 +616,77 @@ sealed partial class CheatMenu
         Check(R(gx + 14, y + 6, half - 28, 42), "Build and repair", "They fetch materials from storage and the ground.", m.Build, () => MgmtSend(squad, m with { Build = !m.Build }));
         Check(R(gx + 14, y + 54, half - 28, 42), "Man turrets", "When nothing above needs them.", s.ManTurrets, () => AutSend(squad, s with { ManTurrets = !s.ManTurrets }));
         Text("At most 3 builders per building.", R(gx + 14, y + 102, half - 28, 18), 10, MutedInk);
+    }
+
+    // ------------------------------------------------------------------ the Buildings page (the manager's assigned buildings, Meitou)
+
+    /// <summary>Clicking buildings in the world to add to (or take off) a squad's list: the squad and the building selected when the last one was taken.</summary>
+    (int Squad, string? Before)? assigning;
+
+    void DrawBuildingsPage(SquadView squad, AutonomySettings s, float x, float w)
+    {
+        var m = MgmtSettings(squad) ?? new Meitou.Simulation.Management.ManagementSettings();
+        Header("Buildings: the ones this squad looks after", x, 120, w);
+        Card(R(x, 166, w, 482));
+        if (m.Buildings.Count == 0)
+        {
+            CardTitle("None assigned: they work the whole outpost by the Priorities page", x + 14, 176);
+            Text("Assign buildings to keep this squad on them only, e.g. two stone mines, a stone processor and the building material storage for a stone crew. "
+                + "The list's order is what comes first: put the processor above the mines and, when stone piles up in storage, one of the miners is moved to it; "
+                + "when it runs dry he goes back to mining. Unbuilt ones on the list get built. Stuck ones (full, no storage, no power) show in the manager's log.",
+                R(x + 14, 200, w - 28, 120), 12, MutedInk, "Left Top");
+        }
+        else CardTitle("Top first. They only work, build and man these.", x + 14, 176);
+        float y = m.Buildings.Count == 0 ? 330 : 200;
+        for (int k = 0; k < m.Buildings.Count && k < 12; k++)
+        {
+            string id = m.Buildings[k];
+            int at = k;
+            string name = player.PlaceName(id, population()) ?? "Gone";
+            Text($"{k + 1}.", R(x + 14, y, 28, 26), 13, MutedInk);
+            Text(name, R(x + 44, y, w - 300, 26), 14, name == "Gone" ? Bad : LightInk);
+            Button("Up", R(x + w - 238, y + 1, 56, 24), () => MgmtSend(squad, m with { Buildings = Swap(m.Buildings, at, at - 1) }), enabled: k > 0, size: 11);
+            Button("Down", R(x + w - 176, y + 1, 64, 24), () => MgmtSend(squad, m with { Buildings = Swap(m.Buildings, at, at + 1) }), enabled: k < m.Buildings.Count - 1, size: 11);
+            Button("Remove", R(x + w - 106, y + 1, 84, 24), () => MgmtSend(squad, m with { Buildings = [.. m.Buildings.Where((_, j) => j != at)] }), size: 11);
+            y += 30;
+        }
+        if (m.Buildings.Count > 12) Text($"and {m.Buildings.Count - 12} more", R(x + 14, y, 300, 20), 11, MutedInk);
+        float by = 606;
+        Button("Pick buildings in the world", R(x + 14, by, 230, 30), () => { assigning = (squad.Id, player.SelectedBuildingInstance); openDropdown = null; }, primary: true, size: 12);
+        string? selected = player.SelectedBuildingInstance;
+        Button("Add the selected building", R(x + 254, by, 210, 30), () => MgmtSend(squad, m with { Buildings = [.. m.Buildings, selected!] }),
+            enabled: selected is not null && !m.Buildings.Contains(selected) && Snap.Buildings.Any(b => b.Id == selected), size: 12);
+        Button("Clear", R(x + w - 106, by, 84, 30), () => MgmtSend(squad, m with { Buildings = [] }), enabled: m.Buildings.Count > 0, size: 12);
+    }
+
+    static IReadOnlyList<string> Swap(IReadOnlyList<string> list, int a, int b)
+    {
+        var copy = list.ToArray();
+        if (a >= 0 && b >= 0 && a < copy.Length && b < copy.Length) (copy[a], copy[b]) = (copy[b], copy[a]);
+        return copy;
+    }
+
+    /// <summary>The world-picking banner: every building of yours clicked goes on the squad's list (clicked again, off it); Done ends it.</summary>
+    void DrawAssigning(int width, int height, UiPainter painter, (int Squad, string? Before) pick)
+    {
+        string? now = player.SelectedBuildingInstance;
+        var squad = Snap.PlayerSquads.FirstOrDefault(q => q.Id == pick.Squad);
+        if (squad is null) { assigning = null; return; }
+        var m = MgmtSettings(squad) ?? new Meitou.Simulation.Management.ManagementSettings();
+        if (now is not null && now != pick.Before && Snap.Buildings.Any(b => b.Id == now))
+        {
+            bool on = m.Buildings.Contains(now);
+            MgmtSend(squad, m with { Buildings = on ? [.. m.Buildings.Where(b => b != now)] : [.. m.Buildings, now] });
+            Notice($"{player.PlaceName(now, population()) ?? "Building"} {(on ? "taken off" : "added to")} {squad.Name}'s buildings.");
+            assigning = (pick.Squad, now);
+        }
+        float w = 720, h = 54;
+        pickBanner = new(MathF.Round((width - w * scale) / 2), MathF.Round(24 * scale), MathF.Round(w * scale), MathF.Round(h * scale));
+        bounds = pickBanner;
+        Surface(pickBanner, "window");
+        Text($"Click your buildings for {squad.Name} ({m.Buildings.Count} assigned). Click again to take one off.", new(pickBanner.X + 16 * scale, pickBanner.Y, pickBanner.Width - 150 * scale, pickBanner.Height), 14, LightInk);
+        Button("Done", new(pickBanner.X + pickBanner.Width - 116 * scale, pickBanner.Y + 12 * scale, 100 * scale, 30 * scale), () => assigning = null, primary: true);
+        painter.Draw(controls, width, height, pointer, null);
     }
 
     // ------------------------------------------------------------------ pick in world

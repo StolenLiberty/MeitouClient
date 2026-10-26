@@ -62,7 +62,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
             if (visible == value) return;
             visible = value;
             dragging = null; focused = null; openDropdown = null;
-            if (!value) { townsMode = false; autoMode = false; picking = null; }
+            if (!value) { townsMode = false; autoMode = false; picking = null; assigning = null; }
             if (value) { scroll = scrollTarget = 0; RefreshFields(); }
         }
     }
@@ -115,7 +115,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
     {
         if (!visible) return button == MouseButton.Left && AutButtonDown(at);
         // Pick in world: only the banner is the window's; a click elsewhere selects the building.
-        if (picking is not null && !bounds.Contains(at.X, at.Y)) return false;
+        if ((picking is not null || assigning is not null) && !bounds.Contains(at.X, at.Y)) return false;
         pointer = at;
         if (button != MouseButton.Left) return Contains(at);
         pointerDown = true;
@@ -164,6 +164,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
         if (key == Key.Escape)
         {
             if (picking is not null) picking = null;
+            else if (assigning is not null) assigning = null;
             else if (openDropdown is not null) openDropdown = null;
             else if (focused is not null) focused = null;
             else Visible = false;

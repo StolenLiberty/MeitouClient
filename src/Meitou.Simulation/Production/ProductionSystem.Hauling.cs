@@ -19,8 +19,11 @@ public sealed partial class ProductionSystem
     }
 
     /// <summary>What an operator at its machine does before working; true when it set off for a storage.</summary>
-    bool StartHaul(World world, CharacterCold cold, BuildSite site, Machine m)
+    bool StartHaul(World world, CharacterCold cold, BuildSite site, Machine m) => StartHaul(world, cold, site, m, out _);
+
+    bool StartHaul(World world, CharacterCold cold, BuildSite site, Machine m, out bool full)
     {
+        full = false;
         if (cold.Inventory is not { } inv) return false;
         bool changed = false;
         foreach (var input in m.Inputs)
@@ -44,6 +47,7 @@ public sealed partial class ProductionSystem
         {
             int moved = Placed(inv, made);
             if (moved > 0) { output.Count -= moved; changed = true; }
+            else full = true;   // a storage would take it, but the operator has no room for it
         }
         if (changed) world.Machines.Touch();
         if (m.Output is { } o && Carried(inv, o.Recipe.Item).FirstOrDefault() is { } carried &&

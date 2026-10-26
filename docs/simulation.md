@@ -298,7 +298,7 @@ its hold point (`CharacterCold.HoldPoint`: where Hold was turned on, then each g
 Attack All (Meitou-only, `CharacterOrders.AttackAll`, the HUD's eighth toggle, saved as GAMESTATE_CHARACTER `meitou attack all`): an attack on a target the player picks
 (`AttackOrder.Picked`) spreads over every awake character of the target's faction within `Orders.AttackAllRadius` (300) of it: each attacker with the toggle takes the one with the
 fewest attackers so far, the nearest on a tie (`CombatSystem.AttackAllTargets`), each an assault.
-A toggle (button or hotkey) sets every selected character to the opposite of the first one's state, so a mixed selection ends uniform (engine choice; the original's rule is **Unknown**). Toggles and the run speed arrows also apply while paused ([time model](#time-model)).
+A toggle (button or hotkey) sets every selected character to the opposite of the first one's state, so a mixed selection ends uniform (engine choice; the original's rule is **Unknown**). Toggles and the run speed arrows also apply while paused ([time model](#time-model)). A run speed change reaches a character already walking an order at once (Meitou: `RunSpeedCommand` sets the walk's mode too; the original's rule is **Unknown**).
 New player characters start with Jobs and Ranged enabled. Jobs gates the job list and automatic rescue (the medic, robotics, splint and attacking-enemies jobs run regardless, as the original); direct orders still run. The saved `chase mode` is this switch. Saved toggles override
 defaults, including explicit false values. Jobs is GAMESTATE_AI `jobs` ([perma-jobs](game/ai-tasks.md#perma-jobs)); Meitou's older `meitou jobs enabled` is read, not written.
 Sneak: sneaking speed cap and clips, quieter, smaller view factor; a hostile looker sees the sneaker only once its
@@ -1414,7 +1414,7 @@ on the squad's platoon as the Meitou-only string `meitou autonomy` (JSON; the pl
   Not built: the plugin's shopping change, its equipped-item locks and its gate guards' door repair.
 - UI: the HUD's AUT button (the plugin's default place, 0.69 x 0.788 of the screen) opens `CheatMenu.Autonomy.cs` for the squad on the squad bar. Meitou's pages: Squad (work roles,
   presets of the labour and building priorities and turrets that turn the manager on and clear the packages; the manager, the squad leader by default; when attacked; what each
-  member is doing; the manager's log), Priorities (labour and building bars, Build and repair, Man turrets), Schedule (places, work hours, health thresholds), Advanced (the plugin's
+  member is doing; the manager's log), Priorities (labour and building bars, Build and repair, Man turrets), Buildings (the assigned list: up, down, remove, add the selected one, clear, and a world-pick banner where each click on one of the player's buildings adds or removes it), Schedule (places, work hours, health thresholds), Advanced (the plugin's
   roles and packages, its combat and guard options). No button on the squads screen (the window picks the squad).
 
 ## Managers
@@ -1432,6 +1432,12 @@ manager up, free and inside one of the player's outposts (`PlayerTown` radius), 
 by BUILDING `building category`, a bed is Housing: `BuildGroup`) is above the machine's job priority, else after the turret; sites by priority then distance, at most `BuildersPerSite` (3)
 builders on one; else "idle: nothing to do". A building a member came back
   from within 10 s is not given to it again for 120 s (no materials, unreachable).
+A member whose inventory has no free cell (`InventoryCommands.Cramped`) gets no work ("inventory full"); a machine operator or builder whose haul cannot fit stops and says
+"My inventory is full." (a bark, at most every 30 s, `CharacterCold.FullBarkTick`).
+Assigned buildings (`ManagementSettings.Buildings`, site ids, top first; the window's Buildings page, picked in the world): with any, the squad builds, works and mans only those, in list
+order, instead of the priorities. Every 20 s (`ManagerSystem.Chain`) a worker who has been at a lower one for 30 s or more is moved to the highest listed complete one he can work
+(`ProductionSystem.AutonomyCanWork`: operable, not blocked), so a stone crew listing processor above mines moves a miner to the processor when stone is in storage and back when it runs dry. A listed
+building that cannot run (`AutonomyStuck`: no power, out of an input, full with no storage) is noted once in the log with "!".
 The window lists each member's status (`SquadView.Managed`).
 
 ## New-game difficulty

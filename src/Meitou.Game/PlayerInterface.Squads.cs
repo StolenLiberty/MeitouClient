@@ -56,9 +56,24 @@ sealed partial class PlayerInterface
         const string prefix = "mygui:tab:SquadPanel:";
         if (!c.Action.StartsWith(prefix, StringComparison.Ordinal) || !int.TryParse(c.Action.AsSpan(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out int i)) return false;
         var tabs = SquadTabSquads();
-        if (i < tabs.Count) Say(new ActiveSquadCommand(tabs[i].Id) { Tick = session.World.Tick });
+        if (i < tabs.Count)
+        {
+            Say(new ActiveSquadCommand(tabs[i].Id) { Tick = session.World.Tick });
+            // Meitou: a double click on a tab selects the whole squad.
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (tabs[i].Id == lastTabClick && System.Diagnostics.Stopwatch.GetElapsedTime(lastTabClickAt, now).TotalSeconds <= DoubleTapSeconds)
+            {
+                var present = PlayerCharacters().ToHashSet();
+                Select([.. tabs[i].Members.Where(present.Contains)], false);
+                lastTabClick = -1;
+            }
+            else (lastTabClick, lastTabClickAt) = (tabs[i].Id, now);
+        }
         return true;
     }
+
+    int lastTabClick = -1;
+    long lastTabClickAt;
 
     /// <summary>The overview's SQUADS tab widgets: the faction's count against <c>max faction size</c>, the button and the dismiss label (both upper-cased by the original).</summary>
     void BindSquadsTab(UiBindings b)

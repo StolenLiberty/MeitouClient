@@ -124,7 +124,7 @@ identified; pause 0x12 is only blocked by the second). While the MainBar object 
 
 Squad events (**Observed**): select_0..9 (100..109, `FUN_1407f90b0`) and select_all 0x22 (`FUN_1407f8d00`) act on the active squad's members
 ([squad tabs](ui-screens.md#4-hud-mainbargui)); change_squad 0x23 (`FUN_1407f6380`) with more than one squad makes the next one in order (wrapping) that has
-members active, and leaves the selection alone. character_next / prev 0x26 / 0x27 (`FUN_1407f9130(+1 / -1)`, **Observed**): nothing unless the
+members active, and leaves the selection alone. Meitou: a second click on the same squad tab within 0.5 s selects all of its members on screen (`PlayerInterface.SquadTabClick`, engine choice). character_next / prev 0x26 / 0x27 (`FUN_1407f9130(+1 / -1)`, **Observed**): nothing unless the
 active squad has at least two members; when the focus character (`DAT_142133a50`) is a living one of the player's faction, the next (previous) member
 of its own squad, wrapping, is selected alone (`FUN_1407f9000`); otherwise the current selected character is selected alone and focused, or with no
 selection the first entry of a list at PlayerInterface+0x2c0 (**Unknown** which). Meitou (`StepCharacter`): the HUD's character (the inspected one

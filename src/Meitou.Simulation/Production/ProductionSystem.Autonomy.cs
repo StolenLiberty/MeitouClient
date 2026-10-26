@@ -76,6 +76,33 @@ public sealed partial class ProductionSystem
         return true;
     }
 
+    /// <summary>
+    /// Whether the character can work site <paramref name="siteId"/> now (a manager's assigned building, Meitou): a complete machine of the player's it may operate (or haul for, an automatic one)
+    /// with work and a free place (<see cref="Blocked"/>), or a turret nobody else mans.
+    /// </summary>
+    internal bool AutonomyCanWork(World world, int slot, string siteId)
+    {
+        if (world.Characters.Cold(slot) is not { } cold || !Able(cold) || Site(world, siteId) is not { Complete: true } site || site.Owner != world.Player.Faction || world.Machines.Find(siteId) is not { } m) return false;
+        if (m.Data.Function == Meitou.Data.World.ObjectRanges.TurretFunction) return !Blocked(world, cold, new PermaJob(TaskType.MAN_A_TURRET_PLAYER_JOB, site.Id));
+        bool automatic = m.Data.IsAutomatic && m.Data.IsProducer;
+        if (!automatic && !m.Data.Operable) return false;
+        return !Blocked(world, cold, new PermaJob(automatic ? TaskType.OPERATE_AUTOMATIC_MACHINERY : TaskType.OPERATE_MACHINERY, site.Id));
+    }
+
+    /// <summary>Why an assigned machine cannot go on (for the manager's log), or null: no power; an input with nothing to fill it from; a full output no storage takes.</summary>
+    internal string? AutonomyStuck(World world, string siteId)
+    {
+        if (Site(world, siteId) is not { Complete: true } site || world.Machines.Find(siteId) is not { } m || m.Data.IsStorage || m.Data.IsResearch || m.Farm is not null) return null;
+        string name = site.Name.Length > 0 ? site.Name : m.Data.Name;
+        if (WorkFactor(world, m) <= 0 && m.Data.Operable) return $"{name} has no power";
+        foreach (var input in m.Inputs)
+            if (input.Rate > 0 && input.Level + input.Count <= 0 && NearestSource(world, site, input.Item) is null)
+                return $"{name} is out of {items.Create(input.Item, 1)?.Name ?? input.Item}";
+        if (m.Output is { Full: true } o && items.Create(o.Recipe.Item, 1) is { } one && NearestStorage(world, site, x => x.Data.Accepts(one.Record, one.Type) && Fits(x.Storage!, one)) is null)
+            return $"{name} is full: no storage with room for {one.Name}";
+        return null;
+    }
+
     /// <summary>Ends an operator's work (its task goes back to idle).</summary>
     internal static void AutonomyEnd(CharacterTable table, int slot) => End(table, slot);
 }

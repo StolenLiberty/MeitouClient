@@ -34,6 +34,11 @@ public sealed record ManagementSettings
     public bool Build { get; init; } = true;
     /// <summary>How much each <see cref="BuildGroup"/> matters (0..10, 0: never built by him); a site goes before a machine whose job priority is lower.</summary>
     public IReadOnlyList<float> BuildPriority { get; init; } = DefaultBuildPriority;
+    /// <summary>
+    /// The buildings assigned to the squad (site ids, first = most important); empty: the whole outpost by the job and building priorities. With some, its people work, man and build
+    /// only those, in this order, and are moved up the list as work turns up there (<see cref="ManagerSystem"/> "the chain").
+    /// </summary>
+    public IReadOnlyList<string> Buildings { get; init; } = [];
 
     public static readonly IReadOnlyList<float> DefaultBuildPriority = [6, 8, 7, 5, 4, 4, 5, 2];
 
@@ -52,9 +57,9 @@ public sealed record ManagementSettings
         _ => BuildGroup.Other,
     };
 
-    sealed record Stored(int S, string N, byte D, bool B, List<float>? P = null);
+    sealed record Stored(int S, string N, byte D, bool B, List<float>? P = null, List<string>? A = null);
 
-    public string Write() => JsonSerializer.Serialize(new Stored(ManagerSquadIndex, ManagerName, (byte)Defence, Build, [.. BuildPriority]));
+    public string Write() => JsonSerializer.Serialize(new Stored(ManagerSquadIndex, ManagerName, (byte)Defence, Build, [.. BuildPriority], [.. Buildings]));
 
     public static ManagementSettings? Read(string text)
     {
@@ -64,6 +69,7 @@ public sealed record ManagementSettings
         return s is null ? null : new ManagementSettings
         {
             ManagerSquadIndex = s.S, ManagerName = s.N ?? "", Defence = Enum.IsDefined((DefenceMode)s.D) ? (DefenceMode)s.D : DefenceMode.Militia, Build = s.B,
+            Buildings = s.A is { } a ? [.. a.Where(x => x.Length > 0).Distinct()] : [],
             BuildPriority = s.P is { Count: > 0 } p ? [.. p.Concat(DefaultBuildPriority.Skip(p.Count)).Take(DefaultBuildPriority.Count).Select(v => Math.Clamp(v, 0, 10))] : DefaultBuildPriority,
         };
     }
@@ -185,6 +191,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             current = (squad.Id, manager.Name);
             foreach (var id in squad.Members)
                 Manage(world, production, m, settings, rest, town, enemies, table.Next[boss].Position, id, beds, building);
+            if (enemies.Count == 0 && !rest) Chain(world, production, squad, m);
         }
     }
 
@@ -240,7 +247,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             return;
         }
         // One the manager sent to work stops for the end of its shift or a wound.
-        bool ours = sent.TryGetValue(id, out var job) && (task == CharacterTask.Operate && c.OperateSite == job.Site || task is CharacterTask.Build && c.BuildSite == job.Site);
+        bool ours = sent.TryGetValue(id, out var job) && (task == CharacterTask.Operate && c.OperateSite == job.Site || task is CharacterTask.Build or CharacterTask.DeliverMaterials or CharacterTask.FetchMaterials && c.BuildSite == job.Site);
         if (ours && (rest || wounded))
         {
             if (Bed(world, town, c, beds) is { } bed) { world.Defer(new Locks.UseBedOrder([id], bed) { Tick = world.Tick + 1 }); status[id] = rest ? "off to bed" : "off to bed (hurt)"; Log(world, c, rest ? "to bed (shift over)" : "to bed (hurt)"); }
@@ -249,7 +256,14 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         }
         if (task != CharacterTask.Idle || c.InCombat || c.Formation is not null || c.LootAll is not null || !c.FollowOrder.IsNone)
         {
-            status[id] = ours ? task == CharacterTask.Build ? "building" : "working" : c.Formation is not null ? "in formation" : TaskWord(task);
+            status[id] = ours ? task == CharacterTask.FetchMaterials ? "fetching materials" : task is CharacterTask.Build or CharacterTask.DeliverMaterials ? "building: " + SiteName(world, job.Site) : "working: " + SiteName(world, job.Site) : c.Formation is not null ? "in formation" : TaskWord(task);
+            return;
+        }
+        // Too full to carry anything: it waits for the player to empty it (and says so now and then).
+        if (c.Inventory is { } carried && Items.InventoryCommands.Cramped(carried))
+        {
+            Production.ProductionSystem.InventoryFull(world, id, c);
+            status[id] = "inventory full";
             return;
         }
         // Back from a building it was just sent to: that one does not work for it for a while.
@@ -259,6 +273,13 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         {
             if (Bed(world, town, c, beds) is { } bed) { world.Defer(new Locks.UseBedOrder([id], bed) { Tick = world.Tick + 1 }); status[id] = wounded ? "off to bed (hurt)" : "off to bed"; Log(world, c, wounded ? "to bed (hurt)" : "to bed (off shift)"); }
             else status[id] = "no free bed";
+            return;
+        }
+        // Assigned buildings: only those, the first in the list that needs building or has work for it.
+        if (m.Buildings.Count > 0)
+        {
+            if (Assigned(world, production, m, slot, id, c, building)) return;
+            status[id] = "idle: nothing to do at his buildings";
             return;
         }
         // A site to build whose group matters more than the best machine's job goes first (Building page against the Jobs page).
@@ -290,6 +311,97 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             return;
         }
         status[id] = "idle: nothing to do";
+    }
+
+    /// <summary>
+    /// An assigned building for a free member, the list in order: one placed or damaged is built or repaired (at most <see cref="BuildersPerSite"/>), a machine or turret with work and a
+    /// free place is worked. True when it was sent.
+    /// </summary>
+    bool Assigned(World world, Production.ProductionSystem? production, ManagementSettings m, int slot, CharacterId id, CharacterCold c, Dictionary<string, int> building)
+    {
+        foreach (var siteId in m.Buildings)
+        {
+            if (world.Buildings.Find(siteId) is not { } site || site.Owner != world.Player.Faction || Stuck(world, id, siteId)) continue;
+            if (!site.Complete || site.Destroyed)
+            {
+                if (!m.Build || site.Paused || site.Dismantling || site.Ruined || Builders(world, siteId) + building.GetValueOrDefault(siteId) >= BuildersPerSite) continue;
+                StartBuild(world, id, c, site, building);
+                return true;
+            }
+            if (production is null || !production.AutonomyCanWork(world, slot, siteId) || !production.AutonomyBegin(world, slot, siteId)) continue;
+            if (!sent.TryGetValue(id, out var was) || was.Site != siteId) Log(world, c, "to work the " + SiteName(world, siteId));
+            sent[id] = (siteId, world.Tick);
+            status[id] = "working: " + SiteName(world, siteId);
+            return true;
+        }
+        return false;
+    }
+
+    static int Builders(World world, string siteId)
+    {
+        var table = world.Characters;
+        int count = 0;
+        for (int s = 0; s < table.HighWater; s++)
+            if (table.Next[s].Alive && table.Next[s].Task is (byte)CharacterTask.Build or (byte)CharacterTask.DeliverMaterials or (byte)CharacterTask.FetchMaterials && table.Cold(s)?.BuildSite == siteId) count++;
+        return count;
+    }
+
+    /// <summary>Seconds between the chain's checks, and how long one must have been at a building before it is moved up the list.</summary>
+    public const float ChainSeconds = 20, ChainStay = 30;
+    readonly Dictionary<int, long> nextChain = [];
+    readonly Dictionary<string, string> stuckSaid = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The chain (assigned buildings, every <see cref="ChainSeconds"/>): one member working a building lower on the list, there at least <see cref="ChainStay"/>, is moved to the first
+    /// building above it that has work and a free place for it (stone piling up in storage takes a miner to the processor; the processor empty, he is idle and goes back down the list).
+    /// Then a stuck building (no power, out of an input, full with no storage) is said once in the log.
+    /// </summary>
+    void Chain(World world, Production.ProductionSystem? production, Squad squad, ManagementSettings m)
+    {
+        if (production is null || m.Buildings.Count == 0) return;
+        long every = (long)(ChainSeconds / world.TickSeconds);
+        if (nextChain.TryGetValue(squad.Id, out long due) && world.Tick < due) return;
+        nextChain[squad.Id] = world.Tick + every;
+        var table = world.Characters;
+        var order = m.Buildings.Select((id, k) => (id, k)).ToDictionary(p => p.id, p => p.k, StringComparer.Ordinal);
+        (int Slot, CharacterId Id, int At)? lowest = null;
+        foreach (var id in squad.Members)
+        {
+            if (!table.TryResolveNext(id, out int s) || table.Cold(s) is not { } c || c.InCombat || table.Next[s].Task != (byte)CharacterTask.Operate) continue;
+            if (c.OperateSite is not { } here || !order.TryGetValue(here, out int at) || !sent.TryGetValue(id, out var job) || job.Site != here) continue;
+            if ((world.Tick - job.Tick) * world.TickSeconds < ChainStay) continue;
+            if (lowest is null || at > lowest.Value.At) lowest = (s, id, at);
+        }
+        if (lowest is { } mover)
+            for (int k = 0; k < mover.At; k++)
+            {
+                string up = m.Buildings[k];
+                if (world.Buildings.Find(up) is not { Complete: true, Destroyed: false } || !production.AutonomyCanWork(world, mover.Slot, up)) continue;
+                var cold = table.Cold(mover.Slot)!;
+                string from = SiteName(world, m.Buildings[mover.At]);
+                if (!production.AutonomyBegin(world, mover.Slot, up)) continue;
+                Log(world, cold, $"from the {from} to the {SiteName(world, up)}");
+                sent[mover.Id] = (up, world.Tick);
+                status[mover.Id] = "working: " + SiteName(world, up);
+                break;
+            }
+        foreach (var siteId in m.Buildings)
+        {
+            string? why = production.AutonomyStuck(world, siteId);
+            if (why is null) { stuckSaid.Remove(siteId); continue; }
+            if (stuckSaid.TryGetValue(siteId, out var said) && said == why) continue;
+            stuckSaid[siteId] = why;
+            Note(world, why);
+        }
+    }
+
+    /// <summary>A line of the log that is not a decision (a stuck building).</summary>
+    void Note(World world, string text)
+    {
+        if (!logs.TryGetValue(current.Squad, out var log)) logs[current.Squad] = log = [];
+        double h = ((world.GameHours % 24) + 24) % 24;
+        log.Add($"{(int)h:00}:{(int)(h % 1 * 60):00}  ! {text}");
+        if (log.Count > LogLines) log.RemoveAt(0);
     }
 
     void StartBuild(World world, CharacterId id, CharacterCold c, Construction.BuildSite site, Dictionary<string, int> building)
