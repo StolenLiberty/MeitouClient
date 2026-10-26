@@ -281,6 +281,8 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
                 Toggle: new("Hover outline", () => config.HoverOutline, v => config.HoverOutline = v, Remaster: true, OnOff: true)));
             result.Add(new("Selection rings", "Draw the green ring on the ground under each selected character.",
                 Toggle: new("Selection rings", () => config.SelectionRings, v => config.SelectionRings = v, Remaster: true, OnOff: true)));
+            result.Add(new("Name tags", "Show the names over your characters' heads.",
+                Toggle: new("Name tags", () => config.NameTags, v => config.NameTags = v, Remaster: true, OnOff: true)));
             result.Add(new("luckyren Mode", "A character that takes a fatal hit explodes, covers everything around in blood and sends bones flying everywhere. Its gear falls to the ground around the spot.",
                 Toggle: new("luckyren Mode", () => config.LuckyrenMode, v => config.LuckyrenMode = v),
                 Picture: SettingsMenuArt.LuckyrenImage));
@@ -537,6 +539,7 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
         FieldOfViewSlider.Set(UserConfig.DefaultFieldOfView);
         config.HoverOutline = true;
         config.SelectionRings = true;
+        config.NameTags = true;
         config.LuckyrenMode = false;
         config.GroundItemLimit = global::Meitou.Simulation.Items.GroundItems.DefaultLimit;
         player.SetUiMode(UiMode.Meitou);

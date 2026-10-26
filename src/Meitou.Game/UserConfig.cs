@@ -116,6 +116,8 @@ sealed class UserConfig
     public bool HoverOutline { get; set; } = true;
     /// <summary>The green ring under each selected character (Advanced settings; default on).</summary>
     public bool SelectionRings { get; set; } = true;
+    /// <summary>The names over your characters' heads (Advanced settings; on as in the game).</summary>
+    public bool NameTags { get; set; } = true;
     /// <summary>A character that takes a fatal hit explodes, covers everything around in blood and sends bones flying (Advanced settings; an easter egg, off by default, not part of the all Faithful / all Meitou switches; docs/game/luckyren.md).</summary>
     public bool LuckyrenMode { get; set; }
     /// <summary>How many items dropped in play stay on the ground before the oldest goes (Advanced settings; <see cref="Meitou.Simulation.Items.GroundItems.Limit"/>).</summary>

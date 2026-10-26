@@ -634,6 +634,7 @@ sealed partial class GameHost
                 if (ui && overlay is not null && !g.NoPopulation)
                 {
                     player.SelectionRings = config.SelectionRings;
+                    player.NameTags = config.NameTags;
                     player.Draw(overlay, size.X, size.Y);
                 }
                 if (ui && overlay is not null && IsSandbox) DrawSandbox(overlay, size.X, size.Y);

@@ -165,6 +165,9 @@ sealed partial class PlayerInterface
     /// <summary>Draw the green ring under each selected character (Advanced → Selection rings).</summary>
     public bool SelectionRings { get; set; } = true;
 
+    /// <summary>Draw the names over your characters' heads (Advanced → Name tags).</summary>
+    public bool NameTags { get; set; } = true;
+
     /// <summary>The HUD, the selection rings and the drag box, over the finished picture.</summary>
     public void Draw(DebugOverlay o, int width, int height, DebugOverlay.OverlayPass? pass = null)
     {

@@ -56,6 +56,7 @@ sealed partial class PlayerInterface
     /// </summary>
     void AddNameTags(List<UiControl> controls)
     {
+        if (!NameTags) return;
         float width = Width * 0.105729f, height = Height * 0.0296296f, scale = Height / 1080f;
         int n = 0;
         foreach (var c in session.CurrentSnapshot.Characters)

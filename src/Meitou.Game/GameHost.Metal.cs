@@ -1381,6 +1381,7 @@ sealed partial class GameHost
                     if (hud.UiVisible)
                     {
                         hud.SelectionRings = config.SelectionRings;
+                        hud.NameTags = config.NameTags;
                         hud.Draw(overlay, size.X, size.Y, overlayPass);
                         if (IsSandbox && !g.UiShowcase) DrawSandbox(overlay, size.X, size.Y);
                     }
