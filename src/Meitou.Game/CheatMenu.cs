@@ -62,7 +62,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
             if (visible == value) return;
             visible = value;
             dragging = null; focused = null; openDropdown = null;
-            if (!value) { townsMode = false; jobsMode = false; assigning = null; }
+            if (!value) { townsMode = false; jobsMode = false; assigning = null; zeusMode = false; zeusPick = null; }
             if (value) { scroll = scrollTarget = 0; RefreshFields(); }
         }
     }
@@ -116,6 +116,8 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
         if (!visible) return button == MouseButton.Left && JobsButtonDown(at);
         // Pick in world: only the banner is the window's; a click elsewhere selects the building.
         if (assigning is not null && !bounds.Contains(at.X, at.Y)) return false;
+        // Zeus: a click on the world places the pick (or, with none, is the game's).
+        if (zeusMode && !bounds.Contains(at.X, at.Y) && openDropdown is null) { pointer = at; return ZeusClick(at, button); }
         pointer = at;
         if (button != MouseButton.Left) return Contains(at);
         pointerDown = true;
@@ -137,14 +139,14 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
         pointer = at;
         if (!visible) return false;
         if (dragging is { Track: { } track }) { dragFraction = Math.Clamp((at.X - track.X) / track.Width, 0, 1); return true; }
-        if (JobsDrag(at)) return true;
+        if (JobsDrag(at) || WindowDrag(at)) return true;
         return Contains(at);
     }
 
     public bool MouseUp()
     {
         pointerDown = false;
-        if (jobsGrab is not null) { jobsGrab = null; return true; }
+        if (jobsGrab is not null || windowGrab is not null || windowResize is not null) { jobsGrab = null; windowGrab = null; windowResize = null; return true; }
         if (dragging is not { Commit: { } commit }) { bool had = dragging is not null; dragging = null; return had; }
         dragging = null;
         commit(dragFraction);
@@ -166,6 +168,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
         if (key == Key.Escape)
         {
             if (assigning is not null) assigning = null;
+            else if (zeusMode && openDropdown is null && focused is null) { if (zeusPick is not null) zeusPick = null; else { zeusMode = false; scroll = scrollTarget = 0; } }
             else if (openDropdown is not null) openDropdown = null;
             else if (focused is not null) focused = null;
             else Visible = false;
@@ -188,7 +191,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
         field.Text += c;
         if (field.Id == "item-search") { itemCache = null; scrollTarget = scroll = 0; }
         if (field.Id == "spawn-search") spawnCache = null;
-        if (field.Id == "faction-filter") scrollTarget = scroll = 0;
+        if (field.Id is "faction-filter" or "zeus-search") scrollTarget = scroll = 0;
     }
 
     static float Parse(string text, float fallback)

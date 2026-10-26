@@ -59,6 +59,12 @@ public sealed record DebugUnlockResearch : DebugCommand;
 /// <summary>Spawns a character of record <see cref="Record"/> at <see cref="At"/>, alone in a squad of the first faction hostile to the player (<see cref="PopulationSystem"/> applies it).</summary>
 public sealed record DebugSpawn(string Record, Vector2 At, int? Faction = null) : DebugCommand;
 
+/// <summary>
+/// Spawns a squad of characters made from <paramref name="Record"/> (the cheat menu's Zeus): one at <paramref name="At"/> plus each of <paramref name="Offsets"/> (world X/Z
+/// from it; the first leads), standing idle facing <paramref name="Yaw"/>, each with a look of its own, of <paramref name="Faction"/> (null: the first faction hostile to the player's).
+/// </summary>
+public sealed record DebugSpawnSquad(string Record, Vector2 At, IReadOnlyList<Vector2> Offsets, float Yaw, int? Faction = null) : DebugCommand;
+
 static class DebugCheats
 {
     public static void Apply(World world, PopulationData? data, CharacterAssembly? assembly, DebugCommand command)

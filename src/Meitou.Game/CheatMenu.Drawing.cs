@@ -236,11 +236,17 @@ sealed partial class CheatMenu
         art.Ensure(painter, MeitouLook, player.UiAtlas);
         if (townsMode) { DrawTownWindow(width, height, painter); return; }
         if (jobsMode) { DrawJobsWindow(width, height, painter); return; }
-        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
-        bounds = new(MathF.Round((width - 1120 * scale) / 2), MathF.Round((height - 720 * scale) / 2), MathF.Round(1120 * scale), MathF.Round(720 * scale));
+        if (zeusMode) { DrawZeus(width, height, painter); return; }
+        // The window's size goes with the screen, times the size its corner was dragged to; it stays where its title strip was dragged (centred until then).
+        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f))) * windowZoom;
+        float ww = MathF.Round(1120 * scale), wh = MathF.Round(720 * scale);
+        var place = windowPlace ?? new Vector2((width - ww) / 2, (height - wh) / 2);
+        place = new(Math.Clamp(place.X, 60 * scale - ww, width - 60 * scale), Math.Clamp(place.Y, 0, height - 44 * scale));
+        bounds = new(MathF.Round(place.X), MathF.Round(place.Y), ww, wh);
         controls.Clear(); hits.Clear();
 
-        Surface(bounds, "window");
+        hits.Add(new(R(0, 0, 1060, 44), () => windowGrab = new(pointer.X - bounds.X, pointer.Y - bounds.Y)));
+        Surface(bounds, "window", alpha: WindowAlpha);
         Text("Cheat Menu", R(20, 6, 300, 32), 22, LightInk);
         var close = R(1069, 6, 31, 32);
         controls.Add(new("cheat-close", "Button", close, "", "cheat:close", "Kenshi_CloseButtonSkin", true, new Dictionary<string, string>(), Vector4.Zero));
@@ -257,6 +263,10 @@ sealed partial class CheatMenu
             if (page == (Page)i) Rect(R(20, 124 + i * 40, 3, 34), Brass);
             Text(PageNames[i], R(36, 124 + i * 40, 130, 34), 14, page == (Page)i ? LightInk : MainInk);
         }
+        // Zeus: the spawning panel (CheatMenu.Zeus.cs).
+        Button("", R(20, 124 + PageNames.Length * 40 + 12, 156, 34), OpenZeus);
+        Rect(R(20, 124 + PageNames.Length * 40 + 12, 3, 34), Enemy with { W = 0.8f });
+        Text("Zeus", R(36, 124 + PageNames.Length * 40 + 12, 130, 34), 14, LightInk);
         Rect(R(192, 124, 1, 544), MainInk with { W = 0.12f });
 
         viewport = R(212, ContentTop, 888, ContentBottom - ContentTop);
@@ -285,8 +295,32 @@ sealed partial class CheatMenu
         Text("Game keeps running · Esc closes", R(700, 684, 260, 28), 11, MutedInk, "Right VCenter");
         Button("Close", R(980, 684, 120, 28), () => Visible = false);
 
+        // The corner that resizes the window.
+        var grip = R(1092, 692, 26, 26);
+        for (int k = 0; k < 3; k++) Rect(new(grip.X + grip.Width - (6 + 6 * k) * scale, grip.Y + grip.Height - 5 * scale, (4 + 6 * k) * scale, MathF.Max(1, MathF.Round(1.5f * scale))), MainInk with { W = 0.45f });
+        hits.Add(new(grip, () => windowResize = (pointer.X - bounds.X, windowZoom)));
+
         if (openDropdown is { } open) DrawDropdown(open);
         painter.Draw(controls, width, height, pointer, null);
+    }
+
+    /// <summary>Where the window was dragged (null: centred), its size from its corner (times the screen's), and the drags in hand.</summary>
+    Vector2? windowPlace;
+    float windowZoom = 1;
+    Vector2? windowGrab;
+    (float Width, float Zoom)? windowResize;
+
+    /// <summary>Moves the window while its title strip is held, or sizes it while its corner is; true while either.</summary>
+    bool WindowDrag(Vector2 at)
+    {
+        if (windowGrab is { } grab) { windowPlace = at - grab; return true; }
+        if (windowResize is { } r)
+        {
+            windowPlace ??= new Vector2(bounds.X, bounds.Y);
+            windowZoom = Math.Clamp(r.Zoom * (at.X - bounds.X) / MathF.Max(1, r.Width), 0.55f, 1.6f);
+            return true;
+        }
+        return false;
     }
 
     void DrawTargetBar()

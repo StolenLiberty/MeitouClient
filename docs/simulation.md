@@ -1525,6 +1525,12 @@ name, typed letters filter it, the wheel, Up / Down and PageUp / PageDown scroll
 from the moment it was picked (a technique keeps only its root height, as in the game), drawn by the host in place of the simulation's layers;
 "simulation" gives the hero back. Nothing is sent to the simulation.
 
+**Zeus** (the cheat menu's button under World, `CheatMenu.Zeus.cs`, after Arma 3's Zeus "Create" panel): every CHARACTER and ANIMAL_CHARACTER by faction (the
+factions of the SQUAD_TEMPLATEs whose leader, squad, squad2, choose-from or animal lists hold it, else its own `faction`; neither: "Other"). A pick shows a figure per
+unit at the ground under the pointer; a left click sends `DebugSpawnSquad` (`SpawnSandboxSquad` mid-game: one idle squad, a look per member). Side: Own (the listed
+faction), Friend / Neutral / Foe (the listed faction when it is already that to the player's, else the first faction that is; Friend falls back to the player's,
+Foe to the sandbox's hostile pick). Amount 1-100 in a block centred on the click, facing away from the camera: `Formation.Line` rows, the front about twice the depth.
+
 ## Duel
 
 The deterministic duel harness locates a scripted knockout, runs the pre-lap fight headless,
