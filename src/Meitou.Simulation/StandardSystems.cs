@@ -196,7 +196,7 @@ public static class StandardSystems
         if (Has(StandardParts.Production)) systems.Add(production = new Meitou.Simulation.Production.ProductionSystem(data, o.Production) { Assembly = new CharacterAssembly(data), Construction = construction, Beds = beds, Carry = carry });
         if (Has(StandardParts.Combat)) systems.Add(combat!);
         // Managers keeping the player's squads busy (Meitou-only): serial, after production (they start its machines); nothing in the hash, they act through orders.
-        if (production is not null) systems.Add(new Meitou.Simulation.Management.ManagerSystem());
+        if (production is not null) systems.Add(new Meitou.Simulation.Management.ManagerSystem(data));
         if (Has(StandardParts.Animation))
         {
             var library = o.AnimationLibrary ?? AnimationLibrary.FromDatabase(data.Db);

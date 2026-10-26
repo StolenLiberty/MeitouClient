@@ -139,14 +139,14 @@ public class AggroTests
         Assert.NotEmpty(a.Aggro.Log);
         Assert.All(a.Aggro.Log, e => { Assert.Equal(Raiders, e.AttackerFaction); Assert.Equal(Villagers, e.TargetFaction); });
         Assert.All(raiders.Members, m => Assert.True(a.Fighting(m), "both raiders fight"));
-        // The villagers answer (retaliation), and nobody touches the nomads, hermits or friends.
+        // The villagers answer (retaliation), and nobody touches the nomads or hermits; the raiders' allies (friends) may come to the raiders' side (Meitou's ally help, AllyHelpChance).
         a.World.RunTicks(60);
         Assert.Contains(villagers.Members, a.Fighting);
-        foreach (var m in nomads.Members.Concat(hermits.Members).Concat(friends.Members)) Assert.False(a.Fighting(m));
+        foreach (var m in nomads.Members.Concat(hermits.Members)) Assert.False(a.Fighting(m));
         foreach (var e in a.Combat.Log)
         {
             int fa = a.World.Characters.Cold(e.Attacker)!.Faction, fd = a.World.Characters.Cold(e.Defender)!.Faction;
-            Assert.True((fa, fd) is (Raiders, Villagers) or (Villagers, Raiders), $"a blow between factions {fa} and {fd}");
+            Assert.True((fa, fd) is (Raiders, Villagers) or (Villagers, Raiders) or (Friends, Villagers) or (Villagers, Friends), $"a blow between factions {fa} and {fd}");
         }
     }
 
@@ -156,7 +156,8 @@ public class AggroTests
         using var a = Make(7, 1);
         var o = new Vector2(2000, 2000);
         var town = a.Squad(Townsfolk, o, o, o + new Vector2(30, 0));
-        var watch = a.Squad(Townsfolk, o + new Vector2(200, 0), o + new Vector2(200, 0));
+        // Beyond hearing the first fight (RetaliationSystem.HearFight) and not looking at it, so it does not come to help before the war.
+        var watch = a.Squad(Townsfolk, o + new Vector2(350, 0), o + new Vector2(350, 0));
         var me = a.PlayerCharacter(o + new Vector2(60, 60));
         a.World.RunTicks(20);
         Assert.Empty(a.Aggro.Log);   // neutral: 10

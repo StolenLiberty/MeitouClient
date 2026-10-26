@@ -15,6 +15,9 @@ public enum DefenceMode : byte
     Shelter = 2,
 }
 
+/// <summary>What a building is for, as the manager ranks sites to build (by its BUILDING <c>building category</c>; a bed is housing).</summary>
+public enum BuildGroup : byte { Defence, Food, Power, Housing, Storage, Industry, Research, Other }
+
 /// <summary>
 /// A player squad's manager (Meitou-only): while <see cref="Manager"/> is up and in one of the player's outposts, <see cref="ManagerSystem"/> keeps the squad's members there busy. Work hours,
 /// job priorities, turrets and rest thresholds are the squad's <see cref="AutonomySettings"/> (the same pages of the window) with autonomy off.
@@ -29,10 +32,29 @@ public sealed record ManagementSettings
     public DefenceMode Defence { get; init; } = DefenceMode.Militia;
     /// <summary>Whether he puts idle members on building and repairing the outpost's sites.</summary>
     public bool Build { get; init; } = true;
+    /// <summary>How much each <see cref="BuildGroup"/> matters (0..10, 0: never built by him); a site goes before a machine whose job priority is lower.</summary>
+    public IReadOnlyList<float> BuildPriority { get; init; } = DefaultBuildPriority;
 
-    sealed record Stored(int S, string N, byte D, bool B);
+    public static readonly IReadOnlyList<float> DefaultBuildPriority = [6, 8, 7, 5, 4, 4, 5, 2];
 
-    public string Write() => JsonSerializer.Serialize(new Stored(ManagerSquadIndex, ManagerName, (byte)Defence, Build));
+    public int PriorityOf(BuildGroup group) => (int)(BuildPriority.Count > (int)group ? BuildPriority[(int)group] : DefaultBuildPriority[(int)group]);
+
+    /// <summary>The group of a <c>building category</c> (the base game's values; anything else is Other).</summary>
+    public static BuildGroup GroupOf(string? category, bool bed) => bed ? BuildGroup.Housing : category?.ToUpperInvariant() switch
+    {
+        "WALLS" or "DEFENCE" => BuildGroup.Defence,
+        "FARMING" or "FOOD" => BuildGroup.Food,
+        "POWER" => BuildGroup.Power,
+        "BUILDINGS" => BuildGroup.Housing,
+        "STORAGE" => BuildGroup.Storage,
+        "MINING" or "CRAFTING" => BuildGroup.Industry,
+        "TECH" => BuildGroup.Research,
+        _ => BuildGroup.Other,
+    };
+
+    sealed record Stored(int S, string N, byte D, bool B, List<float>? P = null);
+
+    public string Write() => JsonSerializer.Serialize(new Stored(ManagerSquadIndex, ManagerName, (byte)Defence, Build, [.. BuildPriority]));
 
     public static ManagementSettings? Read(string text)
     {
@@ -42,6 +64,7 @@ public sealed record ManagementSettings
         return s is null ? null : new ManagementSettings
         {
             ManagerSquadIndex = s.S, ManagerName = s.N ?? "", Defence = Enum.IsDefined((DefenceMode)s.D) ? (DefenceMode)s.D : DefenceMode.Militia, Build = s.B,
+            BuildPriority = s.P is { Count: > 0 } p ? [.. p.Concat(DefaultBuildPriority.Skip(p.Count)).Take(DefaultBuildPriority.Count).Select(v => Math.Clamp(v, 0, 10))] : DefaultBuildPriority,
         };
     }
 }
@@ -56,8 +79,20 @@ public sealed record SetSquadManagement(int SquadId, ManagementSettings? Setting
 /// Turrets), else a site to build or repair (<see cref="ManagementSettings.Build"/>). Members he sent to work go to bed at the end of their shift or when hurt, and are got up when the shift
 /// starts and they are healed. While enemies are in the outpost the squad defends it by its <see cref="DefenceMode"/>, and goes back to work after.
 /// </summary>
-public sealed class ManagerSystem : ITickSystem
+public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
 {
+    /// <summary>At most this many builders on one site (engine choice).</summary>
+    public const int BuildersPerSite = 3;
+    readonly Dictionary<string, BuildGroup> groups = new(StringComparer.Ordinal);
+
+    /// <summary>The group of a site's BUILDING record (cached by record id).</summary>
+    BuildGroup GroupOfRecord(string record)
+    {
+        if (groups.TryGetValue(record, out var g)) return g;
+        var r = data?.Db.Find(record);
+        bool bed = r is not null && Locks.FixtureRegistry.BedDataOf(data!.Db, r) is { Function: Meitou.Data.World.TownBuildings.BedFunction };
+        return groups[record] = ManagementSettings.GroupOf(r?.GetString("building category"), bed);
+    }
     public const float CheckSeconds = 2;
     /// <summary>A building the manager sent one to and that it left again this soon is not given to it again for a while (no materials, a site it cannot reach).</summary>
     const float StuckSeconds = 120;
@@ -200,7 +235,16 @@ public sealed class ManagerSystem : ITickSystem
             else status[id] = "no free bed";
             return;
         }
-        if (production is not null && production.AutonomyLabour(world, slot, s, town.Number, boss) is { } machine && !Stuck(world, id, machine) && production.AutonomyBegin(world, slot, machine))
+        // A site to build whose group matters more than the best machine's job goes first (Building page against the Jobs page).
+        var site = m.Build ? Site(world, m, town, n.Position, id, building) : null;
+        var machine = production?.AutonomyLabour(world, slot, s, town.Number, boss) is { } found && !Stuck(world, id, found) ? found : null;
+        int machinePriority = machine is null ? -1 : MachinePriority(world, s, machine);
+        if (site is { } first && (machine is null || site.Value.Priority > machinePriority))
+        {
+            StartBuild(world, id, first.Site, building);
+            return;
+        }
+        if (production is not null && machine is not null && production.AutonomyBegin(world, slot, machine))
         {
             sent[id] = (machine, world.Tick);
             status[id] = "working";
@@ -212,15 +256,28 @@ public sealed class ManagerSystem : ITickSystem
             status[id] = "on a turret";
             return;
         }
-        if (m.Build && Site(world, town, n.Position, id, building) is { } site)
+        if (site is { } later)
         {
-            building[site.Id] = building.GetValueOrDefault(site.Id) + 1;
-            world.Defer(new Construction.BuildOrder([id], site.Id, Repair: site.Complete && site.Destroyed) { Tick = world.Tick + 1 });
-            sent[id] = (site.Id, world.Tick);
-            status[id] = site.Complete ? "repairing" : "building";
+            StartBuild(world, id, later.Site, building);
             return;
         }
         status[id] = "idle: nothing to do";
+    }
+
+    void StartBuild(World world, CharacterId id, Construction.BuildSite site, Dictionary<string, int> building)
+    {
+        building[site.Id] = building.GetValueOrDefault(site.Id) + 1;
+        world.Defer(new Construction.BuildOrder([id], site.Id, Repair: site.Complete && site.Destroyed) { Tick = world.Tick + 1 });
+        sent[id] = (site.Id, world.Tick);
+        status[id] = site.Complete ? "repairing" : "building";
+    }
+
+    /// <summary>The job priority (Jobs page) of the machine on a site.</summary>
+    static int MachinePriority(World world, AutonomySettings s, string siteId)
+    {
+        foreach (var machine in world.Machines.All)
+            if (machine.Site == siteId) return s.LabourPriority(AutonomyRules.KindOf(machine.Data));
+        return 1;
     }
 
     bool Stuck(World world, CharacterId id, string site) => stuck.TryGetValue((id, site), out long until) && until > world.Tick;
@@ -312,19 +369,30 @@ public sealed class ManagerSystem : ITickSystem
         return null;
     }
 
-    /// <summary>The nearest site of the outpost to build (placed, not paused or being taken apart) or repair (complete and damaged), at most two builders each this pass, not stuck for it.</summary>
-    Construction.BuildSite? Site(World world, Construction.PlayerTown town, Vector3 at, CharacterId id, Dictionary<string, int> building)
+    /// <summary>
+    /// The site of the outpost to build (placed, not paused or being taken apart) or repair (complete and damaged) whose group matters most (<see cref="ManagementSettings.BuildPriority"/>, 0
+    /// never), the nearest on a tie; with fewer than <see cref="BuildersPerSite"/> builders (on it now and sent this pass), not stuck for this one. Null: none.
+    /// </summary>
+    (Construction.BuildSite Site, int Priority)? Site(World world, ManagementSettings m, Construction.PlayerTown town, Vector3 at, CharacterId id, Dictionary<string, int> building)
     {
+        var table = world.Characters;
         Construction.BuildSite? best = null;
+        int bestP = 0;
         float bestD = float.MaxValue;
         foreach (var site in world.Buildings.All)
         {
             if (site.Town != town.Number || site.Owner != world.Player.Faction || site.Paused || site.Dismantling || site.Ruined) continue;
             if (site.Complete && !site.Destroyed) continue;
-            if (building.GetValueOrDefault(site.Id) >= 2 || Stuck(world, id, site.Id)) continue;
+            int p = m.PriorityOf(GroupOfRecord(site.Record));
+            if (p <= 0 || p < bestP || Stuck(world, id, site.Id)) continue;
             float d = Vector3.DistanceSquared(at, site.Position);
-            if (d < bestD) (best, bestD) = (site, d);
+            if (p == bestP && d >= bestD) continue;
+            int builders = building.GetValueOrDefault(site.Id);
+            for (int s = 0; s < table.HighWater && builders < BuildersPerSite; s++)
+                if (table.Next[s].Alive && table.Next[s].Task is (byte)CharacterTask.Build or (byte)CharacterTask.DeliverMaterials && table.Cold(s)?.BuildSite == site.Id) builders++;
+            if (builders >= BuildersPerSite) continue;
+            (best, bestP, bestD) = (site, p, d);
         }
-        return best;
+        return best is null ? null : (best, bestP);
     }
 }

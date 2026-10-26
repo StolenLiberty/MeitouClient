@@ -13,8 +13,8 @@ namespace Meitou.Game;
 // (SetSquadAutonomy), and the AI runs the squad from them.
 sealed partial class CheatMenu
 {
-    enum AutPage { Role, Places, Jobs, Combat, Manager }
-    static readonly string[] AutPageNames = ["Role", "Places & Hours", "Jobs", "Combat & Guard", "Manager"];
+    enum AutPage { Role, Places, Jobs, Combat, Manager, Building }
+    static readonly string[] AutPageNames = ["Role", "Places & Hours", "Jobs", "Combat & Guard", "Manager", "Building"];
 
     bool autoMode;
     AutPage autPage;
@@ -159,6 +159,7 @@ sealed partial class CheatMenu
             case AutPage.Places: DrawPlacesPage(squad, s, X, CW); break;
             case AutPage.Jobs: DrawJobsPage(squad, s, X, CW); break;
             case AutPage.Manager: DrawManagerPage(squad, s, X, CW); break;
+            case AutPage.Building: DrawBuildingPage(squad, s, X, CW); break;
             default: DrawCombatPage(squad, s, X, CW); break;
         }
 
@@ -449,7 +450,8 @@ sealed partial class CheatMenu
         if (mgmtPending is { } p && p.Squad == squad.Id)
         {
             bool arrived = p.Settings is null ? squad.Management is null
-                : squad.Management is { } m && m.Manager == p.Settings.Manager && m.Defence == p.Settings.Defence && m.Build == p.Settings.Build;
+                : squad.Management is { } m && m.Manager == p.Settings.Manager && m.Defence == p.Settings.Defence && m.Build == p.Settings.Build
+                    && m.BuildPriority.SequenceEqual(p.Settings.BuildPriority);
             if (arrived || Environment.TickCount64 - p.At > 3000) mgmtPending = null;
             else return p.Settings;
         }
@@ -498,7 +500,7 @@ sealed partial class CheatMenu
         CardTitle("Work", gx + 14, 176);
         Check(R(gx + 14, 198, half - 28, 44), "Build and repair", "Idle hands go to unfinished or damaged buildings.", m?.Build ?? true,
             () => { if (m is not null) MgmtSend(squad, m with { Build = !m.Build }); }, enabled: m is not null);
-        Text("Hours, job priorities, turrets and resting: the other pages.", R(gx + 14, 246, half - 28, 26), 11, MutedInk);
+        Text("What to build first: the Building page. Hours, jobs, turrets, resting: the other pages.", R(gx + 14, 246, half - 28, 26), 11, MutedInk);
 
         // When the outpost is attacked.
         CardTitle("When the outpost is attacked", x, 290);
@@ -535,6 +537,62 @@ sealed partial class CheatMenu
             }
             if (rows.Count > 33) Text($"and {rows.Count - 33} more", R(x + 14, 626, 300, 18), 11, MutedInk);
         }
+    }
+
+    static readonly (Meitou.Simulation.Management.BuildGroup Group, string Name, string Examples)[] BuildRows =
+    [
+        (Meitou.Simulation.Management.BuildGroup.Defence, "Defence", "walls, gates, turrets"),
+        (Meitou.Simulation.Management.BuildGroup.Food, "Food & water", "farms, wells, stills"),
+        (Meitou.Simulation.Management.BuildGroup.Power, "Power", "generators, batteries"),
+        (Meitou.Simulation.Management.BuildGroup.Housing, "Housing", "houses, beds"),
+        (Meitou.Simulation.Management.BuildGroup.Storage, "Storage", "boxes and stores"),
+        (Meitou.Simulation.Management.BuildGroup.Industry, "Industry", "mining and crafting"),
+        (Meitou.Simulation.Management.BuildGroup.Research, "Research", "research benches"),
+        (Meitou.Simulation.Management.BuildGroup.Other, "Other", "lights, furniture, doors, signs"),
+    ];
+
+    /// <summary>The manager's building priorities: what he has built first when you place something.</summary>
+    void DrawBuildingPage(SquadView squad, AutonomySettings s, float x, float w)
+    {
+        Header("Building: what the manager has built first", x, 120, w);
+        var m = MgmtSettings(squad);
+        Card(R(x, 166, w, 482));
+        CardTitle("Place something and he puts his people on it, most important first", x + 14, 176);
+        if (m is null)
+        {
+            Text("This squad has no manager yet: pick one on the Manager page.", R(x + 14, 200, w - 28, 26), 13, MutedInk);
+            return;
+        }
+        Button("Defaults", R(x + 14, 198, 110, 26), () => MgmtSend(squad, m with { BuildPriority = Meitou.Simulation.Management.ManagementSettings.DefaultBuildPriority }), size: 12);
+        Button("Build nothing", R(x + 132, 198, 130, 26), () => MgmtSend(squad, m with { BuildPriority = [.. Enumerable.Repeat(0f, 8)] }), size: 12);
+        float y = 236, pipsX = x + 300, pipsW = w - 330;
+        foreach (var (group, name, examples) in BuildRows)
+        {
+            int value = m.PriorityOf(group);
+            Text(name, R(x + 14, y, 150, 26), 14, MainInk);
+            Text(examples, R(x + 140, y, 160, 26), 11, MutedInk);
+            float cell = (pipsW - 30) / 11f;
+            for (int v = 0; v <= 10; v++)
+            {
+                int set = v;
+                var at = R(pipsX + v * (cell + 3), y + 5, cell, 16);
+                bool on = v > 0 && v <= value, off = v == 0 && value == 0;
+                Rect(at, off ? Bad with { W = 0.45f } : on ? Brass with { W = 0.75f } : new Vector4(0.10f, 0.08f, 0.07f, 1));
+                Outline(at, MainInk with { W = Hovered(at, null) ? 0.5f : 0.1f });
+                if (v == 0) Text("off", at, 10, off ? LightInk : MutedInk, "Center");
+                hits.Add(new(at, () =>
+                {
+                    var list = m.BuildPriority.ToArray();
+                    if (list.Length < 8) list = [.. list, .. Meitou.Simulation.Management.ManagementSettings.DefaultBuildPriority.Skip(list.Length)];
+                    list[(int)group] = set;
+                    MgmtSend(squad, m with { BuildPriority = list });
+                }));
+            }
+            y += 34;
+        }
+        Text("More bars = built first. A building more important than a job's bars on the Jobs page is built before that job is worked. At most 3 builders per building; repairs count too.",
+            R(x + 14, y + 6, w - 28, 40), 11, MutedInk, "Left Top");
+        if (!m.Build) Text("Build and repair is off on the Manager page.", R(x + 14, y + 48, w - 28, 20), 12, Bad);
     }
 
     // ------------------------------------------------------------------ pick in world

@@ -484,7 +484,9 @@ free squad mates within `JoinRange` (250, engine choice; the original's joiner m
 already fighting or down (engine rule), against an attacker within 150 of it (`AI::findAttackerOf`); an NPC with an AI joins this way only with a protect goal
 (143 PROTECT_OWN_SQUAD, PROTECT_ALLIES and the like) in its lists at the hour (`AiMind.Protects`, whatever goal sets its stance: the base patrols, e.g. `Holy Army Patrol`
 and `Starving bandit mob`, hold both Attack enemies and Protect allies, **Verified** by dump of the merged data) and only for a mate that fights, else through its stance or not at all
-(`RetaliationSystem.ProtectsMates`).
+(`RetaliationSystem.ProtectsMates`). Meitou adds help between squads (`JoinFaction`, engine rule): a free NPC of the attacked NPC's faction in another squad (not a slave, not of the
+attacker's faction) who hears the fight (within `HearFight`, 300) or sees the attacked one (`SightMap.Sees`, its sight range) defends it; one of an allied faction only with
+`AllyHelpChance` (0.2, drawn once per helper and attacker, `RngPurpose.AllyHelp`); nearest first, at most `FactionHelpers` (12) per attacker per check; never for the player's faction.
 Orders defer to the next tick. Relations are live state and deed/witness effects have distinct
 paths; preserve current ordering.
 Relation events (`FactionDeeds`, built with the aggro part; [factions 3.5](game/factions-squads-towns.md#35-what-fires-relation-changes-observed-decompile)):
@@ -1418,7 +1420,9 @@ manager up, free and inside one of the player's outposts (`PlayerTown` radius), 
   women (`CharacterAppearance.Female`) walk into the nearest complete outpost building with a door and stay; Shelter: everyone does; afterwards they are free again;
 - in bed: got up (`GetOutOrder`) in work hours once healed; one he sent to work goes to bed at the end of the shift or below the rest threshold (`UseBedOrder`, a free outpost bed);
 - a free one (idle, out of combat, not in a formation, a Loot All or a follow): hurt or off shift, to bed; else the best machine (`ProductionSystem.AutonomyLabour`/`AutonomyBegin`), else a
-  free turret with Man turrets, else the nearest site to build or repair (at most two builders each per check, `BuildOrder`); else "idle: nothing to do". A building a member came back
+  free turret with Man turrets; a site to build or repair (`BuildOrder`) goes before the machine when its group's priority (`ManagementSettings.BuildPriority`, the Building page; groups
+by BUILDING `building category`, a bed is Housing: `BuildGroup`) is above the machine's job priority, else after the turret; sites by priority then distance, at most `BuildersPerSite` (3)
+builders on one; else "idle: nothing to do". A building a member came back
   from within 10 s is not given to it again for 120 s (no materials, unreachable).
 The window lists each member's status (`SquadView.Managed`).
 

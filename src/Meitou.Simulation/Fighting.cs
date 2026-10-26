@@ -304,6 +304,8 @@ public sealed class RetaliationSystem(CombatSystem combat) : ITickSystem
             bool fights = combat.StateOf(new CharacterId(t, next[t].Generation)).TargetSlot >= 0 || defenders.Count > 0;
             if (gap.X * gap.X + gap.Z * gap.Z <= ProtectReach * ProtectReach && (table.Cold(a)?.SquadId is not { } foeSquad || foeSquad < 0 || foeSquad != table.Cold(t)?.SquadId))
                 JoinMates(world, table, t, defenders, taken, fights ? CanProtectFighter : CanProtect);
+            // Others of the attacked NPC's faction who see it (or hear the fight) come too; an ally of another faction only now and then.
+            if (table.Cold(t) is { IsPlayer: false } victimCold && victimCold.Faction >= 0 && victimCold.Faction != world.Player.Faction) JoinFaction(world, table, t, a, defenders, taken);
             // Bodyguards of the attacked character come too (Bodyguard, order 45).
             Guards(world, table, t, a, defenders, taken, guards);
             // Allies come to a defender that is already fighting too.
@@ -388,6 +390,48 @@ public sealed class RetaliationSystem(CombatSystem combat) : ITickSystem
             if (!next[s].Alive || table.Cold(s) is not { IsPlayer: true } c || c.Faction == ally.Faction || !relations.Contains(c.Faction) || !relations.IsAlly(c.Faction, ally.Faction)) continue;
             var d = next[s].Position - at;
             if (d.X * d.X + d.Z * d.Z > JoinRange * JoinRange || !CanFight(table, s, taken)) continue;
+            defenders.Add(new CharacterId(s, next[s].Generation));
+            taken.Add(s);
+        }
+    }
+
+    /// <summary>How near a fight is heard by the attacked one's faction (engine choice); farther, a helper must see the attacked character.</summary>
+    public const float HearFight = 300;
+    /// <summary>The chance an NPC of an allied faction (relation 50 or more) who sees the fight joins it (engine choice: "may help, but usually not").</summary>
+    public const float AllyHelpChance = 0.2f;
+    /// <summary>At most this many come running to one attacker per check (engine choice: a city's guards all within sight would empty the city).</summary>
+    public const int FactionHelpers = 12;
+
+    /// <summary>
+    /// Meitou's help between squads (engine rule; the original's PROTECT_ALLIES finders are not traced through): a free NPC (not the player's, able to fight, not a slave, not of the attacker's
+    /// faction) of the attacked NPC's faction, in another squad, who hears the fight (within <see cref="HearFight"/>) or sees the attacked character (<see cref="SightMap.Sees"/>, its sight
+    /// range) defends it; one of an allied faction does so only with <see cref="AllyHelpChance"/>, drawn once per helper and attacker; nearest first, at most <see cref="FactionHelpers"/>.
+    /// </summary>
+    void JoinFaction(World world, CharacterTable table, int slot, int attacker, List<CharacterId> defenders, HashSet<int> taken)
+    {
+        var next = table.Next;
+        var victim = table.Cold(slot)!;
+        var foe = table.Cold(attacker);
+        var relations = combat.Relations;
+        var at = next[slot].Position;
+        var helpers = new List<(int Slot, float D2)>();
+        for (int s = 0; s < table.HighWater; s++)
+        {
+            if (s == slot || s == attacker || !next[s].Alive || table.Cold(s) is not { IsPlayer: false } c || c.SquadId == victim.SquadId && c.SquadId >= 0) continue;
+            if (c.Faction < 0 || foe is not null && c.Faction == foe.Faction || c.SlaveState is 1 or 2 || c.Fighter is not { CanAttack: true }) continue;
+            bool own = c.Faction == victim.Faction;
+            if (!own && (relations is null || !relations.Contains(c.Faction) || !relations.Contains(victim.Faction) || !relations.IsAlly(c.Faction, victim.Faction))) continue;
+            var d = next[s].Position - at;
+            float d2 = d.X * d.X + d.Z * d.Z;
+            float sight = AggroSystem.RangeOf(c, AggroSystem.OutdoorSight);
+            if (d2 > sight * sight) continue;
+            if (d2 > HearFight * HearFight && !(world.Sight.Sees(s, slot, next[s].Position, next[s].Yaw, at, sight) > 0)) continue;
+            if (!own && Rng.Float(Rng.Hash(world.Seed, Rng.Key(table.IdOf(s)), RngPurpose.AllyHelp, Rng.Key(table.IdOf(attacker)))) >= AllyHelpChance) continue;
+            if (!CanFight(table, s, taken)) continue;
+            helpers.Add((s, d2));
+        }
+        foreach (var (s, _) in helpers.OrderBy(h => h.D2).ThenBy(h => h.Slot).Take(FactionHelpers))
+        {
             defenders.Add(new CharacterId(s, next[s].Generation));
             taken.Add(s);
         }

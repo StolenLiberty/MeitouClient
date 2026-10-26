@@ -51,6 +51,8 @@ public enum RngPurpose : uint
     Formation = 25,
     /// <summary>A stealth KO target's hearing roll on the creeping attacker's last step (<see cref="Carrying.CarrySystem"/>).</summary>
     KnockoutHear = 26,
+    /// <summary>Whether an ally of another faction who sees a fight joins it (<see cref="Combat.RetaliationSystem"/>), keyed by the helper and the attacker.</summary>
+    AllyHelp = 27,
 }
 
 /// <summary>
