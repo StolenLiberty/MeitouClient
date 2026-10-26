@@ -170,7 +170,8 @@ sealed partial class CheatMenu
     {
         scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
         controls.Clear(); hits.Clear();
-        float pw = MathF.Round(ZeusWidth * scale), top = MathF.Round(12 * scale), bottom = MathF.Round(200 * scale);
+        // Clear of the performance line along the top and of the HUD's bottom panels; solid, so nothing of the HUD shows through it.
+        float pw = MathF.Round(ZeusWidth * scale), top = MathF.Round(48 * scale), bottom = MathF.Round(280 * scale);
         bounds = new(width - pw - MathF.Round(12 * scale), top, pw, Math.Max(240 * scale, height - top - bottom));
         float H = bounds.Height / scale, W = ZeusWidth;
 
@@ -178,7 +179,8 @@ sealed partial class CheatMenu
         if (zeusPick is { } pick && ZeusGround(pointer) is { } ground && player.Project(ground + new Vector3(0, pick.Animal ? 14 : 21, 0)) is { } over)
             Text(zeusCount > 1 ? $"{zeusCount} x {pick.Name}" : pick.Name, new(over.X - 160, over.Y - 24, 320, 22), 14, LightInk, "Center");
 
-        Surface(bounds, "window", alpha: WindowAlpha);
+        Rect(bounds, new Vector4(0.075f, 0.065f, 0.055f, 1));
+        Surface(bounds, "window");
         Text("Zeus", R(16, 6, 200, 32), 22, LightInk);
         Text("CREATE", R(110, 10, 160, 26), 12, MutedInk);
         var close = R(W - 47, 6, 31, 32);
