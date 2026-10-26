@@ -180,7 +180,11 @@ public sealed partial class PlayerSystem(PopulationData? data = null) : ITickSys
                 case SelectCommand select:
                     var selectable = select.Characters.Where(id =>
                         table.TryResolveNext(id, out int slot) && table.Cold(slot)!.IsPlayer).ToArray();
-                    if (selectable.Length == 0) break;
+                    if (selectable.Length == 0)
+                    {
+                        if (select.ClearWhenEmpty && !select.Additive) player.Selection.Clear();
+                        break;
+                    }
                     // Picking one of your own shows them: the inspected character of another faction no longer takes the HUD.
                     player.Inspected = CharacterId.None;
                     if (!select.Additive) player.Selection.Clear();

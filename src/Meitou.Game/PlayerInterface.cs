@@ -185,7 +185,9 @@ sealed partial class PlayerInterface(WorldSession session, Func<float, float, fl
         {
             dragging = false;
             var boxed = InBox(from, p);
-            Select(boxed, shift);
+            // Meitou: a box over nobody (without Shift) drops the selection.
+            if (boxed.Count == 0 && !shift) Say(new SelectCommand([]) { Tick = session.World.Tick, ClearWhenEmpty = true });
+            else Select(boxed, shift);
             if (boxed.Count > 0) Inspect(CharacterId.None);
         }
         else

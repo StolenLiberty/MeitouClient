@@ -96,7 +96,11 @@ public sealed class CommandQueue
 public sealed record FocusCommand(Vector3 Position) : SimCommand;
 
 /// <summary>Selects the player's own characters. No valid targets retains the selection; otherwise non-additive replaces it and additive (shift) adds to it.</summary>
-public sealed record SelectCommand(IReadOnlyList<CharacterId> Characters, bool Additive = false) : SimCommand;
+public sealed record SelectCommand(IReadOnlyList<CharacterId> Characters, bool Additive = false) : SimCommand
+{
+    /// <summary>Meitou: with no selectable character (and not additive) the selection is emptied instead of kept (a drag box over nobody).</summary>
+    public bool ClearWhenEmpty { get; init; }
+}
 
 /// <summary>Clears order selection and shows another faction's character in the HUD panels. <see cref="CharacterId.None"/> clears inspection only.</summary>
 public sealed record InspectCommand(CharacterId Target) : SimCommand;

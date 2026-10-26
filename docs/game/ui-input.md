@@ -24,7 +24,7 @@ inspecting non-player characters updates panels without giving orders to them. C
 choose verbs based on target type/state, faction, carrying and available interaction.
 
 Meitou selection commands retain the current selection when no valid player characters are
-targeted (empty ground or an empty drag box). Selecting valid members replaces or adds to it;
+targeted by a click on empty ground; a drag box over none of them without Shift empties it (`SelectCommand.ClearWhenEmpty`, Meitou's choice). Selecting valid members replaces or adds to it;
 inspecting another faction keeps the selection and shows that character in the panels (see [UI screens](ui-screens.md#4-hud-mainbargui)).
 While a selected character sneaks, an NPC that is up gets the verb "Stealth KO" with its chance beside it ([context menu](#context-menu-verbs)) and a quick right click on it gives
 that instead of an attack ([combat](combat.md#stealth-knock-out)); the first sneaking selected character goes.
