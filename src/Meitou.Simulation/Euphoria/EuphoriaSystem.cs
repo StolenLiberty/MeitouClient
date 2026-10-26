@@ -34,6 +34,8 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
     /// from 1.5 the steps he may take to catch himself are limited (<see cref="MaxSteps"/>), and from 2.5 he goes down (measured on Kenshi's man and woman, docs/euphoria.md).
     /// </summary>
     const float PushBase = 15, PushPerStrength = 40, StrongestHit = 4, RangedPush = 0.6f;
+    /// <summary>How much more each earlier hit of the same reaction makes the next one count (engine choice).</summary>
+    const float StackPerHit = 0.5f;
 
     /// <summary>The steps a body may take to keep its balance after a hit of <paramref name="strength"/> (0: as many as it needs).</summary>
     static int MaxSteps(float strength) => strength >= 3.5f ? 1 : strength >= 2.5f ? 2 : strength >= 1.5f ? 4 : 0;
@@ -85,6 +87,8 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
         public float? FellAt;
         /// <summary>Falling from a height (<c>highFall</c> started).</summary>
         public bool Flailing;
+        /// <summary>Hits taken so far in this reaction.</summary>
+        public int Hits;
         public string? Failed;
         public readonly float[] Parts = new float[EuphoriaData.Parts * 7];
         /// <summary>By part: its bone in world space, last read.</summary>
@@ -362,7 +366,9 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
         nm_agent_get_part_transforms(a.Handle, a.Parts, EuphoriaData.Parts);
         float[] at = [a.Parts[k * 7], a.Parts[k * 7 + 1], a.Parts[k * 7 + 2]];
         var dir = Space.DirectionToDelirium(push.Direction);
-        float strength = Math.Clamp(push.Strength, 0, StrongestHit);
+        // Hits on a body still reacting stack: each one before it has its balance back counts half again more, so a character set on by several goes down.
+        float strength = Math.Clamp(push.Strength * (1 + StackPerHit * a.Hits), 0, StrongestHit);
+        if (!a.Down && push.Strength > 0) a.Hits++;
         float size = (PushBase + PushPerStrength * strength) * (0.8f + 0.4f * push.Blunt) * (push.Ranged ? RangedPush : 1);
         nm_agent_apply_impulse(a.Handle, k, at, [dir.X * size, dir.Y * size, dir.Z * size]);
         if (a.Down) return;

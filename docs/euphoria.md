@@ -41,6 +41,10 @@ Space: Kenshi (x, y, z) units = Delirium (x, −z, y) × 0.1 m, about each body'
   strength ≤ 4) N s × 0.8 (cut) to 1.2 (blunt), × 0.6 for bolts. From strength 1.5 the steps it may
   take are limited (`maxSteps` 4, 2 from 2.5, 1 from 3.5). Measured on Kenshi's man and woman
   (probe): 1 staggers about a metre, 2 nearly two, 3 knocks over from the front, back or side.
+- **More hits** on a body still reacting push it again (and restart `shot`); each earlier hit of
+  the reaction makes the next count half again more (strength × (1 + 0.5 × hits)), so a character
+  set on by several goes down. Probe: three strength-1 hits 0.4 and 0.3 s apart move it 0.9 m
+  sideways, then 1.2 m in 0.4 s.
 - **Hold**: combat keeps the character helpless while it reacts (`CombatSystem.Hold`: no swing,
   block or walking); its position follows the pelvis.
 - **Ending**: standing, once balancing with the centre of mass under 0.35 m/s (from 0.5 s, at most
