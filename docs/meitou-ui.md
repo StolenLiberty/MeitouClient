@@ -2,8 +2,8 @@
 
 Design reference for the Meitou UI mode ([native-ui](native-ui.md)): the game's materials (rust,
 worn paper, charcoal button plates, Exo 2 SemiBold, `kenshi_colours.xml`) as floating plates with
-soft corners, used by the Meitou title and settings and, in the Meitou UI mode, by the in-game tooltips (one nine-sliced `rust` plate, radius 10; [ui-screens](game/ui-screens.md#tooltips)). In-game HUD and windows currently use
-the original layouts in both modes. Values: [tokens.json](meitou-ui/tokens.json). Live
+soft corners, used by the Meitou title and settings and, in the Meitou UI mode, by the in-game tooltips (one nine-sliced `rust` plate, radius 10; [ui-screens](game/ui-screens.md#tooltips)). In-game windows use the original layouts in both modes; the Meitou mode has its own HUD
+(below). Values: [tokens.json](meitou-ui/tokens.json). Live
 components: [reference/](meitou-ui/reference/) (web, React 18): run
 `tools/scripts/meitou-ui-textures.ps1` once (crops the textures from the install into git-ignored
 `reference/textures/`), then open `reference/index.html`. Online copy (private):
@@ -62,3 +62,24 @@ arrows, talk, light, lock/lockpick, door/escape, house, tools, mining, lifting, 
 hand, search, use/gears, steal, knockout, scavenge and invalid. They are action cursors, not
 dedicated save/load icons. `Kenshi_SaveGamePanel.layout` uses a plain captioned Save button;
 no dedicated save image was found in these resources or by inspecting the atlas.
+
+## In-game HUD
+
+The Meitou mode replaces `Kenshi_MainPanel` with see-through plates on the screen's edges (`PlayerInterface.MeitouHud.cs`; art drawn at run
+time in `MeitouHudArt.cs`: a white rounded plate, rim and ring nine-sliced under a tint, line icons from SVG path data). Plate tint
+`rgba(18,14,11,.7)`, rim main at 16 %, radii as the tokens; layout in pixels at 1080 lines.
+
+- Top left: day, time, Pause and the speeds (brass while on), money.
+- Top centre: the region under the camera, Paused, "Fighting N vs M", and inside a building the floor and its buttons.
+- Top right: the outpost on one line (power, battery, research, open to public); its button opens the original town panel under it.
+  Under that the alerts: messages (`Notice`) and a player character knocked out or killed or the squad pulled into a fight; a click
+  centres on the character and dismisses it.
+- Bottom left: the character card (portrait, name, faction or bounty, health word; Overview: body outline coloured per part, blood,
+  hunger, load, state and goal, the hurt parts, six skills; Skills; Jobs, rows drag to reorder); minimise / maximise in its corner
+  (`HudCardMinimised`, kept in the settings). A selected building shows its own card (status, condition rows, its lines and buttons).
+- Bottom centre: the orders in groups (stance, engage, move, duties) with their keys, over the squad tabs and portraits (number,
+  hungry and first-aid marks, knockout time, health strip; up to two rows, then the wheel scrolls); shrinks to the room left.
+- Bottom right: Bag, Stats, Map, Faction, Tech, Craft, Squads, Build.
+- At the pointer: another faction's character's name, faction, health and what a right click does.
+- Build mode hides the HUD, as the original's bar.
+

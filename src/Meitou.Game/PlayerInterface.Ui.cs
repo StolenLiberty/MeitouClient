@@ -217,8 +217,10 @@ sealed partial class PlayerInterface
         var b = BindUi();
         faithfulScreens.FocusRing = UiMode == UiMode.Meitou;
         bool hud =!TitleOpen && !EditorOpen && !conversationShown;   // the conversation panel covers the HUD bar (engine reading of its layout)
-        SyncTownPanel(hud);
-        var controls = hud ? MyGuiPresentation.Arrange(faithfulHud, Width, Height, b, uiResources.Layers).ToList() : [];
+        // The Meitou mode draws its own HUD (PlayerInterface.MeitouHud.cs); the outpost's full panel only when its line is opened.
+        bool meitouHud = hud && UiMode == UiMode.Meitou;
+        SyncTownPanel(hud && (!meitouHud || outpostOpen));
+        var controls = hud && !meitouHud ? MyGuiPresentation.Arrange(faithfulHud, Width, Height, b, uiResources.Layers).ToList() : [];
         UiRect FaithfulSlot(string name) => controls.FirstOrDefault(c => c.Name == name)?.Bounds ?? default;
         var slots = new Dictionary<string, UiRect>
         {
@@ -229,11 +231,16 @@ sealed partial class PlayerInterface
         };
         if (hud) controls.AddRange(uiHost.Arrange(UiMode, Width, Height, b, slots));
         squadBarRow = 0;   // no bar, no scrolling
-        if (controls.FirstOrDefault(c => c.Name == "SquadPanel") is { } squadPanel) AddSquadPortraits(controls, squadPanel.Bounds);
-        AddHudText(controls);
-        AddJobRemoveButtons(controls);
+        if (meitouHud) AddMeitouHud(controls);
+        else
+        {
+            if (controls.FirstOrDefault(c => c.Name == "SquadPanel") is { } squadPanel) AddSquadPortraits(controls, squadPanel.Bounds);
+            AddHudText(controls);
+            AddJobRemoveButtons(controls);
+        }
         foreach (var screen in faithfulScreens.Arrange(Width, Height, BindFaithfulScreen, AddFaithfulContent))
         {
+            if (meitouHud && screen.Id == TownScreen) PlaceTownScreen(screen);
             if (screen.Id == "editor") controls.AddRange(EditorBackdrop());
             controls.AddRange(screen.Controls.Where(c => UiMode == UiMode.Faithful ||
                 !c.Properties.TryGetValue("ImageResource", out var resource) || resource != "Kenshi_TitleScreen"));
@@ -248,7 +255,7 @@ sealed partial class PlayerInterface
                     new Dictionary<string, string> { ["FontName"] = "Meitou_TitleFont", ["TextAlign"] = "Right VCenter" },
                     Vector4.Zero, new Vector4(0.89f, 0.84f, 0.71f, 1), TextScale: Height / 720f));
         }
-        AddNotice(controls);
+        if (!meitouHud) AddNotice(controls);
         AddInventoryDrag(controls);
         var nameTags = new List<UiControl>();   // the tags are on the original's Back layer: under every panel
         AddItemLabels(nameTags);
@@ -274,6 +281,7 @@ sealed partial class PlayerInterface
         if (JobDragStart(controls, p)) return true;
         if (MyGuiPresentation.HitTest(controls, p.X, p.Y) is not { } c) return false;
         if (SquadTabClick(c)) return true;
+        if (c.Action.StartsWith("hud:", StringComparison.Ordinal)) { MeitouHudAction(c.Action[4..], c.Argument); return true; }
         if (c.Action.StartsWith("faithful:", StringComparison.Ordinal))
         {
             // A second click on the open tab's button closes the overview.

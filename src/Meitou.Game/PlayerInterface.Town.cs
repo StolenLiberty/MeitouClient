@@ -34,13 +34,7 @@ sealed partial class PlayerInterface
     /// </summary>
     void SyncTownPanel(bool hud)
     {
-        var outposts = session.CurrentSnapshot.Outposts;
-        var pivot = session.Camera.Current.Target;
-        static bool Within(OutpostSnapshot t, Vector3 p) => (t.Position.X - p.X) * (t.Position.X - p.X) + (t.Position.Z - p.Z) * (t.Position.Z - p.Z) <= t.Radius * t.Radius;
-        var town = outposts.FirstOrDefault(t => t.Number == shownTown) is { } kept && Within(kept, pivot) ? kept
-            : outposts.Where(t => t.Owner == session.World.Player.Faction)
-                .MinBy(t => (t.Position.X - pivot.X) * (t.Position.X - pivot.X) + (t.Position.Z - pivot.Z) * (t.Position.Z - pivot.Z)) is { } nearest && Within(nearest, pivot) ? nearest : null;
-        if (!hud) town = null;
+        var town = hud ? PickTown() : null;
         shownTown = town?.Number ?? 0;
         if (town is null) { if (faithfulScreens.IsOpen(TownScreen)) faithfulScreens.Close(TownScreen); return; }
         if (!faithfulScreens.IsOpen(TownScreen)) faithfulScreens.Open(TownScreen);
@@ -71,6 +65,17 @@ sealed partial class PlayerInterface
 
     /// <summary>A bar's position as the panel sets it: whole percent of its range of 100.</summary>
     static float Percent(float fraction) => MathF.Round(fraction * 100) / 100;
+
+    /// <summary>The outpost the panel is for: the one shown while the camera pivot is still within its radius, else the nearest of the player's faction with the pivot within its radius.</summary>
+    OutpostSnapshot? PickTown()
+    {
+        var outposts = session.CurrentSnapshot.Outposts;
+        var pivot = session.Camera.Current.Target;
+        static bool Within(OutpostSnapshot t, Vector3 p) => (t.Position.X - p.X) * (t.Position.X - p.X) + (t.Position.Z - p.Z) * (t.Position.Z - p.Z) <= t.Radius * t.Radius;
+        return outposts.FirstOrDefault(t => t.Number == shownTown) is { } kept && Within(kept, pivot) ? kept
+            : outposts.Where(t => t.Owner == session.World.Player.Faction)
+                .MinBy(t => (t.Position.X - pivot.X) * (t.Position.X - pivot.X) + (t.Position.Z - pivot.Z) * (t.Position.Z - pivot.Z)) is { } nearest && Within(nearest, pivot) ? nearest : null;
+    }
 
     /// <summary>A text change in the name box is kept as the draft; the tick flips Open to public (<c>FUN_140721e50</c>, with <c>General_Click</c>).</summary>
     void TownAction(MyGuiEvent e)

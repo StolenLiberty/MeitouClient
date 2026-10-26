@@ -754,6 +754,7 @@ sealed partial class GameHost
             }
             config.Bindings = session.Bindings.ToDictionary();
             config.UiMode = player.UiMode;
+            config.HudCardMinimised = player.HudCardMinimised;
             config.Save();
         }
 

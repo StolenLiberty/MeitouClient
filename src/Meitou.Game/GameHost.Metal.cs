@@ -466,6 +466,8 @@ sealed partial class GameHost
             // The picks the interface asks the host for: the drawn character meshes, the buildings' floors and their closed shells.
             hud.MeshHit = (id, origin, direction) => characters?.RayHit(DrawKey(id), origin, direction);
             hud.Floor = (() => viewedFloor, StepFloor);
+            hud.InsideBuilding = () => viewed.Count > 0;
+            hud.HudCardMinimised = config.HudCardMinimised;
             hud.BuildingMoveHit = (origin, direction, distance) => objects?.MoveHit(origin, direction, viewedFloor, distance);
             hud.SurfaceMoveHit = SurfaceMoveHit;
             hud.ClosedBuildingHit = (origin, direction, distance) => objects?.ClosedBuildingHit(origin, direction, distance);
@@ -1527,7 +1529,7 @@ sealed partial class GameHost
             config.FullScreen = BorderlessFullScreen.IsOn(window);
             config.MetalUpscaler = mode;
             config.MetalRenderScale = ctx.RenderScale;
-            if (hud is not null) config.UiMode = hud.UiMode;
+            if (hud is not null) { config.UiMode = hud.UiMode; config.HudCardMinimised = hud.HudCardMinimised; }
             config.Bindings = session.Bindings.ToDictionary();
             if (settingsValues is not null)
             {

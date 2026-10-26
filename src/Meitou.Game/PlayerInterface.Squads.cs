@@ -55,8 +55,15 @@ sealed partial class PlayerInterface
     {
         const string prefix = "mygui:tab:SquadPanel:";
         if (!c.Action.StartsWith(prefix, StringComparison.Ordinal) || !int.TryParse(c.Action.AsSpan(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out int i)) return false;
+        PickSquadTab(i);
+        return true;
+    }
+
+    /// <summary>Squad tab <paramref name="i"/> pressed: the squad bar shows that squad; a second press within the double-click time selects the whole squad (Meitou).</summary>
+    void PickSquadTab(int i)
+    {
         var tabs = SquadTabSquads();
-        if (i < tabs.Count)
+        if (i >= 0 && i < tabs.Count)
         {
             Say(new ActiveSquadCommand(tabs[i].Id) { Tick = session.World.Tick });
             // Meitou: a double click on a tab selects the whole squad.
@@ -69,7 +76,6 @@ sealed partial class PlayerInterface
             }
             else (lastTabClick, lastTabClickAt) = (tabs[i].Id, now);
         }
-        return true;
     }
 
     int lastTabClick = -1;
