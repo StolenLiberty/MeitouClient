@@ -1168,9 +1168,8 @@ crafting benches, generators and batteries. Facts: [production](game/buildings-p
     pick, whatever the job's target ([buildings](#buildings)); its tasks are *Build*, *DeliverMaterials* and *FetchMaterials*. Blocked with no site.
   - Implicit jobs (`ImplicitPick`): with no list job to run, the switch on and not a slave, the squad AI options (`PlayerState.SquadAi`, the
     overview's AI tab, on by default) start, in this order: Ditch items (242: carried items some player machine makes go to the nearest
-    storage within `HaulRange` that takes them, as a Haul trip; only with no queued orders), Sleep when injured (153: a body part below full
-    health lies in the bed the bed search finds, a `BedSystem` trip (task Sleep, the bed id in `OperateSite`), until healed; Meitou: only for a squad with autonomy on and its "Rest until healed" box, never with autonomy off; job lists are then looked at
-    even with no machine), Sit when idle (275: the nearest free player chair or
+    storage within `HaulRange` that takes them, as a Haul trip; only with no queued orders), Sleep when injured (153; Meitou does not run it: nobody
+    goes to bed for wounds on their own, a squad job's rest rule does it, [squad jobs](#squad-jobs)), Sit when idle (275: the nearest free player chair or
     throne within `SeatRange` 600). The one running is kept while it holds; any list job preempts it. Distances are from the character, or its
     squad leader while it follows, so it gets up when the leader walks off. Sitters are put on the seat's origin facing its way;
     the medic job counts them as idle.
@@ -1399,71 +1398,49 @@ no enemy is near (list A `isNoEnemiesInVicinity`, [combat.md](game/combat.md#tur
 (the relations) is within `AiSystem.EnemyVicinity` 1000 (engine choice: the original's radius is Unknown), so guards man the turrets only
 while enemies come. A guard at its turret fires it ([Ranged](#ranged)).
 
-## Squad autonomy
+## Squad jobs
 
-Meitou's version of the RE_Kenshi plugin Squad Autonomy (Workshop 3800729618, GPLv3 source by Au2942; its AI packages come from its `SquadAutonomy.mod`, which must be in the mod list).
-`Autonomy/SquadAutonomy.cs` holds a player squad's `AutonomySettings` (`Squad.Autonomy`; the plugin's fields and defaults), set whole by `SetSquadAutonomy` (also while paused) and saved
-on the squad's platoon as the Meitou-only string `meitou autonomy` (JSON; the plugin wrote `SquadAutonomy.save` beside the save).
-- Meitou: the switch on with no packages is the squad's manager's (`AutonomySettings.ManagerRuns`, [managers](#managers)); on with packages (the window's Advanced page,
-  `AiRuns`) the AI runs it as below; off is plain Kenshi.
-- With packages, `AiSystem` runs the squad like an NPC squad from the listed packages (slot = the plugin's priority); a settings change releases the squad and takes it up again (the
-  plugin's ResetAI / SetAI). A member is the AI's while it has no order (`AiSystem.PlayerHeld`: idle, or still on the task the AI last gave it); a player order wins until the
-  character is idle again.
-- The plugin's scoring hooks are `AiSystem.AutonomyDesire` (rest time from the work hours: no guarding, gate, labour or turrets; staying home and sitting x0.0001 in work time;
-  turrets only with Man Turrets; no following a sleeping or relaxing leader; beds by Rest Until Healed and Allow Sleep) and the stance rule (Attack Enemies, Protect Allies).
-  Medic and rescue goals of the packages run the first aid and rescue jobs (Do Medic, Rescue Downed Allies). Wandering does not start while a member sleeps, is down or is not healed.
-- In a player town the AI's town lookups (placed towns only) are replaced: posts at the place (a wall gate's leaf, 15 out or inside with Stay Inside Gate), beds of the place,
-  then of the outpost, then of the placed town it is in (others' beds with Use Paid Beds; no rent is charged), patrols between the outpost's buildings, labour as an operator
-  (`ProductionSystem.AutonomyLabour`: priority by the machine's `stat used`, automatic machines through their hauling job, the operating job's blocked test), turrets as a gunner;
-  Close Gate shuts the gate while a guard mans it and opens it for the player's people passing.
-- Engine choices: how healed a character is (the plugin's `restedState`) is hit points over maximum summed over the parts; a player building has no nodes, so posts stand round it.
-  Not built: the plugin's shopping change, its equipped-item locks and its gate guards' door repair.
-- UI: the HUD's AUT button (the plugin's default place, 0.69 x 0.788 of the screen) opens `CheatMenu.Autonomy.cs` for the squad on the squad bar. Meitou's pages: Squad (work roles,
-  presets of the labour and building priorities and turrets that turn the manager on and clear the packages; the manager, the squad leader by default; when attacked; what each
-  member is doing; the manager's log), Priorities (labour and building bars, Build and repair, Man turrets), Buildings (the assigned list: up, down, remove, add the selected one, clear, and a world-pick banner where each click on one of the player's buildings adds or removes it), Schedule (places, work hours, health thresholds), Advanced (the plugin's
-  roles and packages, its combat and guard options). No button on the squads screen (the window picks the squad). The window opens at the top of the screen, centred, 86 % opaque, and is moved by dragging its title strip (kept until the game closes); the header shows the work hours.
-
-## Managers
-
-Meitou-only, engine choices throughout (`Management/Managers.cs`, the Squad Autonomy window's Squad page). A player squad with autonomy on and no packages is run by its manager: the
-one its `ManagementSettings` name (any player character; saved as platoon string `meitou management` with his squad's `Index` and his name, resolved on the first check), else its
-leader; the settings also hold a `DefenceMode`, Build and repair and the building priorities. Work hours, job priorities, Man turrets and the rest thresholds are the squad's
-`AutonomySettings`. Each new decision goes to the squad's log (`ManagerSystem.LogOf`, the last 8, `SquadView.ManagerLog`). Every 2 s (`ManagerSystem.SlowWorld`), with the
-manager up, free and inside one of the player's outposts (`PlayerTown` radius), each member in that outpost:
-- a fight first (`Management/Defence.cs`). Each check finds the outpost's attackers (awake, not the player's, fighting one of the player's characters, within the radius plus
-  `DefendReach` 500) and hostiles (of a faction hostile to the player's, inside the radius, attacking nobody). One already fighting keeps at it; a slave shelters. By the squad's
-  `DefenceMode`: StandGround (the default, every work role) fights only an attacker within `LocalReach` (150) of it or fighting it, else keeps working; Soldiers (the Soldiers role,
-  the quick reaction force) go after the nearest attacker anywhere, else the nearest hostile; Militia: the men as soldiers against attackers only, the women (`CharacterAppearance.Female`)
-  shelter; Shelter: while there are attackers, everyone walks into the nearest complete outpost building with a door and stays. One in bed gets up to fight. Afterwards they work again.
-  **Observed** in a temporary probe (a hostile standing in the outpost: workers kept on, soldiers went for it; it attacking one worker: that one fought, a worker 400 off kept on,
-  the soldiers came);
-- in bed: got up (`GetOutOrder`) in work hours once healed; one he sent to work goes to bed at the end of the shift or below the rest threshold (`UseBedOrder`, a free outpost bed);
-- a free one (idle, out of combat, not in a formation, a Loot All or a follow): hurt or off shift, to bed; else the best machine (`ProductionSystem.AutonomyLabour`/`AutonomyBegin`), else a
-  free turret with Man turrets; a site to build or repair (`BuildOrder`) goes before the machine when its group's priority (`ManagementSettings.BuildPriority`, the Building page; groups
-by BUILDING `building category`, a bed is Housing: `BuildGroup`) is above the machine's job priority, else after the turret; sites by priority then distance, at most `BuildersPerSite` (3)
-builders on one; else "idle: nothing to do". A site waiting for a material the member cannot get (none carried, in storage, on the ground or in a machine's output in range: `ConstructionSystem.Missing`) is skipped and noted once in the log ("! X needs Y: none in storage or on the ground"). With no free outpost bed, one off shift or hurt stays where he is ("off shift, no free bed" / "hurt, no free bed"). A labour or building priority of 0 is never done (the Engineers role zeroes every labour group, so engineers only build); a turret
-is never labour, only Man turrets. A member sitting on a chair (the implicit sit job) counts as free. The members' own job lists do not run while the manager runs the squad
-(`ProductionSystem.PickJobs`; direct orders still do). A building a member came back
-  from within 10 s is not given to it again for 120 s (no materials, unreachable), unless the player gave it an order since it was sent (`ActivityTrace.LastPlayerOrder`).
-Making room (`ProductionSystem.MakeRoom`): a worker with no room for what its job carries (a builder's material, an operator's output, a hauler's load, any 1 x 1 for a cramped
-member) puts aside, biggest first, everything but what it wears, food, first aid, splint and robot kits, containers, locked items and the job's item: into the storage it stands at when
-that takes it, else on the ground ("Making room."). Only with nothing to put aside does it stop and say "My inventory is full." (at most every 30 s, `CharacterCold.FullBarkTick`).
-**Observed** in a temporary probe (an engineer with a full grid put one item down, took the planks and built).
-Assigned buildings (`ManagementSettings.Buildings`, site ids, top first; the window's Buildings page, picked in the world): with any, the squad builds, works and mans only those, in list
-order, instead of the priorities. Every 20 s (`ManagerSystem.Chain`) a worker who has been at a lower one for 30 s or more is moved to the highest listed complete one he can work
-(`ProductionSystem.AutonomyCanWork`: operable, not blocked), so a stone crew listing processor above mines moves a miner to the processor when stone is in storage and back when it runs dry. A listed
-building that cannot run (`AutonomyStuck`: no power, out of an input, full with no storage) is noted once in the log with "!".
-Material crews (`ManagementSettings.Material`, a world resource: 1 iron, 2 stone, 3 copper; saved as `M`): set by the Stone / Iron / Copper crew roles, or by an operate order
-(a click on a machine) given to members of a manager-run squad when the machine is in a material's chain; those members drop what they were doing and the operation starts (no direct
-order). The chain (`ProductionSystem.InChain`, from the data): the material's mines and natural rocks (`world resource mining`), then every Labouring refinery whose input is a chain item,
-repeated (stone: Raw Stone -> processors -> Building Material; iron: Raw Iron -> iron refineries -> Iron Plates -> steel refineries; copper: the mines only). Every 2 s the manager splits
-the members in the outpost (`PlanCrew`): with 4 or more he only runs them; haulers 1 per 5 workers (from 3; none below, then they carry their own), processor workers a third of the rest
-(at least 1 with a processor), miners the rest up to the mines' places, leftovers to the processors then hauling; a member keeps his job while the counts hold. Miners and processor
-workers stay at their machine (`CharacterCold.StationUntil` skips their own carrying while the crew has haulers). A hauler (`CrewHaul`, task Haul with `HaulFetch` naming the item)
-takes, in order: what he carries to a processor input with room (a worked one first, then the emptiest), else a storage; a processor's full output to storage; a processor input below half from a mine's output, else a
-storage; a mine's full output; any output a quarter full; a source another hauler is making for is skipped. Every chain machine in the outpost's radius counts (miners spread over the mines by free places), or with assigned buildings only those. **Observed** in a temporary
-probe (a 5-man squad, one stone mine, processor and box: manager, 2 miners, 1 processor worker, 1 hauler; building materials reach the box).
-The window lists each member's status (`SquadView.Managed`).
+Meitou-only, engine choices throughout (`Jobs/`). It replaces Meitou's earlier port of the Squad Autonomy plugin and its managers; `SquadAutonomy.mod` is not used.
+A player squad has at most one `SquadWork` (`Squad.Work`; null: plain Kenshi): a `SquadJob`, a `Shift`, a `Stance` and optionally a list of buildings (site ids; empty: the whole
+outpost). Set whole by `SetSquadWork` (also while paused); saved as the platoon string `meitou job` (JSON). Older saves' `meitou autonomy` / `meitou management` strings are dropped
+on the next save, so those squads load as Off. No manager: each member works whenever it stands inside one of the player's outposts (`PlayerTown` radius) and does nothing extra elsewhere.
+- Jobs (`JobInfo.All`, their machines by BUILDING_FUNCTIONALITY `stat used`): Builders (build and repair sites), Workers (any operable machine, and automatic producers), Stone / Iron /
+  Copper crew, Farmers (Farming), Cooks (Cooking), Crafters (weapon, armour and bow smithing, robotics, engineering), Researchers (Science), Medics (Medic benches; also heal and
+  rescue, below), Haulers, Soldiers (turrets when calm).
+- Shifts: Day 06:00 to 20:00, Night 20:00 to 06:00, All day (`SquadWork.OnShift`).
+- Every 2 s (`WorkSystem.SlowWorld`) each member gets the first decision that applies: down, imprisoned or away from an outpost: nothing; fighting, or busy on the player's own
+  order (any order since the work system last sent it, `ActivityTrace.LastPlayerOrder`), a formation, a Loot All or a follow: left alone; a fight at the outpost, by stance; rest; room in
+  its inventory; its job, else an idle reason. When the player's order ends (idle) it goes back to the job. **Observed** in a temporary probe (a builder moved 600 away by the player
+  showed "walking (your order)", then finished the site).
+- Rest: off shift, or at night when hurt (below 60 % of the body's hit points, `WorkRules.Rested`; robots never), to a free bed of the outpost (`UseBedOrder`); in bed until on shift
+  and, at night, 95 %. On shift in the day it gets out of bed whatever its wounds. No free bed: it stays put ("no free bed"). **Observed** in a temporary probe (day shift at 22:00
+  did not build; night shift at 22:00 and All day at 03:00 finished the site).
+- Stances (`WorkSystem.Defence.cs`): the outpost's attackers (awake, not the player's, fighting one of the player's characters, within the radius plus 500) and hostiles (of a
+  faction hostile to the player's, inside the radius). Stand ground (every work job): fights only an attacker within 150 or fighting it, else keeps working. Soldiers (the Soldiers
+  job; the quick reaction force): the nearest attacker anywhere, else the nearest hostile. Militia: the men as soldiers against attackers only, the women (`CharacterAppearance.Female`)
+  shelter. Shelter: while there are attackers, everyone goes into the nearest complete outpost building with a door. A slave always shelters. **Observed** in a temporary probe (a
+  hostile 300 from two builders: they kept on, a Soldiers member 400 off went for it).
+- Room (`ProductionSystem.MakeRoom`): a member with no room for what its job carries puts aside, biggest first, all but what it wears, food, first aid, splints, robot kits,
+  containers, locked items and the job's item: into the storage it stands at when that takes it, else on the ground. **Observed** in a temporary probe (a builder with a full grid put
+  one item down, fetched Building Materials from the ground and finished the site).
+- Builders: the nearest unpaused unfinished (or destroyed) site of the outpost or the list, at most `BuildersPerSite` (3) on one (`BuildOrder`). A site waiting for a material nobody
+  can get (`ConstructionSystem.Missing`) is skipped and logged once ("! X needs Y").
+- Machine jobs: the job's machine of the outpost (or the list) with work, as the operating job tests it (`ProductionSystem.WorkMachine`: a free place, power, inputs it can fill,
+  room for the output); the one it runs first, then the fewest operators, then the nearest. Soldiers: the nearest free turret.
+- Crews (`WorkSystem.Crew.cs`; the chain from the data, `ProductionSystem.InChain`: the material's mines and natural rocks, then every Labouring refinery whose input is a chain
+  item, repeated): every chain machine of the outpost (or the list) counts. Split each check (`PlanCrew`): haulers 1 per 5 from 3 workers (none below), processor hands a third of the
+  rest (at least 1 with a processor), miners the rest up to the mines' places, leftovers to processors then hauling; a member keeps its role while the counts hold. Miners and
+  processor hands stay at their machine while the crew has haulers (`CharacterCold.StationUntil`). Haulers (`ProductionSystem.CrewHaul`): what they carry to a processor input with
+  room, else storage; a processor's full output to storage; a processor input below half from a mine's output or storage; a mine's full output; any output a quarter full. The
+  Haulers job hauls the same way for every producer and processor of the outpost (`HaulMachines`). An operate order (a click on a chain machine) given to members of a squad with a
+  job makes it that material's crew. **Observed** in a temporary probe (5 on a stone crew with two stone mines, a processor and an iron mine: 3 miners over both stone mines, 1 on the
+  processor, 1 hauler; nobody on the iron mine).
+- Medics: idle or on a machine, they treat the wounded (`FirstAidSystem`); idle Medics and Soldiers carry the downed to bed (`CarrySystem`).
+- While a squad has a job, its members' own job lists and implicit jobs do not run (`ProductionSystem.PickJobs`, `ImplicitPick`).
+- Each member's status (`WorkSystem.StatusOf`, `SquadView.Doing`) and the squad's last 10 decisions (`LogOf`, `SquadView.Log`).
+- UI (`CheatMenu.Jobs.cs`): the HUD's AUT button (0.69 x 0.788 of the screen, lit while the squad on the squad bar has a job) opens one page: the squad dropdown, a card per job
+  (Off first), shift and stance buttons, the building list (pick in the world: each click on one of the player's buildings adds or removes it; or the whole outpost), what each member
+  is doing (problems in red), the log, and "Same job for another squad". At the top of the screen, 86 % opaque, moved by dragging its title strip.
 
 ## Activity trace
 
@@ -1476,11 +1453,11 @@ reaching one of them is written with who gave it (a system that deferred it, or 
 
 Meitou-only, engine choices throughout (`Slavery/SlaverySystem.cs`); the original lets slavers enslave the player but gives the player no way to take slaves. A captive of the player's
 (`SlaverySystem.IsCaptive`: not the player's, awake, in a cage the player's faction owns, which includes a mod's crucifix whose functionality is the cage function 8, or in locked
-shackles) gets the context verb "Join me or die" with its chance: 35 %, plus up to 45 % the more hurt it is (`AutonomyRules.Rested`), 20 % when starving (hunger below 40 %), 10 % in
+shackles) gets the context verb "Join me or die" with its chance: 35 %, plus up to 45 % the more hurt it is (`WorkRules.Rested`), 20 % when starving (hunger below 40 %), 10 % in
 shackles, at most 95 % (roll `RngPurpose.Enslave`, keyed by the captive and the tick). The first selected non-slave walks within 60 (twice that once its walk ends at the bars) and says it.
 Giving in: out of the cage (`FixtureRegistry.Release`), into the player's squad "Slaves" (a new one when none has room; `DialogueSystem.JoinSquad`, as recruits join) with slave state 1
-owned by the player's faction (saved by `SlaveSave`), renamed "Slave", shackles kept on; refusing: "Never!" / "I'd rather die." and not asked again for a game hour (not saved). A slave of a managed
-squad shelters when the outpost is attacked. Not built: slaves escaping, any relation or crime cost. **Observed** in a temporary probe (a caged captive at 55 % joined the Slaves squad).
+owned by the player's faction (saved by `SlaveSave`), renamed "Slave", shackles kept on; refusing: "Never!" / "I'd rather die." and not asked again for a game hour (not saved). A slave of a squad with a
+job shelters when the outpost is attacked. Not built: slaves escaping, any relation or crime cost. **Observed** in a temporary probe (a caged captive at 55 % joined the Slaves squad).
 
 ## New-game difficulty
 

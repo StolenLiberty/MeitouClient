@@ -1,22 +1,9 @@
 using System.Numerics;
 
-namespace Meitou.Simulation.Management;
-
-/// <summary>What a managed squad does about fights at its outpost (docs/simulation.md "Managers", defence).</summary>
-public enum DefenceMode : byte
-{
-    /// <summary>The quick reaction force: answers any attack on the player's people at the outpost and goes after hostiles inside it.</summary>
-    Soldiers = 0,
-    /// <summary>The men answer any attack on the player's people at the outpost (no going after hostiles); the women go inside a building until it is over.</summary>
-    Militia = 1,
-    /// <summary>Everyone goes inside a building while the player's people are being attacked.</summary>
-    Shelter = 2,
-    /// <summary>Workers: each fights only a threat at hand (one attacking it, or attacking anyone within <see cref="ManagerSystem.LocalReach"/> of it) and otherwise keeps working.</summary>
-    StandGround = 3,
-}
+namespace Meitou.Simulation.Jobs;
 
 /// <summary>
-/// The fights at one outpost this check: <see cref="Attackers"/> fight one of the player's characters (within the outpost's radius plus <see cref="ManagerSystem.DefendReach"/>);
+/// The fights at one outpost this check: <see cref="Attackers"/> fight one of the player's characters (within the outpost's radius plus <see cref="WorkSystem.DefendReach"/>);
 /// <see cref="Hostiles"/> are awake characters of a faction hostile to the player's inside the outpost who attack nobody (only soldiers go after them).
 /// </summary>
 internal sealed record OutpostThreats(List<int> Attackers, List<int> Hostiles)
@@ -24,7 +11,7 @@ internal sealed record OutpostThreats(List<int> Attackers, List<int> Hostiles)
     public bool Any => Attackers.Count > 0 || Hostiles.Count > 0;
 }
 
-public sealed partial class ManagerSystem
+public sealed partial class WorkSystem
 {
     /// <summary>How far outside the outpost's radius a fight with the player's people still calls the squads out (engine choice).</summary>
     public const float DefendReach = 500;
@@ -58,25 +45,20 @@ public sealed partial class ManagerSystem
 
     /// <summary>
     /// A member's part in a fight at the outpost, before any work: true when it took this pass (fighting, getting out of bed to fight, sheltering), false to go on with its work.
-    /// A slave always shelters; a member already fighting keeps at it.
+    /// A slave always shelters.
     /// </summary>
-    bool Defend(World world, ManagementSettings m, int slot, CharacterId id, CharacterCold c, CharacterTask task, OutpostThreats threats, Construction.PlayerTown town)
+    bool Defend(World world, SquadWork work, int slot, CharacterId id, CharacterCold c, CharacterTask task, OutpostThreats threats, Construction.PlayerTown town)
     {
         var table = world.Characters;
         var at = table.Next[slot].Position;
-        if (c.InCombat || task == CharacterTask.Attack)
-        {
-            status[id] = "fighting";
-            return true;
-        }
         bool attacked = threats.Attackers.Count > 0;
-        var mode = c.SlaveState == 1 ? DefenceMode.Shelter : m.Defence;
-        if (mode == DefenceMode.Militia && c.Appearance?.Female == true) mode = DefenceMode.Shelter;
+        var mode = c.SlaveState == 1 ? Stance.Shelter : work.Stance;
+        if (mode == Stance.Militia && c.Appearance?.Female == true) mode = Stance.Shelter;
         int? foe = mode switch
         {
-            DefenceMode.Soldiers => Nearest(table, at, threats.Attackers) ?? Nearest(table, at, threats.Hostiles),
-            DefenceMode.Militia => Nearest(table, at, threats.Attackers),
-            DefenceMode.StandGround => threats.Attackers.Where(a => Close(table, at, a) || Targets(world, a, slot)).Select(a => (int?)a).FirstOrDefault(),
+            Stance.Soldiers => Nearest(table, at, threats.Attackers) ?? Nearest(table, at, threats.Hostiles),
+            Stance.Militia => Nearest(table, at, threats.Attackers),
+            Stance.StandGround => threats.Attackers.Where(a => Close(table, at, a) || Targets(world, a, slot)).Select(a => (int?)a).FirstOrDefault(),
             _ => null,
         };
         if (foe is { } f)
@@ -85,24 +67,24 @@ public sealed partial class ManagerSystem
             if (c.InSomething == Locks.HeldState.Bed)
             {
                 world.Defer(new Locks.GetOutOrder([id]) { Tick = world.Tick + 1 });
-                Log(world, c, "out of bed to fight");
+                Log(world, $"{c.Name} out of bed to fight");
             }
             else
             {
                 // An attacker is fought back (defence); a soldier going after a hostile who attacks nobody starts it.
                 world.Defer(new Combat.AttackOrder([id], table.IdOf(f)) { Tick = world.Tick + 1, Defensive = threats.Attackers.Contains(f) });
-                Log(world, c, "to fight " + (table.Cold(f)?.Name ?? "an enemy"));
+                Log(world, $"{c.Name} to fight {table.Cold(f)?.Name ?? "an enemy"}");
             }
             status[id] = "defending";
             return true;
         }
-        if (mode == DefenceMode.Shelter && attacked)
+        if (mode == Stance.Shelter && attacked)
         {
             status[id] = "sheltering";
             if (sheltering.Add(id) && Shelter(world, town, at) is { } spot)
             {
                 world.Defer(new MoveOrder([id], spot) { Tick = world.Tick + 1 });
-                Log(world, c, "inside to shelter");
+                Log(world, $"{c.Name} inside to shelter");
             }
             return true;
         }
@@ -116,6 +98,21 @@ public sealed partial class ManagerSystem
     /// <summary>Whether the attacker in slot <paramref name="a"/> is fighting the character in slot <paramref name="slot"/>.</summary>
     static bool Targets(World world, int a, int slot) =>
         world.SystemOf<Combat.CombatSystem>() is { } combat && combat.StateOf(world.Characters.IdOf(a)).TargetSlot == slot;
+
+    /// <summary>The nearest complete building of the outpost with a door (one has an inside), its centre; null without one.</summary>
+    static Vector3? Shelter(World world, Construction.PlayerTown town, Vector3 at)
+    {
+        var doors = new HashSet<string>(world.Fixtures.All.Where(f => f.Kind == Locks.FixtureKind.Door).Select(f => f.Building), StringComparer.Ordinal);
+        Vector3? best = null;
+        float bestD = float.MaxValue;
+        foreach (var site in world.Buildings.All)
+        {
+            if (!site.Complete || site.Destroyed || site.Town != town.Number || site.Parent is not null || !doors.Contains(site.Id)) continue;
+            float d = Vector3.DistanceSquared(at, site.Position);
+            if (d < bestD) (best, bestD) = (site.Position, d);
+        }
+        return best;
+    }
 
     static int? Nearest(CharacterTable table, Vector3 at, List<int> slots)
     {

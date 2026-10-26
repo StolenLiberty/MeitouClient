@@ -2,7 +2,7 @@ using Meitou.Simulation.Items;
 
 namespace Meitou.Simulation.Production;
 
-// Making room for the job (Meitou, engine choices; docs/simulation.md "Managers"): a worker whose inventory has no room for what its job carries (building materials, a machine's output,
+// Making room for the job (Meitou, engine choices; docs/simulation.md "Squad jobs"): a worker whose inventory has no room for what its job carries (building materials, a machine's output,
 // a hauler's load) puts what it does not need where it stands (into the storage it is at when that takes it, else on the ground) until the job's item fits. Kept: what is worn, food,
 // first aid, splint and robot repair kits, containers, locked items, and the job's own item.
 public sealed partial class ProductionSystem

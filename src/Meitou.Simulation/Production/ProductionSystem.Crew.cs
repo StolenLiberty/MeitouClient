@@ -8,8 +8,8 @@ namespace Meitou.Simulation.Production;
 /// <summary>A haul a crew's hauler makes (Meitou): pick up <see cref="Item"/> at <see cref="From"/> (a machine's output, a storage; the same as <see cref="To"/>: what it carries), take it to <see cref="To"/>.</summary>
 internal readonly record struct CrewTrip(string From, string To, string Item);
 
-// A material crew (docs/simulation.md "Managers", engine choices throughout): the manager keeps some members at the material's mines, some at its processors and the rest hauling between
-// them and the storages, so the station workers never leave their machine (CharacterCold.StationUntil stops their own hauling).
+// Crews and haulers (docs/simulation.md "Squad jobs", engine choices throughout): a material crew keeps some members at the material's mines, some at its processors and the rest hauling
+// between them and the storages, so the station workers never leave their machine (CharacterCold.StationUntil stops their own hauling); the Haulers job hauls for every machine.
 public sealed partial class ProductionSystem
 {
     /// <summary>The material whose chain a machine is in (<see cref="InChain"/>: iron, stone, copper), 0 none.</summary>
@@ -39,6 +39,23 @@ public sealed partial class ProductionSystem
         return (mines, processors);
     }
 
+    /// <summary>
+    /// What the Haulers job carries between, in the outpost (or <paramref name="only"/>): producers (mines, farms, wells: an output and no inputs) and processors (a machine with inputs
+    /// it uses and an output), by site id order.
+    /// </summary>
+    internal (List<Machine> Producers, List<Machine> Processors) HaulMachines(World world, PlayerTown town, IReadOnlyCollection<string>? only)
+    {
+        List<Machine> producers = [], processors = [];
+        foreach (var m in world.Machines.All)
+        {
+            if (m.Data.IsStorage || m.Output is null || !Workable(world, town, m) || only is { Count: > 0 } && !only.Contains(m.Site)) continue;
+            (m.Inputs.Any(i => i.Rate > 0) ? processors : producers).Add(m);
+        }
+        producers.Sort((a, b) => string.CompareOrdinal(a.Site, b.Site));
+        processors.Sort((a, b) => string.CompareOrdinal(a.Site, b.Site));
+        return (producers, processors);
+    }
+
     /// <summary>A complete machine in the outpost's radius: the player's own, or a natural rock.</summary>
     bool Workable(World world, PlayerTown town, Machine m)
     {
@@ -66,14 +83,15 @@ public sealed partial class ProductionSystem
     }
 
     /// <summary>
-    /// The next haul for a crew's hauler, or null, the end of the chain first: what it carries of the chain to a processor that takes it (else a storage); a processor's full output to
-    /// storage; a processor input below half from the chain's mines (else a storage); a mine's full output; then any output a quarter full. A source another hauler is making for is left to it.
+    /// The next haul for a hauler, or null, the end of the chain first: what it carries (of <paramref name="chain"/>; null: anything a machine makes) to a processor that takes it (else a
+    /// storage); a processor's full output to storage; a processor input below half from a producer (else a storage); a producer's full output; then any output a quarter full. A source
+    /// another hauler is making for is left to it.
     /// </summary>
-    internal CrewTrip? CrewHaul(World world, int slot, PlayerTown town, int material, List<Machine> mines, List<Machine> processors)
+    internal CrewTrip? CrewHaul(World world, int slot, PlayerTown town, HashSet<string>? chain, List<Machine> mines, List<Machine> processors)
     {
         var table = world.Characters;
         if (table.Cold(slot) is not { Inventory: { } inv }) return null;
-        var chain = ChainItems(material);
+        bool Ours(string record) => chain?.Contains(record) ?? world.Machines.All.Any(m => !m.Data.IsStorage && m.Output?.Recipe.Item == record);
         var storages = world.Machines.All.Where(s => s.Data.IsStorage && s.Storage is not null && Workable(world, town, s)).OrderBy(s => s.Site, StringComparer.Ordinal).ToList();
         string? Into(string item, int carry)
         {
@@ -91,7 +109,7 @@ public sealed partial class ProductionSystem
             return false;
         }
         // What it carries.
-        foreach (var item in inv.All().Where(i => chain.Contains(i.Record) && i.Section is "main" or "backpack_content" && !i.LockedOn).Select(i => i.Record).Distinct().ToList())
+        foreach (var item in inv.All().Where(i => i.Section is "main" or "backpack_content" && !i.LockedOn && Ours(i.Record)).Select(i => i.Record).Distinct().ToList())
             if (Into(item, 1) is { } to) return new(to, to, item);
         // The end of the chain first, so it keeps flowing: a processor's full output to storage.
         foreach (var p in processors.Where(m => m.Output is { Full: true }))
@@ -113,13 +131,10 @@ public sealed partial class ProductionSystem
         {
             string item = m.Output!.Recipe.Item;
             if (Claimed(m.Site, item)) continue;
-            if ((m.Data.Function == MachineData.RefineryFunction ? Store(item) : Into(item, m.Output.Count)) is { } to) return new(m.Site, to, item);
+            if ((processors.Contains(m) ? Store(item) : Into(item, m.Output.Count)) is { } to) return new(m.Site, to, item);
         }
         return null;
     }
-
-    /// <summary>Takes a character off its machine or haul (the manager moving him to another job).</summary>
-    internal void AutonomyStop(World world, int slot) => End(world.Characters, slot);
 
     /// <summary>Sets the hauler off on a trip (task <see cref="CharacterTask.Haul"/>, <see cref="CharacterCold.HaulFetch"/> naming the item); false when a site is gone.</summary>
     internal bool CrewHaulBegin(World world, int slot, CrewTrip trip)

@@ -89,8 +89,8 @@ public sealed partial class ProductionSystem
             if (!onJob && task is not (CharacterTask.Idle or CharacterTask.Wander or CharacterTask.Follow)) continue;
             if (!Able(cold)) continue;
             int pick = -1;
-            // Meitou: a squad its manager runs works by his priorities, not by each member's own job list (direct orders still work).
-            bool managed = cold.SquadId >= 0 && world.Squads.Find(cold.SquadId)?.Autonomy is { ManagerRuns: true };
+            // Meitou: a squad on a job works by its job (Jobs.WorkSystem), not by each member's own job list (direct orders still work).
+            bool managed = Jobs.WorkRules.OnJob(world, cold);
             for (int k = 0; k < cold.Jobs.Count && pick < 0 && !managed; k++)
                 if (Runnable(world, i, cold, k)) pick = k;
             if (pick >= 0)
@@ -123,7 +123,8 @@ public sealed partial class ProductionSystem
         var table = world.Characters;
         var cold = table.Cold(slot)!;
         var options = world.Player.SquadAi;
-        if ((cold.Orders & CharacterOrders.Jobs) == 0 || cold.SlaveState != 0 || options == SquadAi.None) return null;
+        // Meitou: a squad on a job has none of these (the work system decides its rest and its idle time).
+        if ((cold.Orders & CharacterOrders.Jobs) == 0 || cold.SlaveState != 0 || options == SquadAi.None || Jobs.WorkRules.OnJob(world, cold)) return null;
         var at = table.Next[slot].Position;
         if (idle == CharacterTask.Follow && cold.SquadId >= 0 && world.Squads.Find(cold.SquadId)?.Leader is { IsNone: false } leader && leader.Slot != slot && table.IsAlive(leader))
             at = table.Next[leader.Slot].Position;
@@ -134,15 +135,7 @@ public sealed partial class ProductionSystem
                 && NearestSite(world, at, Settings.HaulRange, (_, m) => m.Data.IsStorage && m.Storage is not null && inv.All().Any(item => Takes(world, m, item))) is { } store)
                 return (TaskType.DITCH_ALL_RESOURCES, store);
         }
-        // Meitou: resting until healed follows the squad's autonomy (off: never) and the one rule for it (AutonomyRules.MayRestHurt: at night or off shift).
-        if ((options & SquadAi.Sleep) != 0 && Injured(cold) && Beds is not null && cold.SquadId >= 0 && world.Squads.Find(cold.SquadId)?.Autonomy is { Enabled: true } squadRules
-            && Autonomy.AutonomyRules.MayRestHurt(squadRules, world.GameHours))
-        {
-            if (cold.Implicit == TaskType.GO_HOME_AND_GO_TO_BED && cold.OperateSite is { } bed && world.Fixtures.Find(bed) is { } kept
-                && Gap(kept.Position, at) <= Locks.FixtureRegistry.BedSearchRange)
-                return (TaskType.GO_HOME_AND_GO_TO_BED, bed);
-            if (Beds.FindFor(world, slot) is { } free) return (TaskType.GO_HOME_AND_GO_TO_BED, free.Id);
-        }
+        // Sleep when injured: Meitou's characters never go to bed by themselves for their wounds; a squad on a job is put to bed by the work system (docs/simulation.md "Squad jobs").
         if ((options & SquadAi.Sit) != 0)
         {
             if (cold.Implicit == TaskType.SIT_AROUND && cold.OperateSite is { } seat && Site(world, seat) is { } kept && Gap(kept.Position, at) <= SeatRange)

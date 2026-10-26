@@ -755,9 +755,9 @@ public sealed partial class CarrySystem(GameConstants constants, BodyOptions opt
         for (int i = 0; i < table.HighWater; i++)
         {
             if (!next[i].Alive || table.Cold(i) is not { } cold) continue;
-            // Squad autonomy: the rescue goals of its packages (Rescue Downed Allies) work as the rescue job, while the AI holds it.
-            if (cold.IsPlayer && cold.Ai is { } mind && Ai.AiSystem.PlayerHeld(next[i], cold, mind) && CanCarry(cold) && !cold.Fleeing
-                && Autonomy.AutonomyRules.Wants(world, table.IdOf(i), cold, Meitou.Data.Gameplay.Ai.TaskType.FIND_AND_RESCUE, Meitou.Data.Gameplay.Ai.TaskType.FIND_AND_RESCUE_IF_THERES_BEDS, Meitou.Data.Gameplay.Ai.TaskType.FIND_AND_RESCUE_LEADER))
+            // Squad jobs: an idle member of a Medics or Soldiers squad carries the downed to bed, as the rescue job does.
+            if (cold.IsPlayer && next[i].Task == (byte)CharacterTask.Idle && CanCarry(cold) && !cold.Fleeing && !cold.InCombat
+                && Jobs.WorkRules.JobOf(world, cold) is Jobs.SquadJob.Medics or Jobs.SquadJob.Soldiers)
             {
                 RescueSomeone(world, i, taken);
                 continue;

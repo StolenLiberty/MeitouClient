@@ -29,7 +29,7 @@ public sealed class SlaverySystem(PopulationData data) : ITickSystem
     /// <summary>The chance a captive gives in (0..0.95).</summary>
     public static float Chance(CharacterCold captive)
     {
-        float rested = Autonomy.AutonomyRules.Rested(captive);
+        float rested = Jobs.WorkRules.Rested(captive);
         bool starving = captive.Medical is { } m && m.Hunger < MedicalState.MaxHunger * 0.4f;
         bool shackled = Locks.LockSystem.WornShackles(captive) is not null;
         return Math.Min(0.95f, 0.35f + 0.45f * (1 - rested) + (starving ? 0.2f : 0) + (shackled ? 0.1f : 0));

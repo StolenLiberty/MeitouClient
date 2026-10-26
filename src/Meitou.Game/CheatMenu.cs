@@ -62,7 +62,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
             if (visible == value) return;
             visible = value;
             dragging = null; focused = null; openDropdown = null;
-            if (!value) { townsMode = false; autoMode = false; picking = null; assigning = null; }
+            if (!value) { townsMode = false; jobsMode = false; assigning = null; }
             if (value) { scroll = scrollTarget = 0; RefreshFields(); }
         }
     }
@@ -70,7 +70,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
     /// <summary>True while a text box has the keyboard (the host then routes every key and character here).</summary>
     public bool TakesKeyboard => visible && focused is not null;
 
-    public bool Contains(Vector2 at) => visible && (bounds.Contains(at.X, at.Y) || openDropdown is not null) || !visible && autButton.Width > 0 && autButton.Contains(at.X, at.Y);
+    public bool Contains(Vector2 at) => visible && (bounds.Contains(at.X, at.Y) || openDropdown is not null) || !visible && jobsButton.Width > 0 && jobsButton.Contains(at.X, at.Y);
 
     void Notice(string text) { notice = text; noticeAt = Environment.TickCount64; }
 
@@ -113,9 +113,9 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
 
     public bool MouseDown(Vector2 at, MouseButton button = MouseButton.Left)
     {
-        if (!visible) return button == MouseButton.Left && AutButtonDown(at);
+        if (!visible) return button == MouseButton.Left && JobsButtonDown(at);
         // Pick in world: only the banner is the window's; a click elsewhere selects the building.
-        if ((picking is not null || assigning is not null) && !bounds.Contains(at.X, at.Y)) return false;
+        if (assigning is not null && !bounds.Contains(at.X, at.Y)) return false;
         pointer = at;
         if (button != MouseButton.Left) return Contains(at);
         pointerDown = true;
@@ -137,14 +137,14 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
         pointer = at;
         if (!visible) return false;
         if (dragging is { Track: { } track }) { dragFraction = Math.Clamp((at.X - track.X) / track.Width, 0, 1); return true; }
-        if (AutDrag(at)) return true;
+        if (JobsDrag(at)) return true;
         return Contains(at);
     }
 
     public bool MouseUp()
     {
         pointerDown = false;
-        if (autGrab is not null) { autGrab = null; return true; }
+        if (jobsGrab is not null) { jobsGrab = null; return true; }
         if (dragging is not { Commit: { } commit }) { bool had = dragging is not null; dragging = null; return had; }
         dragging = null;
         commit(dragFraction);
@@ -165,8 +165,7 @@ sealed partial class CheatMenu(PlayerInterface player, Func<World> world, Func<G
         if (!visible) return false;
         if (key == Key.Escape)
         {
-            if (picking is not null) picking = null;
-            else if (assigning is not null) assigning = null;
+            if (assigning is not null) assigning = null;
             else if (openDropdown is not null) openDropdown = null;
             else if (focused is not null) focused = null;
             else Visible = false;

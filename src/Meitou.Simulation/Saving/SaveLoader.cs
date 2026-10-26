@@ -126,13 +126,9 @@ public static class SaveLoader
         // What the player's squads remembered (of the characters made so far; an NPC not made yet is not named again).
         if (context.Memory is { } memory)
             foreach (var lp in loaded.PlayerPlatoons) memory.Restore(lp.Squad.Id, MemorySave.Read(lp.Platoon.Record, context.CharacterOf));
-        // Squad autonomy, taken up by the AI on its first serial step.
+        // Squad jobs (the old squad autonomy and manager strings are not read: those squads start with no job).
         foreach (var lp in loaded.PlayerPlatoons)
-        {
-            if (lp.Platoon.Record.Strings.GetValueOrDefault(SaveCapture.AutonomyKey) is { Length: > 0 } text) lp.Squad.Autonomy = Autonomy.AutonomySettings.Read(text);
-            // Managers: the manager is found by his squad's index and name on the first check (ManagerSystem).
-            if (lp.Platoon.Record.Strings.GetValueOrDefault(SaveCapture.ManagementKey) is { Length: > 0 } managed) lp.Squad.Management = Management.ManagementSettings.Read(managed);
-        }
+            if (lp.Platoon.Record.Strings.GetValueOrDefault(SaveCapture.WorkKey) is { Length: > 0 } text && Jobs.SquadWork.Read(text) is { On: true } work) lp.Squad.Work = work;
 
         // The selection.
         var selected = new List<Hand> { camera.SelectedCharacter };

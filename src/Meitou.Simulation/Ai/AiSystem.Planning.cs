@@ -58,13 +58,6 @@ public sealed partial class AiSystem
         public bool TryPlan(AiGoal goal, float desire)
         {
             var type = goal.Task.Type;
-            if (AutonomyActs(mind, board, type))
-            {
-                // Acted out by the autonomy in a player town (AiSystem.Autonomy.cs): no plan of the base AI's.
-                mind.Plan.Clear();
-                mind.Plan.Add(new PlanStep(type, default));
-                return true;
-            }
             if (TaskDataTable.Of(type) is not { } row)
             {
                 mind.Plan.Clear();

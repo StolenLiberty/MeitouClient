@@ -139,15 +139,6 @@ public sealed class Blackboard
     /// <summary>The template's <c>public day</c>, which the original writes over <see cref="OwnHome"/>'s public flag (docs/game/locks.md "Data"): what trespassing reads.</summary>
     public bool HomePublic { get; init; } = true;
     public TownBuilding? Home { get; set; }
-    /// <summary>
-    /// Squad autonomy: the player building the squad keeps now (its home in rest time, else its work place; <see cref="Autonomy.AutonomySettings.PlaceNow"/>), the player town it acts in
-    /// (its place's, else the one it is in; 0: none), that place's gate post, and whether the town has labour and a free turret for it (looked at on the cadence).
-    /// </summary>
-    public Construction.BuildSite? AutonomySite { get; set; }
-    public int AutonomyTown { get; set; }
-    public (Vector3 Door, Vector2 Out, float HalfWidth, string Fixture)? AutonomyGate { get; set; }
-    public bool AutonomyLabour { get; set; }
-    public bool AutonomyTurret { get; set; }
     /// <summary>The table a bar package reserved for the squad: an index into <see cref="Home"/>'s <see cref="TownBuilding.Tables"/>, 0 for an outdoor table (the home itself); -1: none.</summary>
     public int BarTable { get; set; } = -1;
     /// <summary>The members it was made with: the squad size of the intact rule.</summary>
@@ -458,17 +449,6 @@ public sealed class AiMind
     /// Protect allies (most patrols) stands Aggressive and still comes to a mate's defence (<see cref="RetaliationSystem"/>).
     /// </summary>
     public bool Protects { get; set; }
-    /// <summary>
-    /// Squad autonomy (a player character the AI runs): the task, walk goal and operated site its last act-out left it with. A player order changes them, and the AI leaves the character
-    /// alone until it is idle again (<see cref="AiSystem.PlayerHeld"/>). Derived, not hashed.
-    /// </summary>
-    internal byte IssuedTask { get; set; }
-    internal System.Numerics.Vector2 IssuedGoal { get; set; }
-    internal string? IssuedSite { get; set; }
-    /// <summary>Squad autonomy: work or a turret the act-out asked the serial step to start (shared machines), else <see cref="AiBehaviour.None"/>.</summary>
-    internal AiBehaviour Request { get; set; }
-    /// <summary>Squad autonomy: the game hours it last got out of bed (the plugin's sleep need counts from <c>lastSlept</c>).</summary>
-    internal double LastSlept { get; set; } = double.NegativeInfinity;
     /// <summary>The role list and hour <see cref="Stance"/> was worked out for (a cache; the stance itself is hashed).</summary>
     internal IReadOnlyList<AiGoal>? StanceFrom { get; set; }
     internal int StanceHour { get; set; } = -1;

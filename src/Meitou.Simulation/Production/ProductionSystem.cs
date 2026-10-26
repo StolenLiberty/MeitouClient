@@ -242,13 +242,14 @@ public sealed partial class ProductionSystem : ITickSystem
                     foreach (var id in Who(world, order.Characters))
                     {
                         if (!table.TryResolveNext(id, out int slot) || table.Cold(slot) is not { IsPlayer: true } cold || !Able(cold)) continue;
-                        // Meitou: a squad its manager runs, sent to a mine or processor of a material, makes that material its operation; the manager gives out the jobs.
-                        if (material != 0 && cold.SquadId >= 0 && world.Squads.Find(cold.SquadId) is { Autonomy: { ManagerRuns: true } } crew)
+                        // Meitou: a squad on a job, sent to a mine or processor of a material, becomes that material's crew; the work system splits it.
+                        if (material != 0 && cold.SquadId >= 0 && world.Squads.Find(cold.SquadId) is { Work: { On: true } work } crew)
                         {
                             if ((started ??= []).Add(crew.Id))
                             {
-                                if (crew.Management?.Material != material) world.Post($"{crew.Name}: {MaterialName(material)} operation. The manager splits them into miners, processor workers and haulers.");
-                                crew.Management = (crew.Management ?? new Meitou.Simulation.Management.ManagementSettings()) with { Material = material };
+                                var job = material switch { ResourceField.StoneResource => Jobs.SquadJob.StoneCrew, ResourceField.IronResource => Jobs.SquadJob.IronCrew, _ => Jobs.SquadJob.CopperCrew };
+                                if (work.Job != job) world.Post($"{crew.Name}: {Jobs.JobInfo.Of(job).Name}. They split into miners, processor hands and haulers.");
+                                crew.Work = Jobs.SquadWork.For(job, work);
                             }
                             if (table.Next[slot].Task is (byte)CharacterTask.Operate or (byte)CharacterTask.Haul) End(table, slot);
                             else if (table.Next[slot].Task == (byte)CharacterTask.GoTo) MovementSystem.Stop(table, slot);

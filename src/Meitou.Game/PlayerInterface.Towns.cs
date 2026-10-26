@@ -40,7 +40,7 @@ sealed partial class PlayerInterface
 
 sealed partial class PlayerInterface
 {
-    /// <summary>The selected building's instance (a player site's id, a town building's key), or null: what Squad Autonomy's Pick in world takes.</summary>
+    /// <summary>The selected building's instance (a player site's id, a town building's key), or null: what Squad Jobs' Pick in the world takes.</summary>
     internal string? SelectedBuildingInstance => BuildingFocus()?.Instance;
 
     /// <summary>The name of a building by instance (a player site's catalogue name, else a town building's), or null when the world has no such building.</summary>

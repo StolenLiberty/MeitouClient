@@ -200,13 +200,12 @@ public sealed partial class World
 
     /// <summary>The sneaker's watchers of the last <see cref="AggroSystem.WatcherSeconds"/> that are still about, where they stand now.</summary>
     SquadView[] PublishSquads() => [.. SquadManagement.PlayerSquads(this).Select(s => new SquadView(s.Id, s.Name, [.. s.Members])
-        { Leader = s.Leader, Autonomy = s.Autonomy, Doing = s.Autonomy is { AiRuns: true } ? Ai.AiSystem.AutonomyStatus(this, s) : [], Management = s.Management,
-          Managed = s.Autonomy is { ManagerRuns: true } || s.Management is not null ? ManagedOf(s) : [], ManagerLog = systems.OfType<Management.ManagerSystem>().FirstOrDefault()?.LogOf(s.Id) ?? [] })];
+        { Leader = s.Leader, Work = s.Work, Doing = s.Work is { On: true } ? DoingOf(s) : [], Log = systems.OfType<Jobs.WorkSystem>().FirstOrDefault()?.LogOf(s.Id) ?? [] })];
 
-    IReadOnlyList<(CharacterId, string, string)> ManagedOf(Squad squad)
+    IReadOnlyList<(CharacterId, string, string)> DoingOf(Squad squad)
     {
-        var managers = systems.OfType<Management.ManagerSystem>().FirstOrDefault();
-        return [.. squad.Members.Where(Characters.IsAlive).Select(id => (id, Characters.Cold(id.Slot)?.Name ?? "", managers?.StatusOf(id) ?? "waiting for the manager"))];
+        var work = systems.OfType<Jobs.WorkSystem>().FirstOrDefault();
+        return [.. squad.Members.Where(Characters.IsAlive).Select(id => (id, Characters.Cold(id.Slot)?.Name ?? "", work?.StatusOf(id) ?? "starting"))];
     }
 
     WatcherView[] WatchersOf(CharacterCold cold)

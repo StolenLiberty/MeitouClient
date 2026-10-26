@@ -235,7 +235,7 @@ sealed partial class CheatMenu
         if (!visible || player.SettingsPainter is not { } painter) return;
         art.Ensure(painter, MeitouLook, player.UiAtlas);
         if (townsMode) { DrawTownWindow(width, height, painter); return; }
-        if (autoMode) { DrawAutonomyWindow(width, height, painter); return; }
+        if (jobsMode) { DrawJobsWindow(width, height, painter); return; }
         scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
         bounds = new(MathF.Round((width - 1120 * scale) / 2), MathF.Round((height - 720 * scale) / 2), MathF.Round(1120 * scale), MathF.Round(720 * scale));
         controls.Clear(); hits.Clear();
