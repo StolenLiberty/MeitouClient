@@ -22,21 +22,40 @@ sealed partial class PlayerInterface
     // ---- notices (the original's MessageRoller, docs/game/ui-screens.md "Messages") ----
 
     /// <summary>The seconds a message holds at full alpha, then the alpha it loses per second (<b>Verified</b>).</summary>
-    const float NoticeHoldSeconds = 4, NoticeFadeRate = 3;
+    /// <summary>Seconds a message line shows at full strength, then fades over <see cref="NoticeFadeSeconds"/>; at most <see cref="NoticeLines"/> show at once.</summary>
+    const float NoticeHoldSeconds = 5, NoticeFadeSeconds = 1;
+    const int NoticeLines = 5;
 
-    readonly Queue<(string Text, bool Error)> noticeQueue = new();
-    (string Text, bool Error)? notice;
-    float noticeHold, noticeAlpha;
+    /// <summary>A line of the message feed: its text, red when an error, how many times it came while shown, and its age.</summary>
+    sealed class NoticeLine(string text, bool error)
+    {
+        public string Text { get; } = text;
+        public bool Error { get; } = error;
+        public int Count { get; set; } = 1;
+        public float Age { get; set; }
+    }
+
+    readonly List<NoticeLine> notices = [];
     long noticeAt;
-    MyGuiLayout? messageLayout;
-    string? messageClient;
 
-    /// <summary>Queues a message for the message panel ("Discovered {1}", "Saved", or an error text in red); each shows for 4 s in turn.</summary>
+    /// <summary>
+    /// A message for the feed ("Discovered {1}", "Saved", a crime, an error in red; Meitou's own: the game's big centre bar showed one at a time for 4 s each, and a burst queued up): a
+    /// small line at the bottom left, the newest lowest; the same text again while it shows counts up ("x3") instead of adding a line.
+    /// </summary>
     public void Notice(string text, bool error = false)
     {
         string line = Loc.Tr(text).ReplaceLineEndings(" ");
         LogMessage("", line, MessageTone.System);
-        noticeQueue.Enqueue((line, error));
+        if (notices.FirstOrDefault(n => n.Text == line && n.Error == error) is { } same)
+        {
+            same.Count++;
+            same.Age = 0;
+            notices.Remove(same);
+            notices.Add(same);
+            return;
+        }
+        notices.Add(new NoticeLine(line, error));
+        if (notices.Count > NoticeLines) notices.RemoveAt(0);
     }
 
     /// <summary>Adds a line to the Overview's DIALOGUE log only ("owner: text", docs/game/ui-screens.md "Dialogue log"); the newest 200 are kept.</summary>
@@ -64,34 +83,38 @@ sealed partial class PlayerInterface
         return $"#{(int)MathF.Round(c.X * 255):x2}{(int)MathF.Round(c.Y * 255):x2}{(int)MathF.Round(c.Z * 255):x2}";
     }
 
-    /// <summary>Once a frame: the next queued message comes up at full alpha when none shows; the shown one holds, then fades out.</summary>
+    /// <summary>Once a frame: the lines age; the faded ones go.</summary>
     void PollNotice()
     {
         long now = System.Diagnostics.Stopwatch.GetTimestamp();
         float dt = noticeAt == 0 ? 0 : MathF.Min((float)System.Diagnostics.Stopwatch.GetElapsedTime(noticeAt, now).TotalSeconds, 0.25f);
         noticeAt = now;
-        if (notice is null)
-        {
-            if (noticeQueue.TryDequeue(out var next)) (notice, noticeHold, noticeAlpha) = (next, NoticeHoldSeconds, 1);
-            return;
-        }
-        if ((noticeHold -= dt) < 0 && (noticeAlpha -= dt * NoticeFadeRate) <= 0) notice = null;
+        foreach (var n in notices) n.Age += dt;
+        notices.RemoveAll(n => n.Age >= NoticeHoldSeconds + NoticeFadeSeconds);
     }
 
-    /// <summary>The shown message in the game's <c>Kenshi_MessagePanel</c> layout, placed where the HUD's <c>MessagePanel</c> is; it never takes the mouse.</summary>
+    /// <summary>
+    /// The feed: one line each on a faint dark strip, small type, left-aligned, stacked up from just above the HUD's information panel (bottom left); it never takes the mouse.
+    /// </summary>
     void AddNotice(List<UiControl> controls)
     {
-        if (notice is not { } shown || messageLayout is null || messageLayout.Roots.Count == 0) return;
-        var root = messageLayout.Roots[0];
-        var b = new UiBindings();
-        if (faithfulHud.Find("MessagePanel") is { RealPosition: true } slot) b.RelativePositions[root] = root.Position with { X = slot.Position.X, Y = slot.Position.Y };
-        b.Text["MessageTextBox"] = shown.Text;
-        b.Properties[root.Name] = new Dictionary<string, string> { ["Alpha"] = Math.Clamp(noticeAlpha, 0, 1).ToString(System.Globalization.CultureInfo.InvariantCulture) };
-        foreach (var w in messageLayout.Widgets.Where(w => w != root)) b.Properties[w.Name] = new Dictionary<string, string> { ["NeedMouse"] = "false" };
-        // The EditBox's alignment is its text's, which the template's client draws.
-        if (messageClient is not null)
-            b.Properties[messageClient] = new Dictionary<string, string> { ["NeedMouse"] = "false", ["TextAlign"] = "Center", ["TextColour"] = shown.Error ? BadColour : MyGuiColours.InkText };
-        controls.AddRange(MyGuiPresentation.Arrange(messageLayout, Width, Height, b, uiResources.Layers).Select(c => c with { Pickable = false }));
+        if (notices.Count == 0) return;
+        float s = Height / 1080f, line = MathF.Round(20 * s), pad = MathF.Round(6 * s), x = MathF.Round(8 * s);
+        float width = MathF.Min(MathF.Round(Width * 0.2f), MathF.Round(420 * s));
+        // Just above the top of the character panel as it is drawn this frame (its name bar, or the bounty bar over it; the panel slides with the extended stats).
+        float top = controls.Where(c => c.Name is "NamePanel" or "BountyPanel").Select(c => c.Bounds.Y).DefaultIfEmpty(Height).Min();
+        float bottom = MathF.Min(top, Height) - MathF.Round(6 * s);
+        for (int k = notices.Count - 1, row = 0; k >= 0; k--, row++)
+        {
+            var n = notices[k];
+            float alpha = n.Age <= NoticeHoldSeconds ? 1 : Math.Clamp(1 - (n.Age - NoticeHoldSeconds) / NoticeFadeSeconds, 0, 1);
+            var strip = new UiRect(x, bottom - (row + 1) * (line + MathF.Round(2 * s)), width, line);
+            string text = n.Count > 1 ? $"{n.Text}  x{n.Count}" : n.Text;
+            controls.Add(new UiControl($"notice-strip-{row}", "Widget", strip, "", "", "", true, new Dictionary<string, string>(), new Vector4(0.05f, 0.04f, 0.03f, 0.55f * alpha), Pickable: false));
+            var colour = n.Error ? new Vector4(1f, 0.45f, 0.38f, alpha) : new Vector4(0.92f, 0.88f, 0.78f, alpha);
+            controls.Add(new UiControl($"notice-text-{row}", "TextBox", strip with { X = strip.X + pad, Width = strip.Width - 2 * pad }, text, "", "", true,
+                new Dictionary<string, string> { ["FontName"] = "Kenshi_StandardFont_Small", ["TextAlign"] = "Left VCenter" }, Vector4.Zero, colour, Pickable: false, Clip: strip));
+        }
     }
 
     /// <summary>Drops the transient state of the mouse (a drag box, a steering right click): the world it belonged to is gone.</summary>

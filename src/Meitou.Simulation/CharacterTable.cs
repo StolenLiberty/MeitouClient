@@ -109,6 +109,8 @@ public sealed class CharacterCold
     /// to the spot; null: none. Derived from orders, not saved and not hashed.
     /// </summary>
     public FormationGroup? Formation { get; set; }
+    /// <summary>The Loot All order it works through (<see cref="Carrying.LootAllOrder"/>); null: none. Derived from orders, not saved and not hashed.</summary>
+    public Carrying.LootAllGroup? LootAll { get; set; }
     /// <summary>Its spot in <see cref="Formation"/> (with the clicked height) and the yaw it faces there.</summary>
     public System.Numerics.Vector3 FormationSpot { get; set; }
     public float FormationYaw { get; set; }

@@ -102,6 +102,41 @@ sealed class CharacterAssembly(PopulationData data)
 
     Fighter FighterOf(GameRecord? record, Inventory inventory, MedicalState? medical) => AnimalData.From(record) is { } animal ? MakeAnimalFighter(animal) : MakeFighter(inventory, medical);
 
+    // ---- Loot All's worth of gear (docs/simulation.md "Carrying, rescue and looting"; engine choices: the original has no such order) ----
+
+    /// <summary>A melee weapon's worth to <paramref name="who"/>: (cut + blunt multiplier) × (0.5 + its skill in the weapon's class / 100), plus 0.02 per attack and defence mod; null: not a known weapon.</summary>
+    public float? MeleeWorth(ItemInstance item, CharacterCold who)
+    {
+        if (item.Type != FcsRecordType.WEAPON || data.Combat.Weapon(item.Record) is not { } w) return null;
+        var weapon = WeaponInstance.Create(item.Level * 0.01f, w, data.Combat.Manufacturer(item.CompanyId), data.Combat.WeaponMaterial(item.MaterialId), data.Combat.Constants);
+        float skill = who.Stats?[weapon.Skill] ?? 0;
+        return (weapon.Stats.CutMultiplier + weapon.Stats.BluntMultiplier) * (0.5f + skill / 100f) + (weapon.Stats.AttackMod + weapon.Stats.DefenceMod) * 0.02f;
+    }
+
+    /// <summary>A crossbow's worth: mean pierce damage × shots ÷ (mean reload seconds + 1), plus range / 500; null: not a known crossbow.</summary>
+    public float? CrossbowWorth(ItemInstance item)
+    {
+        if (item.Type != FcsRecordType.CROSSBOW || data.Combat.Crossbow(item.Record) is not { } x) return null;
+        var bow = CrossbowInstance.Create(item.Level * 0.01f, x, data.Combat.Constants, data.BodyOptions.GlobalDamageMultiplier);
+        var s = bow.Stats;
+        return (s.PierceMin + s.PierceMax) * 0.5f * bow.NumShots / ((s.ReloadMin + s.ReloadMax) * 0.5f + 1) + s.Range / 500;
+    }
+
+    /// <summary>The ammunition a crossbow item shoots (empty: none needed); null: not a known crossbow.</summary>
+    public string? AmmoOf(ItemInstance item) => item.Type == FcsRecordType.CROSSBOW ? data.Combat.Crossbow(item.Record)?.AmmoId : null;
+
+    /// <summary>
+    /// An armour piece's worth: (cut + blunt defence at its quality) × its coverage (the parts' percents / 100), plus 0.02 per combat attack and defence bonus, plus the damage output and
+    /// combat speed multipliers less 1, plus half the dodge multiplier less 1; null: not a known ARMOUR.
+    /// </summary>
+    public float? ArmourWorth(ItemInstance item)
+    {
+        if (item.Type != FcsRecordType.ARMOUR || data.Combat.Armour(item.Record) is not { } a) return null;
+        var piece = ArmourPiece.Create(a, item.Quality * 0.01f);
+        float cover = a.Coverage.Sum(c => c.Percent) / 100f;
+        return (piece.CutDefence + piece.BluntDefence) * cover + (a.CombatAttackBonus + a.CombatDefenceBonus) * 0.02f + (a.DamageOutputMult - 1) + (a.CombatSpeedMult - 1) + 0.5f * (a.DodgeMult - 1);
+    }
+
     public void RefreshEquipment(CharacterCold cold)
     {
         if (cold.Inventory is not { } inventory) return;

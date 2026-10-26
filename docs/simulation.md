@@ -508,6 +508,11 @@ body comes round (another faction's) or is lifted. The same window opens on the 
 row (**Observed**, owner's screenshots of the original, 2026-10-24; Meitou: limbs, own bag, own character, theirs, their bag, centred, and a bag the window opened closes with it unless OPEN BAG was pressed); a death item taken butchers only a down body. An animal's inventory and loot windows use `Kenshi_InventoryAnimalWindow` (backpack slot,
 main grid, weight and burden only, grid size from its `inventory w` / `inventory h`; **Observed** in the original). It also runs the stealth knock-out
 (`StealthKo` task, reusing `CarryTarget`/`LiftTime`): [combat](game/combat.md#stealth-knock-out).
+- **Loot All** (Meitou-only, `LootAllOrder`, the body menu's verb under Loot; `CarrySystem.LootAll.cs`, engine choices): the bodies (down, with an inventory, not the player's, not
+  carried or caged) within `LootAllRadius` (400) of the clicked one form a `LootAllGroup`; each selected looter walks to the nearest one nobody else loots that holds something better for
+  it and has not been looted by it, takes it (a `Loot` task; theft and witnesses as a loot), and goes on until none is left ("done looting"); another order drops it. Better
+  (`CharacterAssembly` worths, a 5 % margin): per armour section the best piece its race may wear; for the hip the best melee weapon that fits (skill-weighted cut + blunt), not over a
+  crossbow there; the best crossbow (pierce × shots ÷ reload, + range) into its crossbow's section, else the back; then its crossbow's ammunition. A replaced item goes to its main grid, else onto the body.
 - **NPC looting** (`CarrySystem.Scavenge.cs`, facts: [carry-loot 3.3](game/carry-loot.md#33-npc-looting)): every `AutoEveryTicks`, an NPC the AI runs whose package lists goal 177 for its role
   in the hour (`PopulationSystem.GoalDuty`) loots the nearest dead body (not of its faction), else downed living one of a non-allied faction, within 100: the player's only with
   `PlayerState.BanditsLoot` (CAMERA `bl`, default on), only whom `shouldIScrewThisGuyOver` allows (classes, love/hate tags), not one its squad tagged short-term 6

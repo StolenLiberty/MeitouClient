@@ -139,6 +139,9 @@ public sealed partial class CarrySystem(GameConstants constants, BodyOptions opt
                         Begin(table, looter, loot.Target, CharacterTask.Loot, CharacterTask.Idle);
                     }
                     break;
+                case LootAllOrder all:
+                    StartLootAll(world, table, all);
+                    break;
                 case OpenLootOrder open:
                     if (!table.TryResolveNext(open.Target, out int body2) || !CanBeOpened(table.Cold(body2)!)) break;
                     if (Nearest(table, Who(world, open.Looters), body2, s => s != body2 && table.Cold(s) is { Medical.Incapacitated: false, Inventory: not null } c && c.CarriedBy.IsNone) is int opener)
@@ -336,7 +339,7 @@ public sealed partial class CarrySystem(GameConstants constants, BodyOptions opt
         }
         LootWindow(world);
         KeepLinks(world);
-        if (Settings.AutoEveryTicks > 0 && world.Tick % Settings.AutoEveryTicks == 0) { Rescue(world, table); Forage(world, table); Scavenge(world, table); }
+        if (Settings.AutoEveryTicks > 0 && world.Tick % Settings.AutoEveryTicks == 0) { Rescue(world, table); Forage(world, table); Scavenge(world, table); KeepLootAll(world, table); }
     }
 
     void Lift(World world, CharacterTable table, int i, float dt)
@@ -503,6 +506,12 @@ public sealed partial class CarrySystem(GameConstants constants, BodyOptions opt
         {
             // An open-loot order: the window opens instead of a take-all.
             (player.OpenLoot, player.LootOpener, player.OpeningLoot) = (player.OpeningLoot, player.LootWalker, CharacterId.None);
+            End(table, i);
+            return;
+        }
+        if (cold.LootAll is not null)
+        {
+            LootAllTake(world, table, i, t);
             End(table, i);
             return;
         }

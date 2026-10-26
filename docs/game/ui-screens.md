@@ -402,7 +402,9 @@ screen), of the build window's `MessagePanel` while that is open (`1404e5210`). 
 the next (**Observed**: the delegate's body is not read). Nothing new comes up while the LoadingWindow is up. When an unknown widget (`DAT_1421337d0 + 0x38`) is visible the panel
 sits above another one instead (**Unknown**).
 
-Meitou (`PlayerInterface.Hud.cs`, both UI modes): its own notices (Saved, Loaded, errors) share the queue, errors in `Bad` red; always at the HUD's spot; real-time timers.
+Meitou (`PlayerInterface.Hud.cs`, both UI modes) does not use this panel: every message (the world's and its own: Saved, Loaded, errors in red) is a small line
+(`Kenshi_StandardFont_Small` on a faint dark strip) in a feed stacked up from just above the character panel at the bottom left, newest lowest, at most 5, each 5 s then a 1 s fade;
+the same text again while it shows counts up ("x3") instead of adding a line. Real-time timers.
 
 ### Dialogue log
 

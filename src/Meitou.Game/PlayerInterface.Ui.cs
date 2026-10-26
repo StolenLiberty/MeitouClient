@@ -48,9 +48,7 @@ sealed partial class PlayerInterface
         faithfulHud = MyGuiTemplates.Expand(WithAttackAllButton(mainPanel), uiResources);
         relationsLineLayout = resolve("Kenshi_FactionRelationsLine.layout") is { } relationsLine ? MyGuiTemplates.Expand(MyGuiReader.ReadLayout(relationsLine), uiResources) : null;
         squadBoxLayout = resolve("Kenshi_SquadBox.layout") is { } squadBox ? MyGuiTemplates.Expand(MyGuiReader.ReadLayout(squadBox), uiResources) : null;
-        messageLayout = resolve("Kenshi_MessagePanel.layout") is { } messages ? MyGuiTemplates.Expand(MyGuiReader.ReadLayout(messages), uiResources) : null;
         taskBarLayout = resolve("Kenshi_ProgressBarPanel.layout") is { } taskBar ? MyGuiTemplates.Expand(MyGuiReader.ReadLayout(taskBar), uiResources) : null;
-        messageClient = messageLayout?.Widgets.FirstOrDefault(w => w.Properties.GetValueOrDefault("CaptionOwner") == "MessageTextBox")?.Name;
         faithfulScreens = new(uiResources) { ClipboardReader = () => ClipboardRead?.Invoke(), ClipboardWriter = text => ClipboardWrite?.Invoke(text) };
         foreach (var (id, file, modal) in FaithfulScreenFiles)
         {

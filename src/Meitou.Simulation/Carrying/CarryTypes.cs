@@ -16,6 +16,20 @@ public sealed record PutDownOrder(IReadOnlyList<CharacterId> Carriers) : SimComm
 public sealed record LootOrder(IReadOnlyList<CharacterId> Looters, CharacterId Target) : SimCommand;
 
 /// <summary>
+/// Loot All (Meitou-only, the context menu on a body): every looter (none: the selection) goes over the bodies within <see cref="CarrySystem.LootAllRadius"/> of <see cref="Target"/>,
+/// each taking from a body only what is better for it than what it has (<see cref="CarrySystem"/> "Loot All").
+/// </summary>
+public sealed record LootAllOrder(IReadOnlyList<CharacterId> Looters, CharacterId Target) : SimCommand;
+
+/// <summary>The bodies of one Loot All order, shared by its looters (<see cref="CharacterCold.LootAll"/>).</summary>
+public sealed class LootAllGroup
+{
+    public List<CharacterId> Bodies { get; } = [];
+    /// <summary>The (looter, body) pairs already looted: a looter goes to each body once, so ammunition that did not fit does not bring it back.</summary>
+    public HashSet<(CharacterId Looter, CharacterId Body)> Visited { get; } = [];
+}
+
+/// <summary>
 /// As <see cref="LootOrder"/>, but in reach the looter opens <see cref="Target"/>'s inventory in a window (<see cref="PlayerState.OpenLoot"/>) instead of taking all: items are then taken one at a
 /// time (<see cref="TakeLootItem"/>). Closed with <see cref="Items.CloseContainer"/>, or when the looter walks off, goes down, or the body comes round or is lifted.
 /// </summary>

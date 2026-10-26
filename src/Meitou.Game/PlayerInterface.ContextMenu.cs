@@ -29,7 +29,7 @@ sealed partial class PlayerInterface
     /// </summary>
     static readonly Dictionary<string, int> VerbOrders = new()
     {
-        ["Build"] = 2, ["Steal"] = 3, ["Attack Target"] = 5, ["Talk To"] = 12, ["Attack All"] = 16, ["First Aid"] = 25, ["Inventory"] = 26, ["Trade"] = 26, ["Loot"] = 26,
+        ["Build"] = 2, ["Steal"] = 3, ["Attack Target"] = 5, ["Talk To"] = 12, ["Attack All"] = 16, ["First Aid"] = 25, ["Inventory"] = 26, ["Trade"] = 26, ["Loot"] = 26, ["Loot All"] = 26 /* Meitou's, listed under Loot */,
         ["Stand Up"] = 28, ["Follow"] = 31, ["Bodyguard"] = 45, ["Repairs"] = 60, ["Attack Unprovoked"] = 61, ["Put Down"] = 69, ["Open"] = 72, ["Close"] = 73, ["Pick Lock"] = 76,
         ["Lock"] = 77, ["Unlock"] = 78, ["Use"] = 87, ["Repair"] = 95, ["Dismantle"] = 96, ["Training"] = 97, ["Put in Bed"] = 99, ["Get in"] = 107, ["Put in"] = 108,
         ["Knock Out"] = 109, ["Set Free"] = 110, ["Break Out"] = 111, ["Auto-Haul"] = 124, ["Corpse Disposal"] = 136, ["Man Turret"] = 146, ["Capture"] = 166,
@@ -156,6 +156,8 @@ sealed partial class PlayerInterface
         {
             if (!target.CarriedBy.IsNone) return;
             verbs.Add(("Loot", () => Say(new Meitou.Simulation.Carrying.OpenLootOrder([], id) { Tick = session.World.Tick })));
+            // Meitou: the whole selection goes over the bodies about this one, each taking only what is better for it (CarrySystem.LootAll).
+            verbs.Add(("Loot All", () => Say(new Meitou.Simulation.Carrying.LootAllOrder(selection, id) { Tick = session.World.Tick })));
             verbs.Add(PickUpVerb(target));
             return;
         }
