@@ -54,7 +54,16 @@ public sealed partial class DialogueSystem
         if ((world.Squads.Find(world.Player.Squad) ?? world.Squads.Find(selected?.SquadId ?? -1) ?? world.Squads.Find(talker?.SquadId ?? -1)) is not { } squad) return false;
         if (squad.Members.Count >= limits.MaxSquadSize)
             squad = SquadManagement.NewSquad(world, data.Db, table.Next[slot].Position, data.Factions[world.Player.Faction].Name is { Length: > 0 } f ? f : "Nameless");
+        JoinSquad(world, data, slot, squad);
+        return true;
+    }
 
+    /// <summary>The character at <paramref name="slot"/> leaves its squad and joins the player's squad <paramref name="squad"/> as a player character.</summary>
+    internal static void JoinSquad(World world, PopulationData data, int slot, Squad squad)
+    {
+        var table = world.Characters;
+        var me = table.IdOf(slot);
+        var mc = table.Cold(slot)!;
         Leave(world, me, mc);
         mc.Faction = world.Player.Faction;
         mc.RoadPreference = data.RoadPreferenceOf(mc.Faction);
@@ -73,7 +82,6 @@ public sealed partial class DialogueSystem
         MovementSystem.Stop(table, slot);
         squad.Members.Add(me);
         if (squad.Leader.IsNone) squad.Leader = me;
-        return true;
     }
 
     static void Leave(World world, CharacterId me, CharacterCold mc)

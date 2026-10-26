@@ -121,6 +121,7 @@ public sealed partial class World
                 Shackled = cold?.Inventory is { } worn && worn.Items.Any(item => item.IsLocked && item.Section != "main"),
                 PortraitSerial = cold?.PortraitSerial ?? 0,
                 ShacklesLocked = Locks.LockSystem.WornShackles(cold) is not null,
+                JoinChance = cold is not null && Slavery.SlaverySystem.IsCaptive(this, cold) ? Slavery.SlaverySystem.Chance(cold) : null,
                 CanBeShackled = cold is { IsPlayer: false } && Locks.LockSystem.CanBeShackled(cold, true),
                 CarriesShackles = selected && Locks.LockSystem.CarriedShackles(cold) is not null,
                 Orders = cold?.Orders ?? CharacterOrders.None,

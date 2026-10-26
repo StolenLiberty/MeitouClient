@@ -29,7 +29,7 @@ sealed partial class PlayerInterface
     /// </summary>
     static readonly Dictionary<string, int> VerbOrders = new()
     {
-        ["Build"] = 2, ["Steal"] = 3, ["Attack Target"] = 5, ["Talk To"] = 12, ["Attack All"] = 16, ["First Aid"] = 25, ["Inventory"] = 26, ["Trade"] = 26, ["Loot"] = 26, ["Loot All"] = 26 /* Meitou's, listed under Loot */, ["Dead Check"] = 26,
+        ["Build"] = 2, ["Steal"] = 3, ["Attack Target"] = 5, ["Talk To"] = 12, ["Join me or die"] = 12, ["Attack All"] = 16, ["First Aid"] = 25, ["Inventory"] = 26, ["Trade"] = 26, ["Loot"] = 26, ["Loot All"] = 26 /* Meitou's, listed under Loot */, ["Dead Check"] = 26,
         ["Stand Up"] = 28, ["Follow"] = 31, ["Bodyguard"] = 45, ["Repairs"] = 60, ["Attack Unprovoked"] = 61, ["Put Down"] = 69, ["Open"] = 72, ["Close"] = 73, ["Pick Lock"] = 76,
         ["Lock"] = 77, ["Unlock"] = 78, ["Use"] = 87, ["Repair"] = 95, ["Dismantle"] = 96, ["Training"] = 97, ["Put in Bed"] = 99, ["Get in"] = 107, ["Put in"] = 108,
         ["Knock Out"] = 109, ["Set Free"] = 110, ["Break Out"] = 111, ["Auto-Haul"] = 124, ["Corpse Disposal"] = 136, ["Man Turret"] = 146, ["Capture"] = 166,
@@ -100,6 +100,9 @@ sealed partial class PlayerInterface
             // The wearer works its own shackles when it is selected, else the selection.
             IReadOnlyList<CharacterId> Workers() => selection.Contains(id) ? [id] : selection;
         }
+        // Meitou: "Join me or die" to a captive of the player's (in a player cage or crucifix, or in locked shackles); the menu shows the chance it gives in.
+        if (target.JoinChance is { } chance && Selected().FirstOrDefault(c => c.Slave is not { State: 1 }) is { } boss)
+            verbs.Add((WithChance("Join me or die", chance * 100), () => Say(new Meitou.Simulation.Slavery.JoinOrDieOrder(boss.Id, id) { Tick = session.World.Tick })));
         // Meitou stand-in for dragging shackles onto a down or caged character's armour slot: a selected character carrying some puts them on, locked.
         if (target.CanBeShackled && Selected().Any(c => c.CarriesShackles))
             verbs.Add(("Put on Shackles", () => Say(new Meitou.Simulation.Locks.PutShacklesOrder(Selected().Where(c => c.CarriesShackles).Select(c => c.Id).ToArray(), id) { Tick = session.World.Tick })));

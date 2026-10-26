@@ -198,6 +198,8 @@ public static class StandardSystems
         if (Has(StandardParts.Combat)) systems.Add(combat!);
         // Managers keeping the player's squads busy (Meitou-only): serial, after production (they start its machines); nothing in the hash, they act through orders.
         if (production is not null) systems.Add(new Meitou.Simulation.Management.ManagerSystem(data));
+        // Taking slaves (Meitou-only): "Join me or die" to the player's captives.
+        systems.Add(new Meitou.Simulation.Slavery.SlaverySystem(data));
         if (Has(StandardParts.Animation))
         {
             var library = o.AnimationLibrary ?? AnimationLibrary.FromDatabase(data.Db);

@@ -223,7 +223,8 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         // Defence.
         if (enemies.Count > 0)
         {
-            bool fights = m.Defence == DefenceMode.Fighters || m.Defence == DefenceMode.Militia && c.Appearance?.Female != true;
+            // A slave is never armed against the raiders: it shelters.
+            bool fights = c.SlaveState != 1 && (m.Defence == DefenceMode.Fighters || m.Defence == DefenceMode.Militia && c.Appearance?.Female != true);
             if (fights || c.InCombat)
             {
                 status[id] = "defending";

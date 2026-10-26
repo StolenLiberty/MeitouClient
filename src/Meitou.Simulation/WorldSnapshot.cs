@@ -154,6 +154,8 @@ public sealed record CharacterSnapshot(CharacterId Id, CharacterAppearance? Appe
     public bool Shackled { get; init; }
     /// <summary>Its worn shackles are locked (<see cref="Locks.LockSystem.WornShackles"/>): the context menu offers Unlock Shackles, Use Tools and Use Strength.</summary>
     public bool ShacklesLocked { get; init; }
+    /// <summary>A captive of the player's (<see cref="Slavery.SlaverySystem.IsCaptive"/>): its chance of giving in to "Join me or die" (Meitou); null otherwise.</summary>
+    public float? JoinChance { get; init; }
     /// <summary>Alive, down or caged and wearing no shackles (<see cref="Locks.LockSystem.CanBeShackled"/>): the context menu offers Put on Shackles to a selection that carries some.</summary>
     public bool CanBeShackled { get; init; }
     /// <summary>A selected character carrying unworn shackles (<see cref="Locks.LockSystem.CarriedShackles"/>).</summary>

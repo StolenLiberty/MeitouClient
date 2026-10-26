@@ -53,6 +53,8 @@ public enum RngPurpose : uint
     KnockoutHear = 26,
     /// <summary>Whether an ally of another faction who sees a fight joins it (<see cref="Combat.RetaliationSystem"/>), keyed by the helper and the attacker.</summary>
     AllyHelp = 27,
+    /// <summary>A captive's answer to "Join me or die" (<see cref="Slavery.SlaverySystem"/>), keyed by the captive and the tick.</summary>
+    Enslave = 28,
 }
 
 /// <summary>
