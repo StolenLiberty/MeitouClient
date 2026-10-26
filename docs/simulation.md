@@ -287,7 +287,10 @@ the world. A move order given to exactly one formation's members marches it: the
 its centre (kept for a step under `Formation.Spacing`). A march of two or more keeps step (`CharacterCold.MarchSpeed`): each walks at the slowest marcher's speed times its
 share of the longest way, faster behind the block's mean progress and slower ahead of it. A formation drag given to exactly one formation's members three spacings or more off
 re-forms Total War's way (`ApproachOf`): the block marches in its old shape, turned to face the way it goes, until its front rank is 1.5 spacings short of the new centre, then each
-spreads onto its spot (the new spots handed out again along the new line so nobody crosses; the march keeps step only to the block's places, `FormationGroup.MarchTo`). Engine choices throughout; formations are not saved. Holding Alt (no drag) rings
+spreads onto its spot (the march keeps step only to the block's places, `FormationGroup.MarchTo`). Every formation order hands out the spots (and a re-forming block's places) by the
+assignment with the least sum of squared walks (`MovementSystem.Assign`, Hungarian method), so no two straight paths cross: a line given a new line behind it facing back walks straight
+back, its ends to the near ends. **Observed** in a temporary probe (ten in a line, a new line 30 and 200 behind facing back: 0 crossing paths and no sideways walk, against 45 and 135
+with the old hand-out along each side's own right). Engine choices throughout; formations are not saved. Holding Alt (no drag) rings
 where each selected character will stand (`CharacterSnapshot.Stand`: its formation spot, the end of its walk, or where it stands), the notch its facing.
 
 ### Order toggles

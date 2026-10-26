@@ -78,6 +78,14 @@ public sealed partial class MovementSystem
         // A formation given a new shape farther off marches there in its old one and spreads into the new one only at the line (Total War's march, then deploy).
         var approach = reform && !queued ? ApproachOf(table, slots, spots, count, centre, facing) : null;
         if (approach is { } a) spots = a.Spots;
+        else if (!queued && count > 1)
+        {
+            // Each takes the spot that makes the shortest walks overall, so no two paths cross (a line turned about walks straight back, its ends to the near ends).
+            var from = new Vector2[count];
+            for (int k = 0; k < count; k++) from[k] = new Vector2(table.Next[slots[k]].Position.X, table.Next[slots[k]].Position.Z);
+            var pick = Assign(from, [.. spots.Take(count).Select(p => new Vector2(p.X, p.Z))]);
+            spots = [.. pick.Select(j => spots[j])];
+        }
         var group = new FormationGroup { Centre = centre, Facing = facing };
         var right = RightOf(facing);
         float yaw = MathF.Atan2(facing.X, facing.Y);
@@ -155,15 +163,64 @@ public sealed partial class MovementSystem
         var across = RightOf(ahead);
         float front = offsets.Max(o => o.Y);
         var stop = centre - ahead * (front + Formation.Spacing * 1.5f);
-        var via = offsets.Select(o => stop + across * o.X + ahead * o.Y).ToArray();
-        // Along the new line (and a little by depth), so the left of the block takes the left of the line.
-        var right = RightOf(facing);
-        float Key(Vector2 p) => Vector2.Dot(p, right) + Vector2.Dot(p, facing) * 1e-3f;
-        var byVia = Enumerable.Range(0, count).OrderBy(k => Key(via[k])).ToArray();
-        var bySpot = Enumerable.Range(0, count).OrderBy(k => Key(new Vector2(spots[k].X, spots[k].Z))).ToArray();
-        var assigned = new Vector3[count];
-        for (int r = 0; r < count; r++) assigned[byVia[r]] = spots[bySpot[r]];
-        return (via, assigned);
+        // The block's places, turned to face the way it goes; each member takes the one that makes the shortest walks overall (so turning about does not swap its ends over).
+        var places = offsets.Select(o => stop + across * o.X + ahead * o.Y).ToArray();
+        var standing = new Vector2[count];
+        for (int k = 0; k < count; k++) standing[k] = new Vector2(table.Next[slots[k]].Position.X, table.Next[slots[k]].Position.Z);
+        var via = Assign(standing, places).Select(j => places[j]).ToArray();
+        // From its place in the block, each takes the spot that makes the shortest spreading overall, so nobody crosses (whichever way the new line faces).
+        var pick = Assign(via, [.. spots.Take(count).Select(p => new Vector2(p.X, p.Z))]);
+        return (via, [.. pick.Select(j => spots[j])]);
+    }
+
+    /// <summary>
+    /// The assignment of <paramref name="from"/> to <paramref name="to"/> (same length) with the least sum of squared distances (Hungarian method, O(n³)); entry i is the index in
+    /// <paramref name="to"/> for <paramref name="from"/>[i]. With squared distances no two of the straight paths cross.
+    /// </summary>
+    internal static int[] Assign(Vector2[] from, Vector2[] to)
+    {
+        int n = from.Length;
+        var cost = new double[n + 1, n + 1];
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++) cost[i + 1, j + 1] = Vector2.DistanceSquared(from[i], to[j]);
+        var u = new double[n + 1];
+        var v = new double[n + 1];
+        var p = new int[n + 1];
+        var way = new int[n + 1];
+        for (int i = 1; i <= n; i++)
+        {
+            p[0] = i;
+            int j0 = 0;
+            var minv = new double[n + 1];
+            var used = new bool[n + 1];
+            Array.Fill(minv, double.MaxValue);
+            do
+            {
+                used[j0] = true;
+                int i0 = p[j0], j1 = 0;
+                double delta = double.MaxValue;
+                for (int j = 1; j <= n; j++)
+                {
+                    if (used[j]) continue;
+                    double cur = cost[i0, j] - u[i0] - v[j];
+                    if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+                    if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+                }
+                for (int j = 0; j <= n; j++)
+                    if (used[j]) { u[p[j]] += delta; v[j] -= delta; }
+                    else minv[j] -= delta;
+                j0 = j1;
+            } while (p[j0] != 0);
+            do
+            {
+                int j1 = way[j0];
+                p[j0] = p[j1];
+                j0 = j1;
+            } while (j0 != 0);
+        }
+        var result = new int[n];
+        for (int j = 1; j <= n; j++) result[p[j] - 1] = j - 1;
+        return result;
     }
 
     /// <summary>
