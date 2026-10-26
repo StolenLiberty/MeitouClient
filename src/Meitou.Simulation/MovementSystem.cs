@@ -152,6 +152,7 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
                     ref var fn = ref table.Next[s];
                     if (formation.Queued && fn.Task == (byte)CharacterTask.GoTo && (fn.Flags & (ushort)MoveFlags.AnyPath) != 0) { fc.OrderQueue.Add(new Vector2(spot.X, spot.Z)); continue; }
                     var flat = GoToFloor(world, s, spot, fc.RunSpeed);
+                    fc.ArriveWithin = SpotArrive;   // onto the spot, not the move's arrival ring short of it
                     fc.ArriveYaw = MathF.Atan2(formation.Facing.X, formation.Facing.Y);
                     if ((fc.Orders & CharacterOrders.Hold) != 0) fc.HoldPoint = flat;
                 }
@@ -385,6 +386,14 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
                 if (n.Task == (byte)CharacterTask.GoTo) { n.Task = (byte)CharacterTask.Idle; cold.OrderQueue.Clear(); }
             }
         }
+    }
+
+    /// <summary>A formation move's facing (<see cref="FormationOrder"/>), taken where its walk ends (on its spot, or stopped short by a wall or a crowd).</summary>
+    static void Face(ref CharacterHot n, CharacterCold cold)
+    {
+        if (float.IsNaN(cold.ArriveYaw)) return;
+        n.Yaw = cold.ArriveYaw;
+        cold.ArriveYaw = float.NaN;
     }
 
     public void Think(World world, Partition part)
@@ -660,7 +669,7 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
                     {
                         n.Task = (byte)CharacterTask.Idle;
                         // A formation move's facing (FormationOrder).
-                        if (!float.IsNaN(cold.ArriveYaw)) { n.Yaw = cold.ArriveYaw; cold.ArriveYaw = float.NaN; }
+                        Face(ref n, cold);
                     }
                 }
                 else if (!replaced && n.Task == (byte)CharacterTask.Attack) n.TaskTime = PursuitSystem.RepathSeconds;   // a fighter at the end of its path to a moving target asks for the next one soon (PursuitSystem)
@@ -744,7 +753,7 @@ public sealed class MovementSystem(PathService paths) : ITickSystem, IDisposable
                     if (n.Task == (byte)CharacterTask.Follow) cold.FollowPathTime = FollowPathSeconds;
                     n.Flags = (ushort)(n.Flags & ~(ushort)MoveFlags.HasPath);
                     n.TaskTime = FailedPathWait;
-                    if (n.Task == (byte)CharacterTask.GoTo) { n.Task = (byte)CharacterTask.Idle; cold.OrderQueue.Clear(); }
+                    if (n.Task == (byte)CharacterTask.GoTo) { n.Task = (byte)CharacterTask.Idle; cold.OrderQueue.Clear(); Face(ref n, cold); }
                 }
             }
         moved:

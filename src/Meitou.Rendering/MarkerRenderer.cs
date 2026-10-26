@@ -102,7 +102,8 @@ public sealed unsafe class MarkerRenderer : IDisposable
     /// </summary>
     public Vector3[] Rings { get; set; } = [];
     public Vector3 RingFacing { get; set; } = Vector3.UnitZ;
-    static readonly Vector4 RingVisible = new(0.78f, 0.86f, 0.62f, 0.9f), RingHidden = new(0.45f, 0.5f, 0.36f, 0.45f);
+    // Bright whatever the light (the shading halves an unlit face; the target clamps): a pale green, over the ground and through it.
+    static readonly Vector4 RingVisible = new(1.5f, 2f, 1.4f, 1f), RingHidden = new(1.2f, 1.6f, 1.1f, 0.75f);
 
     MarkerRenderer(IGpuContext gpu, float[] data, (int, int) marker, (int, int) arrow, (int, int) ring)
     {
@@ -154,7 +155,7 @@ public sealed unsafe class MarkerRenderer : IDisposable
     {
         int first = data.Count / 6;
         const int Segments = 40;
-        const float Inner = 3.2f, Outer = 4f;
+        const float Inner = 2.9f, Outer = 4.3f;
         void Tri(Vector3 a, Vector3 b, Vector3 c)
         {
             foreach (var p in new[] { a, b, c, a, c, b }) data.AddRange([p.X, p.Y, p.Z, 0, 1, 0]);

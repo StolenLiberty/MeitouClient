@@ -43,7 +43,13 @@ sealed partial class PlayerInterface
         d.Active = true;
         var snapshot = session.CurrentSnapshot;
         var positions = d.Ids.Select(id => snapshot.Characters.FirstOrDefault(c => c.Id == id)?.Position ?? d.From).Select(q => new Vector2(q.X, q.Z)).ToArray();
+        // The way they face, as Total War's: the drag turned a quarter on the screen (left to right faces up the screen, right to left down it), taken onto the ground.
+        var drag = mouse - d.FromPixel;
+        var up = Vector2.Normalize(new Vector2(drag.Y, -drag.X));
+        var mid = (mouse + d.FromPixel) / 2;
         var away = new Vector2(ray.Direction.X, ray.Direction.Z);
+        if (Ray(mid) is { } r0 && MoveHit(r0.Origin, r0.Direction) is { } g0 && Ray(mid + up * 40) is { } r1 && MoveHit(r1.Origin, r1.Direction) is { } g1
+            && new Vector2(g1.X - g0.X, g1.Z - g0.Z) is { } ahead && ahead.LengthSquared() > 1e-4f) away = ahead;
         var (spots, facing) = Formation.Line(positions, new Vector2(d.From.X, d.From.Z), new Vector2(hit.X, hit.Z), away);
         var walk = session.World.Walkability;
         d.Spots = [.. spots.Select(s => new Vector3(s.X, walk.GroundHeight(s.X, s.Y, d.From.Y), s.Y))];
