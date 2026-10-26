@@ -1447,8 +1447,8 @@ repeated (stone: Raw Stone -> processors -> Building Material; iron: Raw Iron ->
 the members in the outpost (`PlanCrew`): with 4 or more he only runs them; haulers 1 per 5 workers (from 3; none below, then they carry their own), processor workers a third of the rest
 (at least 1 with a processor), miners the rest up to the mines' places, leftovers to the processors then hauling; a member keeps his job while the counts hold. Miners and processor
 workers stay at their machine (`CharacterCold.StationUntil` skips their own carrying while the crew has haulers). A hauler (`CrewHaul`, task Haul with `HaulFetch` naming the item)
-takes, in order: what he carries to a processor input with room, else a storage; a processor's full output to storage; a processor input below half from a mine's output, else a
-storage; a mine's full output; any output a quarter full; a source another hauler is making for is skipped. With assigned buildings only those machines count. **Observed** in a temporary
+takes, in order: what he carries to a processor input with room (a worked one first, then the emptiest), else a storage; a processor's full output to storage; a processor input below half from a mine's output, else a
+storage; a mine's full output; any output a quarter full; a source another hauler is making for is skipped. Every chain machine in the outpost's radius counts (miners spread over the mines by free places), or with assigned buildings only those. **Observed** in a temporary
 probe (a 5-man squad, one stone mine, processor and box: manager, 2 miners, 1 processor worker, 1 hauler; building materials reach the box).
 The window lists each member's status (`SquadView.Managed`).
 

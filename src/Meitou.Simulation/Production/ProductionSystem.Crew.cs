@@ -77,7 +77,8 @@ public sealed partial class ProductionSystem
         var storages = world.Machines.All.Where(s => s.Data.IsStorage && s.Storage is not null && Workable(world, town, s)).OrderBy(s => s.Site, StringComparer.Ordinal).ToList();
         string? Into(string item, int carry)
         {
-            foreach (var p in processors)
+            // A processor somebody works first, the emptiest.
+            foreach (var p in processors.OrderByDescending(p => OperatorsOf(world, p.Site) > 0).ThenBy(p => p.Inputs.Where(i => i.Item == item).Sum(i => i.Count)))
                 if (p.Inputs.Any(i => i.Item == item && i.Rate > 0 && i.Count < i.Recipe.Capacity)) return p.Site;
             if (items.Create(item, Math.Max(1, carry)) is not { } one) return null;
             return storages.FirstOrDefault(s => s.Data.Accepts(one.Record, one.Type) && Fits(s.Storage!, one))?.Site;
@@ -96,7 +97,7 @@ public sealed partial class ProductionSystem
         foreach (var p in processors.Where(m => m.Output is { Full: true }))
             if (!Claimed(p.Site, p.Output!.Recipe.Item) && Store(p.Output.Recipe.Item) is { } to) return new(p.Site, to, p.Output.Recipe.Item);
         // A processor running low.
-        foreach (var p in processors)
+        foreach (var p in processors.OrderByDescending(p => OperatorsOf(world, p.Site) > 0))
             foreach (var input in p.Inputs)
             {
                 if (input.Rate <= 0 || input.Count * 2 >= input.Recipe.Capacity) continue;
