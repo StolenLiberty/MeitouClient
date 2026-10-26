@@ -956,8 +956,14 @@ optional), `EdgeGap` (site, point -> gap to its footprint hull; the host's).
   [original's finder](game/buildings-production.md#material-delivery) for each owed material in list order: a loose item
   of it within 1200 of the builder (engine: the nearest), else the nearest player storage holding it, else the nearest
   player machine whose output holds it, both within squared distance 4.246733e7 (the AI's default range mode; engine:
-  no town filter, no remembered source, exact record). At a building it takes up to 2 units while it has room, a loose
-  item whole (the rest stays); with something taken it walks back as *Build*, else the work ends. *Dismantle*: a complete site first
+  no town filter, no remembered source, exact record). Meitou carries full loads (engine choice, after the Engineer Carry Fix
+  plugin; the original takes at most 2 units from a building): a fetch takes what the site still owes of the material less what the site's
+  builders (the fetcher included) already carry, putting junk aside for each unit that does not fit (`ProductionSystem.MakeRoom`); a loose
+  item whole (the rest stays), plus the loose pieces of it within `ScoopRadius` (100) while the load is not full. A material the other builders
+  already carry enough of is not fetched; a builder at a stalled site whose missing materials are all on their way waits there (`Coming`);
+  one that arrives at its source to find them all taken walks back empty. With something taken it walks back as *Build*, else the work ends.
+  **Observed** in a temporary probe (10 owed, 6 x 3 non-stacking materials, junk in the builders' grids: one builder 4 trips from storage and
+  4 from single loose pieces, where the 2-unit rule takes 5 and the original's one-loose-item pickup 10; three builders took exactly the 10 owed). *Dismantle*: a complete site first
   becomes incomplete with progress at most target - 1; then progress -= dt x `lerp(0.05, 4, e/100)` x 4 x rate (no option
   or constant), XP as building; at 0 the delivered materials come back and the site is removed. The `medic` clip plays
   for building and delivering, `stonemine` for dismantling (`AnimationSystem.HeldClip`).

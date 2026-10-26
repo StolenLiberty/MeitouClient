@@ -45,8 +45,13 @@ public sealed class ConstructionSystem : ITickSystem
     public const float BarRate = 0.2f;
     /// <summary>The 0.75 falloff counter is capped at this (<b>Verified</b>); above <see cref="CounterRestart"/> it restarts at 0.</summary>
     public const int CounterCap = 15, CounterRestart = 100;
-    /// <summary>A fetch takes at most this many units from a building (<b>Verified</b>, <c>Task_EmptyMachine_BuildMats</c> slot 5 <c>FUN_1403411c0</c>).</summary>
+    /// <summary>
+    /// The original's fetch takes at most this many units from a building (<b>Verified</b>, <c>Task_EmptyMachine_BuildMats</c> slot 5 <c>FUN_1403411c0</c>). Meitou takes a full load instead
+    /// (<see cref="Load"/>); this is what it takes for a fetcher with no site.
+    /// </summary>
     public const int PickupUnits = 2;
+    /// <summary>Meitou: loose pieces of the material within this far of the one a fetcher picks up come along in the same trip (up to its load).</summary>
+    public const float ScoopRadius = 100;
     /// <summary>Loose materials are looked for within this far of the builder (<b>Verified</b>, <c>FUN_14059d000</c>).</summary>
     public const float GroundRadius = 1200;
     /// <summary>
@@ -166,7 +171,7 @@ public sealed class ConstructionSystem : ITickSystem
                                 site.Destroyed = false;
                                 world.Fixtures.RestoreTownShell(world, site);
                             }
-                            if (site.Stalled && !Carries(cold, site) && Source(world, slot, cold, site) is null)
+                            if (site.Stalled && !Carries(cold, site) && Source(world, slot, cold, site) is null && !Coming(world, cold, site))
                                 world.Bark(id, Loc.Tr("I don't have any building materials."));
                             Begin(world, slot, site, CharacterTask.Build, CharacterTask.Idle);
                         }
@@ -793,7 +798,7 @@ public sealed class ConstructionSystem : ITickSystem
                 cold.BuildBar = 0;
             }
             else if (Source(world, slot, cold, site) is { } source) Fetch(world, slot, cold, source);
-            else End(table, slot);
+            else if (!Coming(world, cold, site)) End(table, slot);   // Meitou: with the rest on its way it waits
             return;
         }
         float skill = Engineering(cold);
@@ -856,7 +861,7 @@ public sealed class ConstructionSystem : ITickSystem
     /// <summary>The material a site waits for that the character neither carries nor can fetch (storage, ground, a machine's output in range), or null (Meitou: the manager's check).</summary>
     internal string? Missing(World world, int slot, BuildSite site)
     {
-        if (!site.Stalled || world.Characters.Cold(slot) is not { } cold || Carries(cold, site) || Source(world, slot, cold, site) is not null) return null;
+        if (!site.Stalled || world.Characters.Cold(slot) is not { } cold || Carries(cold, site) || Source(world, slot, cold, site) is not null || Coming(world, cold, site)) return null;
         return site.Materials.FirstOrDefault(m => m.Required > m.Delivered)?.Item;
     }
 
@@ -884,6 +889,8 @@ public sealed class ConstructionSystem : ITickSystem
         {
             if (material.Required <= material.Delivered) continue;
             string want = material.Item;
+            // Meitou: a material the site's other builders already carry enough of is not fetched again.
+            if (Need(world, cold, site, want) <= 0) continue;
             int? loose = null;
             float best = GroundRadius * GroundRadius;
             foreach (var g in world.GroundItems.All)
@@ -940,9 +947,10 @@ public sealed class ConstructionSystem : ITickSystem
     }
 
     /// <summary>
-    /// A fetcher at its source: a loose item goes into the inventory whole (what does not fit stays on the ground, <c>Task_Pickup</c>); a building gives up to <see cref="PickupUnits"/> units
-    /// while the character has room (<b>Verified</b>, <c>Task_EmptyMachine</c> update <c>FUN_14033cd10</c>; the original takes the first record the building lists, Meitou the material). With
-    /// something taken it goes back to the site, else the work ends.
+    /// A fetcher at its source: a loose item goes into the inventory whole (what does not fit stays on the ground, <c>Task_Pickup</c>); a building gives units while the character has room
+    /// (<c>Task_EmptyMachine</c> update <c>FUN_14033cd10</c>; the original takes the first record the building lists, Meitou the material). The original stops at <see cref="PickupUnits"/>
+    /// (<b>Verified</b>); Meitou takes a full <see cref="Load"/> and, from the ground, the loose pieces of it within <see cref="ScoopRadius"/> too. With something taken it goes back to the
+    /// site, else the work ends.
     /// </summary>
     void FetchStep(World world, int slot, CharacterCold cold)
     {
@@ -953,29 +961,47 @@ public sealed class ConstructionSystem : ITickSystem
         {
             // Meitou: room for the material first (what it does not need goes into the storage it is at, else on the ground).
             Production.ProductionSystem.MakeRoom(world, slot, items.Create(record, 1), cold.FetchSite is { } box ? world.Machines.Find(box) : null);
+            int load = Load(world, cold, record);
+            // Meitou: the other builders picked up what the site owes while it walked here: it goes back empty-handed (and waits there for them).
+            if (load <= 0)
+            {
+                BackToSite(ref n, cold);
+                return;
+            }
             if (cold.FetchItem is { } id && world.GroundItems.Find(id) is { } loose)
             {
-                int before = loose.Item.Quantity;
-                if (inv.Add(loose.Item))
+                var there = loose.Position;
+                taken = PickUp(world, slot, inv, id);
+                // Meitou: the loose pieces of the same material lying round it come along, nearest first, while the load is not full.
+                if (taken > 0 && taken < load)
                 {
-                    world.GroundItems.Take(id);
-                    taken = before;
+                    var near = new List<(float D, int Id)>();
+                    foreach (var g in world.GroundItems.All)
+                        if (g.Item.Record == record && g.Item.Quantity > 0 && g.Item.Contents is null && (g.OwnedBy < 0 || g.OwnedBy == cold.Faction)
+                            && Vector3.DistanceSquared(g.Position, there) <= ScoopRadius * ScoopRadius) near.Add((Vector3.DistanceSquared(g.Position, there), g.Id));
+                    near.Sort();
+                    foreach (var (_, other) in near)
+                    {
+                        if (taken >= load) break;
+                        int got = PickUp(world, slot, inv, other);
+                        if (got == 0) break;
+                        taken += got;
+                    }
                 }
-                else taken = before - loose.Item.Quantity;
                 if (taken > 0) world.EmitSound(SoundKind.PickedUp, slot, n.Position);
             }
             else if (cold.FetchSite is { } from && world.Machines.Find(from) is { } m)
             {
-                for (; taken < PickupUnits; taken++)
+                for (; taken < load; taken++)
                 {
                     if (m.Storage is { } storage && m.Data.IsStorage)
                     {
-                        if (Stack(storage, record) is not { } stack || !inv.Add(stack.WithQuantity(1))) break;
+                        if (Stack(storage, record) is not { } stack || !AddMakingRoom(world, slot, inv, stack.WithQuantity(1), m)) break;
                         storage.RemoveOne(stack);
                     }
                     else if (m.Output is { Count: > 0 } output && output.Recipe.Item == record && items.Create(record, 1) is { } unit)
                     {
-                        if (!inv.Add(unit)) break;
+                        if (!AddMakingRoom(world, slot, inv, unit, null)) break;
                         output.Count--;
                     }
                     else break;
@@ -990,6 +1016,74 @@ public sealed class ConstructionSystem : ITickSystem
             if (cold.Inventory is { } full && Items.InventoryCommands.Cramped(full)) Production.ProductionSystem.InventoryFull(world, table.IdOf(slot), cold);
             End(table, slot);
         }
+    }
+
+    /// <summary>A loose item into the inventory whole, or what fits of it (the rest stays on the ground; Meitou: junk is put aside for it first, <see cref="AddMakingRoom"/>); the units taken.</summary>
+    static int PickUp(World world, int slot, Inventory inv, int id)
+    {
+        if (world.GroundItems.Find(id) is not { } loose) return 0;
+        int before = loose.Item.Quantity;
+        if (!AddMakingRoom(world, slot, inv, loose.Item, null)) return before - loose.Item.Quantity;
+        world.GroundItems.Take(id);
+        return before;
+    }
+
+    /// <summary>Meitou: adds an item; when it does not fit, the builder puts junk aside (<see cref="Production.ProductionSystem.MakeRoom"/>: food, first aid, worn gear and the like are kept) and tries once more.</summary>
+    static bool AddMakingRoom(World world, int slot, Inventory inv, ItemInstance item, Production.Machine? store)
+    {
+        if (inv.Add(item)) return true;
+        return Production.ProductionSystem.MakeRoom(world, slot, item, store) > 0 && inv.Add(item);
+    }
+
+    /// <summary>
+    /// Meitou (engine choice; the Engineer Carry Fix plugin's idea): how many units of <paramref name="record"/> a fetcher takes in one trip: what its site still owes of it, less what the
+    /// site's builders (the fetcher included: anyone of its faction building, delivering to or fetching for it) already carry; 0 or less: nothing to take. The inventory's room caps it.
+    /// </summary>
+    static int Load(World world, CharacterCold cold, string record) =>
+        cold.BuildSite is { } siteId && world.Buildings.Find(siteId) is { } site ? Need(world, cold, site, record) : PickupUnits;
+
+    /// <summary>What <paramref name="site"/> still owes of <paramref name="record"/> less what its builders of <paramref name="cold"/>'s faction carry (it included); 0 or less: covered.</summary>
+    static int Need(World world, CharacterCold cold, BuildSite site, string record)
+    {
+        string siteId = site.Id;
+        float owed = 0;
+        foreach (var m in site.Materials)
+            if (m.Item == record) owed += MathF.Max(0, m.Required - m.Delivered);
+        int need = (int)MathF.Ceiling(owed);
+        var table = world.Characters;
+        for (int s = 0; s < table.HighWater && need > 0; s++)
+        {
+            if (!table.Next[s].Alive || table.Cold(s) is not { } other || other.BuildSite != siteId || other.Faction != cold.Faction) continue;
+            if (table.Next[s].Task is not ((byte)CharacterTask.Build or (byte)CharacterTask.DeliverMaterials or (byte)CharacterTask.FetchMaterials)) continue;
+            need -= Carried(other.Inventory, record);
+        }
+        return need;
+    }
+
+    /// <summary>Meitou: a stalled site's missing materials are all on their way (another builder of it carries what is owed): the builder waits at it instead of fetching or giving up.</summary>
+    static bool Coming(World world, CharacterCold cold, BuildSite site)
+    {
+        bool any = false;
+        foreach (var m in site.Materials)
+        {
+            if (m.Required <= m.Delivered) continue;
+            if (Need(world, cold, site, m.Item) > 0) return false;
+            any = true;
+        }
+        return any;
+    }
+
+    /// <summary>The units of <paramref name="record"/> in an inventory and its backpack.</summary>
+    static int Carried(Inventory? inventory, string record)
+    {
+        if (inventory is null) return 0;
+        int count = 0;
+        foreach (var item in inventory.Items)
+            if (item.Record == record && item.Contents is null) count += item.Quantity;
+        if (inventory.Backpack?.Contents is { } bag)
+            foreach (var item in bag.Items)
+                if (item.Record == record) count += item.Quantity;
+        return count;
     }
 
     void DeliverStep(World world, int slot, CharacterCold cold, BuildSite site, float dt)
@@ -1084,7 +1178,7 @@ public sealed class ConstructionSystem : ITickSystem
         foreach (var site in reg.All)
         {
             if (!site.NeedsWork || site.Paused || site.Destroyed || site.Dismantling || site.WallParent is not null || site.Owner != cold.Faction) continue;
-            if (site.Stalled && !Carries(cold, site) && Source(world, slot, cold, site) is null) continue;
+            if (site.Stalled && !Carries(cold, site) && Source(world, slot, cold, site) is null && !Coming(world, cold, site)) continue;
             float d2 = Vector3.DistanceSquared(at, site.Position);
             float score = MathF.Max(2 * (1 - d2 / (9000f * 9000f)), 0.0001f) / (Workers(table, site.Id, slot) + 1);
             if (best is null || score > bestScore)
