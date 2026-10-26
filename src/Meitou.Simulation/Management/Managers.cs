@@ -39,6 +39,11 @@ public sealed record ManagementSettings
     /// only those, in this order, and are moved up the list as work turns up there (<see cref="ManagerSystem"/> "the chain").
     /// </summary>
     public IReadOnlyList<string> Buildings { get; init; } = [];
+    /// <summary>
+    /// The one material the squad's machines handle (a world resource: <see cref="Meitou.Data.Gameplay.Construction.ResourceField.IronResource"/>, stone, copper; 0 any): its mines and
+    /// the labouring refineries down its chain (<see cref="Production.ProductionSystem.InChain"/>), so a stone crew never mines iron.
+    /// </summary>
+    public int Material { get; init; }
 
     public static readonly IReadOnlyList<float> DefaultBuildPriority = [6, 8, 7, 5, 4, 4, 5, 2];
 
@@ -57,9 +62,9 @@ public sealed record ManagementSettings
         _ => BuildGroup.Other,
     };
 
-    sealed record Stored(int S, string N, byte D, bool B, List<float>? P = null, List<string>? A = null);
+    sealed record Stored(int S, string N, byte D, bool B, List<float>? P = null, List<string>? A = null, int M = 0);
 
-    public string Write() => JsonSerializer.Serialize(new Stored(ManagerSquadIndex, ManagerName, (byte)Defence, Build, [.. BuildPriority], [.. Buildings]));
+    public string Write() => JsonSerializer.Serialize(new Stored(ManagerSquadIndex, ManagerName, (byte)Defence, Build, [.. BuildPriority], [.. Buildings], Material));
 
     public static ManagementSettings? Read(string text)
     {
@@ -69,7 +74,7 @@ public sealed record ManagementSettings
         return s is null ? null : new ManagementSettings
         {
             ManagerSquadIndex = s.S, ManagerName = s.N ?? "", Defence = Enum.IsDefined((DefenceMode)s.D) ? (DefenceMode)s.D : DefenceMode.Militia, Build = s.B,
-            Buildings = s.A is { } a ? [.. a.Where(x => x.Length > 0).Distinct()] : [],
+            Buildings = s.A is { } a ? [.. a.Where(x => x.Length > 0).Distinct()] : [], Material = Math.Clamp(s.M, 0, 4),
             BuildPriority = s.P is { Count: > 0 } p ? [.. p.Concat(DefaultBuildPriority.Skip(p.Count)).Take(DefaultBuildPriority.Count).Select(v => Math.Clamp(v, 0, 10))] : DefaultBuildPriority,
         };
     }
@@ -131,7 +136,8 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
     }
 
     /// <summary>The name of a site's building, for the log.</summary>
-    string SiteName(World world, string site) => world.Buildings.Find(site) is { } b ? (b.Name.Length > 0 ? b.Name : data?.Db.Find(b.Record)?.Name ?? "a building") : "a building";
+    string SiteName(World world, string site) => world.Buildings.Find(site) is { Name.Length: > 0 } b ? b.Name
+        : world.Machines.Find(site)?.Data.Name is { Length: > 0 } name ? name : world.Buildings.Find(site) is { } r ? data?.Db.Find(r.Record)?.Name ?? "a building" : "a building";
 
     public void Inputs(World world, IReadOnlyList<SimCommand> commands)
     {
@@ -189,9 +195,10 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
             var settings = squad.Autonomy ?? new AutonomySettings();
             bool rest = settings.IsRestTime(world.GameHours);
             current = (squad.Id, manager.Name);
+            var plan = m.Material != 0 && production is not null ? PlanCrew(world, production, squad, m, town, bossId) : null;
             foreach (var id in squad.Members)
-                Manage(world, production, m, settings, rest, town, enemies, table.Next[boss].Position, id, beds, building);
-            if (enemies.Count == 0 && !rest) Chain(world, production, squad, m);
+                Manage(world, production, m, settings, rest, town, enemies, table.Next[boss].Position, id, beds, building, plan);
+            if (enemies.Count == 0 && !rest && plan is null) Chain(world, production, squad, m);
         }
     }
 
@@ -202,7 +209,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
     }
 
     void Manage(World world, Production.ProductionSystem? production, ManagementSettings m, AutonomySettings s, bool rest, Construction.PlayerTown town, List<int> enemies, Vector3 boss,
-        CharacterId id, HashSet<string> beds, Dictionary<string, int> building)
+        CharacterId id, HashSet<string> beds, Dictionary<string, int> building, CrewPlan? plan = null)
     {
         var table = world.Characters;
         if (!table.TryResolveNext(id, out int slot) || table.Cold(slot) is not { } c) return;
@@ -257,6 +264,11 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         // Sitting on a chair (the idle sit job) is free time: work takes him off it.
         bool sitting = c.Implicit == Meitou.Data.Gameplay.Ai.TaskType.SIT_AROUND && task == CharacterTask.Operate;
         if (sitting) task = CharacterTask.Idle;
+        // A material crew: each member keeps his job (mining, processing, hauling).
+        if (plan is not null && production is not null && !wounded && !rest && !c.InCombat && c.Formation is null && c.LootAll is null && c.FollowOrder.IsNone
+            && task is CharacterTask.Idle or CharacterTask.Operate or CharacterTask.Haul && plan.Roles.TryGetValue(id, out var role)
+            && !(task == CharacterTask.Idle && c.Inventory is { } bag && Items.InventoryCommands.Cramped(bag))
+            && Crew(world, production, plan, role, slot, id, c, task)) return;
         if (task != CharacterTask.Idle || c.InCombat || c.Formation is not null || c.LootAll is not null || !c.FollowOrder.IsNone)
         {
             status[id] = ours ? task == CharacterTask.FetchMaterials ? "fetching materials" : task is CharacterTask.Build or CharacterTask.DeliverMaterials ? "building: " + SiteName(world, job.Site) : "working: " + SiteName(world, job.Site) : c.Formation is not null ? "in formation" : TaskWord(task);
@@ -287,7 +299,7 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
         }
         // A site to build whose group matters more than the best machine's job goes first (Building page against the Jobs page).
         var site = m.Build ? Site(world, m, town, n.Position, id, building) : null;
-        var machine = production?.AutonomyLabour(world, slot, s, town.Number, boss) is { } found && !Stuck(world, id, found) ? found : null;
+        var machine = production?.AutonomyLabour(world, slot, s, town.Number, boss, m.Material) is { } found && !Stuck(world, id, found) ? found : null;
         int machinePriority = machine is null ? -1 : MachinePriority(world, s, machine);
         if (site is { } first && (machine is null || site.Value.Priority > machinePriority))
         {
@@ -517,6 +529,103 @@ public sealed class ManagerSystem(PopulationData? data = null) : ITickSystem
     /// The site of the outpost to build (placed, not paused or being taken apart) or repair (complete and damaged) whose group matters most (<see cref="ManagementSettings.BuildPriority"/>, 0
     /// never), the nearest on a tie; with fewer than <see cref="BuildersPerSite"/> builders (on it now and sent this pass), not stuck for this one. Null: none.
     /// </summary>
+    // ------------------------------------------------------------------ material crews
+
+    public enum CrewRole : byte { Miner, Processor, Hauler, Manager }
+
+    /// <summary>One pass's crew: the material's machines in the outpost, how many haulers, and each member's job.</summary>
+    internal sealed record CrewPlan(List<Production.Machine> Mines, List<Production.Machine> Processors, int Haulers, Dictionary<CharacterId, CrewRole> Roles, Construction.PlayerTown Town, int Material);
+
+    /// <summary>Each member's last crew job, kept from pass to pass so nobody is shuffled while the counts hold.</summary>
+    readonly Dictionary<CharacterId, CrewRole> crewRoles = [];
+
+    /// <summary>
+    /// The split (engine choice): with 4 or more the manager only runs the crew; haulers 1 for 3-7 workers, 2 for 8-12 and so on (none below 3: then they carry their own); processor
+    /// workers a third of the rest (at least 1 with a processor, at most its places); miners the rest up to the mines' places; anyone left over goes on the processors, then hauling.
+    /// </summary>
+    CrewPlan PlanCrew(World world, Production.ProductionSystem production, Squad squad, ManagementSettings m, Construction.PlayerTown town, CharacterId boss)
+    {
+        var table = world.Characters;
+        var (mines, processors) = production.CrewMachines(world, town, m.Material, m.Buildings);
+        var workers = new List<CharacterId>();
+        foreach (var id in squad.Members)
+            if (table.TryResolveNext(id, out int s) && table.Cold(s) is { } c && c.Medical is not { Dead: true } and not { Incapacitated: true } && !c.IsImprisoned
+                && OutpostAt(world, table.Next[s].Position)?.Number == town.Number) workers.Add(id);
+        var roles = new Dictionary<CharacterId, CrewRole>();
+        if (workers.Count >= 4 && workers.Remove(boss)) roles[boss] = CrewRole.Manager;
+        int w = workers.Count, mineSlots = mines.Sum(x => x.Data.MaxOperators), procSlots = processors.Sum(x => x.Data.MaxOperators);
+        int haulers = w >= 3 ? Math.Max(1, (w + 2) / 5) : 0;
+        int procs = procSlots == 0 ? 0 : w >= 3 ? Math.Min(procSlots, Math.Max(1, (w - haulers) / 3)) : w == 2 && mineSlots > 0 ? 1 : mineSlots == 0 ? Math.Min(procSlots, w) : 0;
+        int miners = Math.Min(mineSlots, w - haulers - procs);
+        int left = w - haulers - procs - miners;
+        int more = Math.Min(left, procSlots - procs);
+        procs += more;
+        left -= more;
+        if (haulers > 0 || w >= 2 && mineSlots + procSlots > 0) haulers += left;
+        var open = new Dictionary<CrewRole, int> { [CrewRole.Miner] = miners, [CrewRole.Processor] = procs, [CrewRole.Hauler] = haulers };
+        var unplaced = new List<CharacterId>();
+        foreach (var id in workers)
+            if (crewRoles.TryGetValue(id, out var was) && was != CrewRole.Manager && open[was] > 0) { roles[id] = was; open[was]--; }
+            else unplaced.Add(id);
+        foreach (var id in unplaced)
+            foreach (var r in (ReadOnlySpan<CrewRole>)[CrewRole.Miner, CrewRole.Processor, CrewRole.Hauler])
+                if (open[r] > 0) { roles[id] = r; open[r]--; break; }
+        foreach (var (id, r) in roles) crewRoles[id] = r;
+        foreach (var id in squad.Members) if (!roles.ContainsKey(id)) crewRoles.Remove(id);
+        return new(mines, processors, roles.Count(r => r.Value == CrewRole.Hauler), roles, town, m.Material);
+    }
+
+    /// <summary>A crew member's job this pass; false to leave him to the usual rules (no machine of his kind).</summary>
+    bool Crew(World world, Production.ProductionSystem production, CrewPlan plan, CrewRole role, int slot, CharacterId id, CharacterCold c, CharacterTask task)
+    {
+        string what = Production.ProductionSystem.MaterialName(plan.Material);
+        if (role == CrewRole.Manager)
+        {
+            if (task is CharacterTask.Operate or CharacterTask.Haul) production.AutonomyStop(world, slot);
+            status[id] = $"managing the {what} crew";
+            return true;
+        }
+        if (role == CrewRole.Hauler)
+        {
+            if (task == CharacterTask.Haul && c.HaulFetch is { } item && c.HaulTo is { } to)
+            {
+                status[id] = $"hauling: {ItemName(item)} to the {SiteName(world, to)}";
+                return true;
+            }
+            if (production.CrewHaul(world, slot, plan.Town, plan.Material, plan.Mines, plan.Processors) is { } trip && production.CrewHaulBegin(world, slot, trip))
+            {
+                Log(world, c, $"to carry {ItemName(trip.Item)} to the {SiteName(world, trip.To)}");
+                status[id] = $"hauling: {ItemName(trip.Item)} to the {SiteName(world, trip.To)}";
+                return true;
+            }
+            if (task is CharacterTask.Operate or CharacterTask.Haul) production.AutonomyStop(world, slot);
+            status[id] = "hauling: nothing to carry";
+            return true;
+        }
+        var stations = role == CrewRole.Miner ? plan.Mines : plan.Processors;
+        if (stations.Count == 0) return false;
+        c.StationUntil = plan.Haulers > 0 ? world.Tick + (long)(3 * CheckSeconds / world.TickSeconds) : 0;
+        string doing = role == CrewRole.Miner ? "mining" : "processing";
+        if (task == CharacterTask.Operate && c.OperateSite is { } on && stations.Any(x => x.Site == on))
+        {
+            status[id] = $"{doing}: {SiteName(world, on)}";
+            return true;
+        }
+        if (production.CrewStation(world, slot, stations) is not { } station)
+        {
+            if (task is CharacterTask.Operate or CharacterTask.Haul) production.AutonomyStop(world, slot);
+            status[id] = $"{doing}: waiting for a free place";
+            return true;
+        }
+        if (!production.AutonomyBegin(world, slot, station)) return false;
+        if (!sent.TryGetValue(id, out var was) || was.Site != station) Log(world, c, $"to {(role == CrewRole.Miner ? "mine at" : "work")} the {SiteName(world, station)}");
+        sent[id] = (station, world.Tick);
+        status[id] = $"{doing}: {SiteName(world, station)}";
+        return true;
+    }
+
+    string ItemName(string record) => data?.Db.Find(record)?.Name is { Length: > 0 } n ? n.ToLowerInvariant() : "goods";
+
     (Construction.BuildSite Site, int Priority)? Site(World world, ManagementSettings m, Construction.PlayerTown town, Vector3 at, CharacterId id, Dictionary<string, int> building)
     {
         var table = world.Characters;

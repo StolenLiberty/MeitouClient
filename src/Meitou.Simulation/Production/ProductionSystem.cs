@@ -237,9 +237,23 @@ public sealed partial class ProductionSystem : ITickSystem
                     var site = Site(world, order.Site);
                     if (site is not { Complete: true } || (Ensure(world, site) is not { } machine) || !(machine.Data.Operable || machine.Data.IsTraining)) break;
                     var table = world.Characters;
+                    int material = MaterialOf(machine.Data);
+                    HashSet<int>? started = null;
                     foreach (var id in Who(world, order.Characters))
                     {
                         if (!table.TryResolveNext(id, out int slot) || table.Cold(slot) is not { IsPlayer: true } cold || !Able(cold)) continue;
+                        // Meitou: a squad its manager runs, sent to a mine or processor of a material, makes that material its operation; the manager gives out the jobs.
+                        if (material != 0 && cold.SquadId >= 0 && world.Squads.Find(cold.SquadId) is { Autonomy: { ManagerRuns: true } } crew)
+                        {
+                            if ((started ??= []).Add(crew.Id))
+                            {
+                                if (crew.Management?.Material != material) world.Post($"{crew.Name}: {MaterialName(material)} operation. The manager splits them into miners, processor workers and haulers.");
+                                crew.Management = (crew.Management ?? new Meitou.Simulation.Management.ManagementSettings()) with { Material = material };
+                            }
+                            if (table.Next[slot].Task is (byte)CharacterTask.Operate or (byte)CharacterTask.Haul) End(table, slot);
+                            else if (table.Next[slot].Task == (byte)CharacterTask.GoTo) MovementSystem.Stop(table, slot);
+                            continue;
+                        }
                         if (cold.OperateSite == site.Id) continue;
                         if (OperatorsOf(world, site.Id) >= machine.Data.MaxOperators)
                         {
@@ -546,7 +560,7 @@ public sealed partial class ProductionSystem : ITickSystem
         {
             ref var n = ref table.Next[i];
             if (!n.Alive) continue;
-            if (n.Task == (byte)CharacterTask.Haul) { HaulStep(world, i); continue; }
+            if (n.Task == (byte)CharacterTask.Haul) { if (table.Cold(i)?.HaulFetch is not null) CrewHaulStep(world, i); else HaulStep(world, i); continue; }
             if (n.Task != (byte)CharacterTask.Operate) continue;
             var cold = table.Cold(i)!;
             if (cold.OperateSite is not { } id || Site(world, id) is not { Complete: true } site || world.Machines.Find(id) is not { } m || !Able(cold))

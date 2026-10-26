@@ -116,6 +116,8 @@ public sealed class CharacterCold
     public int DeadCheckBlows { get; set; }
     /// <summary>When it last said "My inventory is full." (Meitou: a worker that cannot take what its work needs stops; not saved).</summary>
     public long FullBarkTick { get; set; } = long.MinValue;
+    /// <summary>Meitou: until this tick a crew's station worker stays at its machine (its crew's haulers carry; <see cref="Production.ProductionSystem"/> StartHaul). Not saved.</summary>
+    public long StationUntil { get; set; }
     /// <summary>Its spot in <see cref="Formation"/> (with the clicked height) and the yaw it faces there.</summary>
     public System.Numerics.Vector3 FormationSpot { get; set; }
     public float FormationYaw { get; set; }

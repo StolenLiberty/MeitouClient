@@ -41,6 +41,12 @@ public sealed partial class ProductionSystem
                 if (room == 0) break;
             }
         }
+        // A crew's station worker leaves the carrying to its haulers.
+        if (cold.StationUntil > world.Tick)
+        {
+            if (changed) world.Machines.Touch();
+            return false;
+        }
         // A full output is taken only when some storage takes it; without one the machine stays full.
         if (m.Output is { Full: true } output && items.Create(output.Recipe.Item, output.Count) is { } made &&
             NearestStorage(world, site, s => s.Data.Accepts(made.Record, made.Type) && Fits(s.Storage!, made)) is not null)

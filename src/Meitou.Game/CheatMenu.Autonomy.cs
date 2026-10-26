@@ -478,7 +478,7 @@ sealed partial class CheatMenu
 
     // ------------------------------------------------------------------ the Squad and Priorities pages (Meitou's autonomy: the manager runs the squad)
 
-    sealed record WorkRole(string Name, string Blurb, float[] Labour, float[] Build, bool Turrets, Meitou.Simulation.Management.DefenceMode? Defence = null);
+    sealed record WorkRole(string Name, string Blurb, float[] Labour, float[] Build, bool Turrets, Meitou.Simulation.Management.DefenceMode? Defence = null, int Material = 0);
 
     // Labour order: Science, Labouring, Farming, Engineer, Cooking, Robotics, Medic, WeaponSmith, ArmourSmith, CrossbowSmith, AutomaticMachine, Other. Build order: BuildRows.
     static readonly WorkRole[] WorkRoles =
@@ -487,7 +487,9 @@ sealed partial class CheatMenu
         new("Workers", "Run every machine in the outpost. Build when nothing else needs doing.", [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], [3, 3, 3, 3, 3, 3, 3, 2], false),
         new("Farmers", "Plant, tend and harvest the farms; help cook.", [0, 0, 10, 0, 6, 0, 0, 0, 0, 0, 3, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Cooks", "Keep the stoves and ovens going; help on the farms.", [0, 0, 4, 0, 10, 0, 0, 0, 0, 0, 3, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
-        new("Miners", "Mine and refine: ore, stone, copper, iron.", [0, 10, 0, 2, 0, 0, 0, 0, 0, 0, 4, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
+        new("Stone crew", "Stone only: mine it, process it into building materials.", [0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0], [0, 0, 0, 0, 0, 0, 0, 0], false, Material: Meitou.Data.Gameplay.Construction.ResourceField.StoneResource),
+        new("Iron crew", "Iron only: mine ore, refine plates, make steel.", [0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0], [0, 0, 0, 0, 0, 0, 0, 0], false, Material: Meitou.Data.Gameplay.Construction.ResourceField.IronResource),
+        new("Copper crew", "Copper only: mine it.", [0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0], [0, 0, 0, 0, 0, 0, 0, 0], false, Material: Meitou.Data.Gameplay.Construction.ResourceField.CopperResource),
         new("Crafters", "Smith weapons, armour and crossbows; make parts.", [0, 0, 0, 3, 0, 3, 0, 10, 10, 10, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Researchers", "Work the research benches.", [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
         new("Medics", "Run the medical benches.", [0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], false),
@@ -496,18 +498,18 @@ sealed partial class CheatMenu
     ];
 
     bool IsRole(WorkRole role, AutonomySettings s, Meitou.Simulation.Management.ManagementSettings m) =>
-        s.Labour.Take(12).SequenceEqual(role.Labour) && m.BuildPriority.Take(8).SequenceEqual(role.Build) && s.ManTurrets == role.Turrets;
+        s.Labour.Take(12).SequenceEqual(role.Labour) && m.BuildPriority.Take(8).SequenceEqual(role.Build) && s.ManTurrets == role.Turrets && m.Material == role.Material;
 
     /// <summary>The main page: what the squad does (a role sets the priorities), who runs it, what happens when attacked, and what each one is doing now.</summary>
     void DrawSquadPage(SquadView squad, AutonomySettings s, float x, float w)
     {
         var m = MgmtSettings(squad) ?? new Meitou.Simulation.Management.ManagementSettings();
         Header("What should this squad do?", x, 120, w);
-        float cw = (w - 20) / 3, ch = 56;
+        float cw = (w - 30) / 4, ch = 56;
         for (int i = 0; i < WorkRoles.Length; i++)
         {
             var role = WorkRoles[i];
-            var at = R(x + (i % 3) * (cw + 10), 162 + (i / 3) * (ch + 8), cw, ch);
+            var at = R(x + (i % 4) * (cw + 10), 162 + (i / 4) * (ch + 8), cw, ch);
             bool chosen = s.Enabled && IsRole(role, s, m);
             bool hover = Hovered(at, null);
             Rect(at, chosen ? Brass with { W = 0.12f } : new Vector4(0, 0, 0, hover ? 0.28f : 0.18f));
@@ -519,7 +521,7 @@ sealed partial class CheatMenu
             {
                 // A role turns autonomy on for the manager (clearing the old mod's behaviours) and sets every priority.
                 AutSend(squad, s with { Enabled = true, Packages = [], Labour = role.Labour, ManTurrets = role.Turrets });
-                MgmtSend(squad, m with { BuildPriority = role.Build, Build = role.Build.Any(v => v > 0) || m.Build, Defence = role.Defence ?? m.Defence });
+                MgmtSend(squad, m with { BuildPriority = role.Build, Build = role.Build.Any(v => v > 0) || m.Build, Defence = role.Defence ?? m.Defence, Material = role.Material });
                 Notice($"{squad.Name}: {role.Name}. {ManagerName(squad, m)} runs them.");
             }));
         }

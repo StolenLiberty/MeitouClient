@@ -1440,6 +1440,16 @@ Assigned buildings (`ManagementSettings.Buildings`, site ids, top first; the win
 order, instead of the priorities. Every 20 s (`ManagerSystem.Chain`) a worker who has been at a lower one for 30 s or more is moved to the highest listed complete one he can work
 (`ProductionSystem.AutonomyCanWork`: operable, not blocked), so a stone crew listing processor above mines moves a miner to the processor when stone is in storage and back when it runs dry. A listed
 building that cannot run (`AutonomyStuck`: no power, out of an input, full with no storage) is noted once in the log with "!".
+Material crews (`ManagementSettings.Material`, a world resource: 1 iron, 2 stone, 3 copper; saved as `M`): set by the Stone / Iron / Copper crew roles, or by an operate order
+(a click on a machine) given to members of a manager-run squad when the machine is in a material's chain; those members drop what they were doing and the operation starts (no direct
+order). The chain (`ProductionSystem.InChain`, from the data): the material's mines and natural rocks (`world resource mining`), then every Labouring refinery whose input is a chain item,
+repeated (stone: Raw Stone -> processors -> Building Material; iron: Raw Iron -> iron refineries -> Iron Plates -> steel refineries; copper: the mines only). Every 2 s the manager splits
+the members in the outpost (`PlanCrew`): with 4 or more he only runs them; haulers 1 per 5 workers (from 3; none below, then they carry their own), processor workers a third of the rest
+(at least 1 with a processor), miners the rest up to the mines' places, leftovers to the processors then hauling; a member keeps his job while the counts hold. Miners and processor
+workers stay at their machine (`CharacterCold.StationUntil` skips their own carrying while the crew has haulers). A hauler (`CrewHaul`, task Haul with `HaulFetch` naming the item)
+takes, in order: what he carries to a processor input with room, else a storage; a processor's full output to storage; a processor input below half from a mine's output, else a
+storage; a mine's full output; any output a quarter full; a source another hauler is making for is skipped. With assigned buildings only those machines count. **Observed** in a temporary
+probe (a 5-man squad, one stone mine, processor and box: manager, 2 miners, 1 processor worker, 1 hauler; building materials reach the box).
 The window lists each member's status (`SquadView.Managed`).
 
 ## New-game difficulty

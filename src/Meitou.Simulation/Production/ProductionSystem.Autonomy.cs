@@ -1,4 +1,7 @@
 using System.Numerics;
+using Meitou.Data.Fcs;
+using Meitou.Data.Gameplay.Bodies;
+using Meitou.Data.Gameplay.Construction;
 using Meitou.Data.Gameplay.Ai;
 using Meitou.Simulation.Autonomy;
 using Meitou.Simulation.Construction;
@@ -15,7 +18,7 @@ public sealed partial class ProductionSystem
     /// operator places, power, inputs it can fill, room for the output, a queued research or craft; an automatic machine as its hauling job). Highest priority first; on a tie the one it works
     /// at now, then fewer operators, then the nearest (distance squared from the character, plus twice that from <paramref name="home"/>, the squad's work place, when it has one).
     /// </summary>
-    internal string? AutonomyLabour(World world, int slot, AutonomySettings settings, int town, Vector3? home)
+    internal string? AutonomyLabour(World world, int slot, AutonomySettings settings, int town, Vector3? home, int material = 0)
     {
         var table = world.Characters;
         if (table.Cold(slot) is not { } cold || !Able(cold) || town <= 0) return null;
@@ -29,6 +32,7 @@ public sealed partial class ProductionSystem
             if (!automatic && !m.Data.Operable) continue;
             // A turret is manned only with Man turrets (the plugin's couldIOperate), not as "other" labour.
             if (m.Data.Function == Meitou.Data.World.ObjectRanges.TurretFunction && !settings.ManTurrets) continue;
+            if (material != 0 && !InChain(m.Data, material)) continue;
             int priority = settings.LabourPriority(AutonomyRules.KindOf(m.Data));
             if (priority <= 0) continue;
             var job = new PermaJob(automatic ? TaskType.OPERATE_AUTOMATIC_MACHINERY : TaskType.OPERATE_MACHINERY, site.Id);
@@ -45,6 +49,38 @@ public sealed partial class ProductionSystem
 
         static bool Better((int P, bool C, int O, float D) a, (int P, bool C, int O, float D) b) =>
             a.P != b.P ? a.P > b.P : a.C != b.C ? a.C : a.O != b.O ? a.O < b.O : a.D < b.D;
+    }
+
+    readonly Dictionary<int, HashSet<string>> chains = [];
+
+    /// <summary>
+    /// Whether a machine is part of one material's chain (Meitou, engine choice): a mine of that world resource (<c>world resource mining</c> 1 iron, 2 stone, 3 copper), or a
+    /// refinery worked with Labouring whose input is that mine's output or a further such refinery's (stone: the processors; iron: the iron and steel refineries; copper: the mines only).
+    /// </summary>
+    internal bool InChain(MachineData m, int resource)
+    {
+        if (m.Function is MachineData.MineFunction or MachineData.NaturalMineFunction) return m.Resource == resource && m.Farm is null;
+        if (m.Function != MachineData.RefineryFunction || (StatsEnumerated)m.Stat != StatsEnumerated.Labouring) return false;
+        var items = ChainItems(resource);
+        return m.Inputs.Any(i => items.Contains(i.Item));
+    }
+
+    /// <summary>The items of a material's chain, from every BUILDING of the data (read once per material).</summary>
+    HashSet<string> ChainItems(int resource)
+    {
+        if (chains.TryGetValue(resource, out var items)) return items;
+        chains[resource] = items = new(StringComparer.Ordinal);
+        var all = db.OfType(FcsRecordType.BUILDING).Select(r => Data(r.StringId)).OfType<MachineData>().ToList();
+        foreach (var m in all)
+            if (m.Function is MachineData.MineFunction or MachineData.NaturalMineFunction && m.Resource == resource && m.Farm is null && m.Output is { } o) items.Add(o.Item);
+        for (bool grew = items.Count > 0; grew;)
+        {
+            grew = false;
+            foreach (var m in all)
+                if (m.Function == MachineData.RefineryFunction && (StatsEnumerated)m.Stat == StatsEnumerated.Labouring && m.Output is { } o
+                    && m.Inputs.Any(i => items.Contains(i.Item)) && items.Add(o.Item)) grew = true;
+        }
+        return items;
     }
 
     /// <summary>Whether any machine of the town has work for the squad (the AI's desire for its labour goal).</summary>
