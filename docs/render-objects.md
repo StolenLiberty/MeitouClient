@@ -129,6 +129,7 @@ motion vectors of moving parts not checked.
 - A building with an `interior` list owns an interior object, open or closed.
 - **Opening.** `FUN_1407f7230` runs every frame. Each player character whose location is a non-destroyed building sets that interior's keep-open timer to 10. The timer falls by the game-time step (`FUN_14054a790`), and the interior closes below 0 (`FUN_14054b690`). A building just left shows every floor (floor 4) until then.
 - **Closing** (`FUN_14054b130`) hides the interior's contained objects in every pass, except those flagged outside (`RootObject+0x240`). Their entities are destroyed and the lights go off.
+- **Meitou build mode** (engine choice): every loaded building within 3000 of the camera's point is in the interior view at the viewed floor (`GameHost.UpdateInteriorView`), so things can be placed inside one nobody is in.
 - **Contained objects** are registered by `FUN_14054f3d0`. They are interior-layout furniture and buildings with a parent building: a saved `isInsideBuilding`, or player ghosts placed inside.
 - **The outside flag:**
   - Loaded from a state's `flags` bit 0, or the older `is outside` (`FUN_140552b70`).

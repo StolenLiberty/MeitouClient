@@ -25,6 +25,8 @@ sealed partial class GameHost
     readonly List<InteriorVolume> held = [];
     readonly List<string> expired = [];
     const double KeepOpenSeconds = 10;
+    /// <summary>How far from the camera's point build mode opens the buildings (engine choice: the zones about the view).</summary>
+    const float BuildInteriorRadius = 3000;
     /// <summary>
     /// The characters not drawn: those above the viewed floor of a building in the view (game: FUN_1409fb540 hides objects above their building's floor), and
     /// those inside a building seen from outside, whose interior is not drawn (a construction site is open, so its builders stay).
@@ -54,6 +56,10 @@ sealed partial class GameHost
         foreach (var c in characters)
             if (c.IsPlayer && objects.InteriorAt(DrawnPosition(c), InsideMargin) is { } building && interiorView.TryAdd(building.PlacementId, viewedFloor))
                 viewed.Add(building);
+        // Meitou: in build mode every building about the camera shows its inside at the viewed floor, so things can be placed in one nobody is in.
+        if (player?.BuildModeOn == true)
+            foreach (var building in objects.InteriorsNear(session.Camera.Current.Target, BuildInteriorRadius))
+                if (interiorView.TryAdd(building.PlacementId, viewedFloor)) viewed.Add(building);
         HoldLeftOpen(objects);
         objects.InteriorView = interiorView;
         session.Camera.Floors ??= CameraFloor;

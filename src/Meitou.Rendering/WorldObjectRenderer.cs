@@ -831,6 +831,16 @@ public sealed unsafe partial class WorldObjectRenderer : IDisposable
 
     const float InteriorOver = 200, InteriorKeep = 50;
 
+    /// <summary>The indoor volumes of the loaded buildings whose zones lie within <paramref name="radius"/> of <paramref name="p"/> (Meitou's build mode opens them all).</summary>
+    public IEnumerable<InteriorVolume> InteriorsNear(Vector3 p, float radius)
+    {
+        foreach (var zone in streamer.AllZones)
+        {
+            if (zone.Interiors.Count == 0 || ObjectStreamer.ZoneDistance(zone.X0, zone.Z0, p) > radius) continue;
+            foreach (var v in zone.Interiors) yield return v;
+        }
+    }
+
     /// <summary>A point's last <see cref="InteriorAt(Vector3, ref InteriorMemo)"/> answer, kept by the asker (a character): good while the interiors are the same and the point within <c>Clear</c> of where it was asked.</summary>
     public struct InteriorMemo
     {

@@ -26,7 +26,9 @@ sealed partial class PlayerInterface
     MyGuiLayout? squadBoxLayout;
     float squadsScroll;
     /// <summary>A portrait pressed on the squads screen (dragged once the pointer moves) or a squad box pressed on its frame (dragged to reorder).</summary>
-    (CharacterId Character, Vector2 From)? portraitDrag;
+    (CharacterId Character, Vector2 From, string Tag, IReadOnlyList<CharacterId> Group)? portraitDrag;
+    /// <summary>The portrait a plain click last picked (its squad and place): Shift + click on another of the same squad selects everyone between (Meitou).</summary>
+    (int Squad, int Index)? squadAnchor;
     (int Squad, Vector2 From)? squadBoxDrag;
 
     bool SquadsShown => faithfulScreens.IsOpen("overview") && faithfulScreens.GetTab("overview", "TabsMain") == SquadsTab;
@@ -131,7 +133,7 @@ sealed partial class PlayerInterface
             var cellClip = cellsArea.Intersect(clip);
             for (int k = 0; k < members.Count; k++)
             {
-                if (dragging && portraitDrag!.Value.Character == members[k]) continue;   // it follows the pointer
+                if (dragging && portraitDrag!.Value.Group.Contains(members[k])) continue;   // they follow the pointer
                 var cell = new UiRect(cellsArea.X + 2 + k * size, cellsArea.Y + (cellsArea.Height - size) / 2, size, size);
                 AddSquadPortrait(controls, $"squad-{squadId}-cell-{k}", cell, byId[members[k]], cells.GetValueOrDefault(members[k], -1), cellClip,
                     new Dictionary<string, string> { ["SquadOf"] = squadId, ["SquadPortrait"] = $"{squadId}:{k}" });
@@ -141,6 +143,11 @@ sealed partial class PlayerInterface
         {
             float size = Math.Min(Width * SquadCellWidth, Height * SquadCellHeight);
             AddSquadPortrait(controls, "squad-drag", new(mouse.X - size / 2, mouse.Y - size / 2, size, size), held, cells.GetValueOrDefault(held.Id, -1), null, null);
+            int more = portraitDrag.Value.Group.Count - 1;
+            if (more > 0)
+                controls.Add(new UiControl("squad-drag-count", "TextBox", new(mouse.X + size / 2 - 4, mouse.Y - size / 2 - 6, size, 20), $"+{more}", "", "", true,
+                    new Dictionary<string, string> { ["TextAlign"] = "Left Top", ["FontName"] = "Kenshi_StandardFont_Medium", ["TextShadow"] = "true" }, Vector4.Zero,
+                    new Vector4(1f, 0.9f, 0.6f, 1), Pickable: false));
         }
     }
 
@@ -172,7 +179,17 @@ sealed partial class PlayerInterface
     {
         if (!SquadsShown || faithfulScreens.HitTest(p) is not { Screen: "overview" } hit) return false;
         var c = hit.Control;
-        if (c.Properties.TryGetValue("SquadPortrait", out var at) && PortraitAt(at) is { } member) { faithfulScreens.Blur(); portraitDrag = (member, p); return true; }
+        if (c.Properties.TryGetValue("SquadPortrait", out var at) && PortraitAt(at) is { } member)
+        {
+            faithfulScreens.Blur();
+            // A selected portrait drags the whole selection along (in squad order); any other, just itself.
+            var selected = session.CurrentSnapshot.Characters.Where(x => x.IsPlayer && x.Selected).Select(x => x.Id).ToHashSet();
+            IReadOnlyList<CharacterId> group = selected.Contains(member)
+                ? [member, .. session.CurrentSnapshot.PlayerSquads.SelectMany(q => q.Members).Where(m => m != member && selected.Contains(m))]
+                : [member];
+            portraitDrag = (member, p, at, group);
+            return true;
+        }
         if (c.Properties.TryGetValue("SquadBox", out var box) && int.TryParse(box, NumberStyles.None, CultureInfo.InvariantCulture, out int squad)) { faithfulScreens.Blur(); squadBoxDrag = (squad, p); return true; }
         return false;
     }
@@ -204,19 +221,49 @@ sealed partial class PlayerInterface
         int? targetSquad = target is not null && target.Properties.TryGetValue("SquadOf", out var of) && int.TryParse(of, NumberStyles.None, CultureInfo.InvariantCulture, out int s) ? s : null;
         if (portrait is { } drag)
         {
-            if (Vector2.Distance(drag.From, p) < DragThreshold) { Select([drag.Character], shift); return; }
+            if (Vector2.Distance(drag.From, p) < DragThreshold) { ClickPortrait(drag.Character, drag.Tag, shift); return; }
             if (OverDismiss(p)) { AskDismiss(drag.Character); return; }
             if (targetSquad is not { } into) return;
             int index = -1;
             if (target!.Properties.TryGetValue("SquadPortrait", out var at) && at.Split(':') is [_, var place]) index = int.Parse(place, CultureInfo.InvariantCulture);
-            if (index >= 0 && PortraitAt(target.Properties["SquadPortrait"]) == drag.Character) return;
-            Say(new MoveToSquadCommand(drag.Character, into, index, shift) { Tick = session.World.Tick });
+            if (index >= 0 && drag.Group.Contains(PortraitAt(target.Properties["SquadPortrait"]) ?? CharacterId.None)) return;
+            if (drag.Group.Count == 1)
+            {
+                Say(new MoveToSquadCommand(drag.Character, into, index, shift) { Tick = session.World.Tick });
+                return;
+            }
+            // Several: each in turn, kept together at the drop place (or at the end).
+            for (int k = 0; k < drag.Group.Count; k++)
+                Say(new MoveToSquadCommand(drag.Group[k], into, index < 0 ? -1 : index + k, false) { Tick = session.World.Tick });
         }
         else if (box is { } moved && targetSquad is { } onto && onto != moved.Squad && Vector2.Distance(moved.From, p) >= DragThreshold)
         {
             int index = session.CurrentSnapshot.PlayerSquads.ToList().FindIndex(q => q.Id == onto);
             Say(new ReorderSquadCommand(moved.Squad, index) { Tick = session.World.Tick });
         }
+    }
+
+    /// <summary>
+    /// A portrait clicked without dragging: it alone is selected (Shift: added) and becomes the anchor; with Shift on another portrait of the anchor's squad, everyone from the anchor to
+    /// it is added to the selection (Meitou's range pick, to drag them as one).
+    /// </summary>
+    void ClickPortrait(CharacterId member, string tag, bool shift)
+    {
+        if (tag.Split(':') is not [var sq, var ix] || !int.TryParse(sq, NumberStyles.None, CultureInfo.InvariantCulture, out int squad) || !int.TryParse(ix, NumberStyles.None, CultureInfo.InvariantCulture, out int index))
+        {
+            Select([member], shift);
+            return;
+        }
+        if (shift && squadAnchor is { } anchor && anchor.Squad == squad)
+        {
+            var present = PlayerCharacters().ToHashSet();
+            var members = session.CurrentSnapshot.PlayerSquads.FirstOrDefault(q => q.Id == squad)?.Members.Where(present.Contains).ToList() ?? [];
+            int from = Math.Min(anchor.Index, index), to = Math.Min(Math.Max(anchor.Index, index), members.Count - 1);
+            if (from <= to) Select(members.GetRange(from, to - from + 1), true);
+            return;
+        }
+        Select([member], shift);
+        squadAnchor = (squad, index);
     }
 
     /// <summary>Dismiss: refused for the faction's last character, else asked first ("Dismiss character '{1}'?").</summary>
