@@ -13,8 +13,8 @@ namespace Meitou.Game;
 // (SetSquadAutonomy), and the AI runs the squad from them.
 sealed partial class CheatMenu
 {
-    enum AutPage { Role, Places, Jobs, Combat }
-    static readonly string[] AutPageNames = ["Role", "Places & Hours", "Jobs", "Combat & Guard"];
+    enum AutPage { Role, Places, Jobs, Combat, Manager }
+    static readonly string[] AutPageNames = ["Role", "Places & Hours", "Jobs", "Combat & Guard", "Manager"];
 
     bool autoMode;
     AutPage autPage;
@@ -158,11 +158,13 @@ sealed partial class CheatMenu
             case AutPage.Role: DrawRolePage(squad, s, X, CW); break;
             case AutPage.Places: DrawPlacesPage(squad, s, X, CW); break;
             case AutPage.Jobs: DrawJobsPage(squad, s, X, CW); break;
+            case AutPage.Manager: DrawManagerPage(squad, s, X, CW); break;
             default: DrawCombatPage(squad, s, X, CW); break;
         }
 
         Rect(R(20, H - 46, W - 40, 1), MainInk with { W = 0.12f });
-        string hint = notice.Length > 0 && Environment.TickCount64 - noticeAt < 8000 ? notice : s.Enabled ? "Changes apply right away." : "Autonomy is off: turn it on (top right) to start.";
+        string hint = notice.Length > 0 && Environment.TickCount64 - noticeAt < 8000 ? notice : s.Enabled ? "Changes apply right away."
+            : MgmtSettings(squad) is not null ? "A manager runs this squad (Manager page)." : "Autonomy is off: turn it on (top right), or give the squad a manager.";
         Text(hint, R(20, H - 38, 560, 28), 12, Brass);
         var others = squads.Where(q => q.Id != squad.Id).ToList();
         if (others.Count > 0)
@@ -179,6 +181,11 @@ sealed partial class CheatMenu
 
     string StatusLine(SquadView squad, AutonomySettings s)
     {
+        if (!s.Enabled && MgmtSettings(squad) is { } m)
+        {
+            var doing = squad.Managed.GroupBy(d => d.Doing).OrderByDescending(g => g.Count()).Take(3).Select(g => $"{g.Count()} {g.Key}");
+            return $"Managed by {ManagerName(m)} · " + string.Join(" · ", doing);
+        }
         if (!s.Enabled) return $"{squad.Members.Count} member{(squad.Members.Count == 1 ? "" : "s")} · autonomy off";
         if (squad.Doing.Count == 0) return "Starting up...";
         var parts = squad.Doing.GroupBy(d => d).OrderByDescending(g => g.Count()).Select(g => $"{g.Count()} {g.Key}");
@@ -430,6 +437,104 @@ sealed partial class CheatMenu
         Check(R(gx + 14, 252, half - 28, 44), "Stay inside the gate", "Gate guards stand on the inside.", s.StayInsideGate, () => AutSend(squad, s with { StayInsideGate = !s.StayInsideGate }));
         Check(R(gx + 14, 304, half - 28, 44), "Keep the gate shut", "Close it; open it for your people passing.", s.CloseGate, () => AutSend(squad, s with { CloseGate = !s.CloseGate }));
         Text("These apply to the behaviours that use them (for example the gate options to Gate Guards).", R(x, 440, w, 20), 12, MutedInk);
+    }
+
+    // ------------------------------------------------------------------ the manager (Meitou-only, ManagerSystem)
+
+    /// <summary>Management sent and not yet in the snapshot (shown meanwhile).</summary>
+    (int Squad, Meitou.Simulation.Management.ManagementSettings? Settings, long At)? mgmtPending;
+
+    Meitou.Simulation.Management.ManagementSettings? MgmtSettings(SquadView squad)
+    {
+        if (mgmtPending is { } p && p.Squad == squad.Id)
+        {
+            bool arrived = p.Settings is null ? squad.Management is null
+                : squad.Management is { } m && m.Manager == p.Settings.Manager && m.Defence == p.Settings.Defence && m.Build == p.Settings.Build;
+            if (arrived || Environment.TickCount64 - p.At > 3000) mgmtPending = null;
+            else return p.Settings;
+        }
+        return squad.Management;
+    }
+
+    void MgmtSend(SquadView squad, Meitou.Simulation.Management.ManagementSettings? settings)
+    {
+        mgmtPending = (squad.Id, settings, Environment.TickCount64);
+        world().Commands.Enqueue(new Meitou.Simulation.Management.SetSquadManagement(squad.Id, settings) { Tick = Now });
+    }
+
+    string ManagerName(Meitou.Simulation.Management.ManagementSettings m) =>
+        Snap.Characters.FirstOrDefault(c => c.Id == m.Manager)?.Name is { Length: > 0 } name ? name : m.ManagerName.Length > 0 ? m.ManagerName : "nobody";
+
+    static readonly (Meitou.Simulation.Management.DefenceMode Mode, string Name, string Blurb)[] DefenceModes =
+    [
+        (Meitou.Simulation.Management.DefenceMode.Fighters, "Fighters", "Everyone drops their work and takes on enemies in the outpost."),
+        (Meitou.Simulation.Management.DefenceMode.Militia, "Militia", "The men take up arms; the women go inside a building until it's over."),
+        (Meitou.Simulation.Management.DefenceMode.Shelter, "Shelter", "Everyone goes inside a building until the enemies are gone."),
+    ];
+
+    void DrawManagerPage(SquadView squad, AutonomySettings s, float x, float w)
+    {
+        Header("Manager: keeps everyone in this squad busy", x, 120, w);
+        var m = MgmtSettings(squad);
+        float half = (w - 14) / 2;
+
+        // Who manages.
+        Card(R(x, 166, half, 112));
+        CardTitle("Manager", x + 14, 176);
+        var people = Snap.Characters.Where(c => c.IsPlayer).OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        int current = m is null ? 0 : people.FindIndex(c => c.Id == m.Manager) + 1;
+        DropdownButton("mgr-who", R(x + 14, 198, half - 28, 32), ["None", .. people.Select(c => c.Name)], current, k =>
+        {
+            if (k == 0) { MgmtSend(squad, null); Notice($"{squad.Name} has no manager."); return; }
+            var who = people[k - 1];
+            MgmtSend(squad, (m ?? new()) with { Manager = who.Id, ManagerName = "", ManagerSquadIndex = -1 });
+            Notice($"{who.Name} now manages {squad.Name}.");
+        }, caption: m is null ? "Pick a manager..." : null);
+        Text("He works too. He must be up and inside your outpost for it to run.", R(x + 14, 236, half - 28, 34), 11, MutedInk, "Left Top");
+
+        // What he does with them.
+        float gx = x + half + 14;
+        Card(R(gx, 166, half, 112));
+        CardTitle("Work", gx + 14, 176);
+        Check(R(gx + 14, 198, half - 28, 44), "Build and repair", "Idle hands go to unfinished or damaged buildings.", m?.Build ?? true,
+            () => { if (m is not null) MgmtSend(squad, m with { Build = !m.Build }); }, enabled: m is not null);
+        Text("Hours, job priorities, turrets and resting: the other pages.", R(gx + 14, 246, half - 28, 26), 11, MutedInk);
+
+        // When the outpost is attacked.
+        CardTitle("When the outpost is attacked", x, 290);
+        float cw = (w - 20) / 3;
+        for (int i = 0; i < DefenceModes.Length; i++)
+        {
+            var (mode, name, blurb) = DefenceModes[i];
+            var at = R(x + i * (cw + 10), 310, cw, 70);
+            bool chosen = (m?.Defence ?? Meitou.Simulation.Management.DefenceMode.Militia) == mode;
+            bool hover = m is not null && Hovered(at, null);
+            Rect(at, chosen ? Brass with { W = 0.12f } : new Vector4(0, 0, 0, hover ? 0.28f : 0.18f));
+            Outline(at, chosen ? Brass : MainInk with { W = hover ? 0.35f : 0.12f });
+            if (chosen) Rect(at with { Width = 3 * scale }, Brass);
+            Text(name, new(at.X + 14 * scale, at.Y + 6 * scale, at.Width - 28 * scale, 22 * scale), 15, m is null ? MutedInk : LightInk);
+            Text(blurb, new(at.X + 14 * scale, at.Y + 28 * scale, at.Width - 28 * scale, 38 * scale), 11, MutedInk, "Left Top");
+            if (m is not null) hits.Add(new(at, () => MgmtSend(squad, m with { Defence = mode })));
+        }
+
+        // What each one is doing.
+        Card(R(x, 392, w, 256));
+        CardTitle(m is null ? "Members" : $"What {ManagerName(m)}'s people are doing", x + 14, 402);
+        if (s.Enabled) Text("Autonomy is on for this squad: turn it off (top right) for the manager to run it.", R(x + 14, 422, w - 28, 20), 12, Bad);
+        else if (m is null) Text("Pick a manager above.", R(x + 14, 422, w - 28, 20), 12, MutedInk);
+        else
+        {
+            var rows = squad.Managed;
+            float colW = (w - 28) / 3;
+            for (int k = 0; k < rows.Count && k < 33; k++)
+            {
+                var (_, name, doing) = rows[k];
+                var at = R(x + 14 + (k % 3) * colW, 424 + (k / 3) * 20, colW - 10, 20);
+                bool idle = doing.StartsWith("idle", StringComparison.Ordinal) || doing.StartsWith("no ", StringComparison.Ordinal);
+                Text($"{name}: {doing}", at, 11, idle ? Bad : MainInk);
+            }
+            if (rows.Count > 33) Text($"and {rows.Count - 33} more", R(x + 14, 626, 300, 18), 11, MutedInk);
+        }
     }
 
     // ------------------------------------------------------------------ pick in world

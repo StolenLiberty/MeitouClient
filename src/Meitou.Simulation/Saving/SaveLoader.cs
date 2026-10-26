@@ -128,7 +128,11 @@ public static class SaveLoader
             foreach (var lp in loaded.PlayerPlatoons) memory.Restore(lp.Squad.Id, MemorySave.Read(lp.Platoon.Record, context.CharacterOf));
         // Squad autonomy, taken up by the AI on its first serial step.
         foreach (var lp in loaded.PlayerPlatoons)
+        {
             if (lp.Platoon.Record.Strings.GetValueOrDefault(SaveCapture.AutonomyKey) is { Length: > 0 } text) lp.Squad.Autonomy = Autonomy.AutonomySettings.Read(text);
+            // Managers: the manager is found by his squad's index and name on the first check (ManagerSystem).
+            if (lp.Platoon.Record.Strings.GetValueOrDefault(SaveCapture.ManagementKey) is { Length: > 0 } managed) lp.Squad.Management = Management.ManagementSettings.Read(managed);
+        }
 
         // The selection.
         var selected = new List<Hand> { camera.SelectedCharacter };

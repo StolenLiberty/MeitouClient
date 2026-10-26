@@ -339,4 +339,7 @@ public sealed record SquadView(int Id, string Name, IReadOnlyList<CharacterId> M
     /// <summary>Its autonomy settings (null: never set) and what each member does under them (<see cref="Ai.AiSystem.AutonomyStatus"/>; empty while autonomy is off).</summary>
     public Autonomy.AutonomySettings? Autonomy { get; init; }
     public IReadOnlyList<string> Doing { get; init; } = [];
+    /// <summary>Its manager settings (null: none) and each member's name and what the manager has it doing (<see cref="Management.ManagerSystem"/>).</summary>
+    public Management.ManagementSettings? Management { get; init; }
+    public IReadOnlyList<(CharacterId Id, string Name, string Doing)> Managed { get; init; } = [];
 }

@@ -1408,6 +1408,20 @@ on the squad's platoon as the Meitou-only string `meitou autonomy` (JSON; the pl
   the packages and slots, places (picked in the world or from the selection), work hours, health thresholds, labour priorities, combat and guard options. No button on the squads
   screen (the window picks the squad).
 
+## Managers
+
+Meitou-only, engine choices throughout (`Management/Managers.cs`, the Squad Autonomy window's Manager page). A player squad's `ManagementSettings` name a manager (any player
+character; saved as platoon string `meitou management` with his squad's `Index` and his name, resolved on the first check), a `DefenceMode` and Build and repair. Work hours, job
+priorities, Man turrets and the rest thresholds are the squad's `AutonomySettings` with autonomy off; a squad with autonomy on is the AI's. Every 2 s (`ManagerSystem.SlowWorld`), with the
+manager up, free and inside one of the player's outposts (`PlayerTown` radius), each member in that outpost:
+- enemies in the outpost (up, hostile to the player's faction, or fighting a player character): Fighters all attack the nearest (`AttackOrder`, defensive); Militia: the men attack, the
+  women (`CharacterAppearance.Female`) walk into the nearest complete outpost building with a door and stay; Shelter: everyone does; afterwards they are free again;
+- in bed: got up (`GetOutOrder`) in work hours once healed; one he sent to work goes to bed at the end of the shift or below the rest threshold (`UseBedOrder`, a free outpost bed);
+- a free one (idle, out of combat, not in a formation, a Loot All or a follow): hurt or off shift, to bed; else the best machine (`ProductionSystem.AutonomyLabour`/`AutonomyBegin`), else a
+  free turret with Man turrets, else the nearest site to build or repair (at most two builders each per check, `BuildOrder`); else "idle: nothing to do". A building a member came back
+  from within 10 s is not given to it again for 120 s (no materials, unreachable).
+The window lists each member's status (`SquadView.Managed`).
+
 ## New-game difficulty
 
 `NewGameSettings` in the game host binds seven numeric options to each new world: body hunger/death/damage,

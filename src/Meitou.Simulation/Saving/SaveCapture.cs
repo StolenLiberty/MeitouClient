@@ -266,6 +266,8 @@ public static partial class SaveCapture
 
     /// <summary>A player platoon's squad autonomy settings (<see cref="Autonomy.AutonomySettings.Write"/>), Meitou-only.</summary>
     public const string AutonomyKey = "meitou autonomy";
+    /// <summary>A player platoon's manager (<see cref="Management.ManagementSettings.Write"/>), Meitou-only.</summary>
+    public const string ManagementKey = "meitou management";
 
     static Dictionary<CharacterId, SaveCharacter> WritePlayerSquads(SaveBuilder builder, World world, PopulationData data, LoadedSave? loaded, SaveCaptureOptions options, SaveClock clock,
         IReadOnlyDictionary<string, FcsRecord> buildings, Dictionary<string, RaceData?> races)
@@ -308,6 +310,8 @@ public static partial class SaveCapture
             // Squad autonomy (Meitou-only string; the plugin kept a SquadAutonomy.save file in the save folder instead).
             if (squad.Autonomy is { } autonomy) platoon.Record.Strings[AutonomyKey] = autonomy.Write();
             else platoon.Record.Strings.Remove(AutonomyKey);
+            if (squad.Management is { } management) platoon.Record.Strings[ManagementKey] = management.Write();
+            else platoon.Record.Strings.Remove(ManagementKey);
             if (index >= 0)
             {
                 // The name the tabs show is the record's name; the string id stays the file's (Observed: rename writes the record's name, docs/formats/save.md).
