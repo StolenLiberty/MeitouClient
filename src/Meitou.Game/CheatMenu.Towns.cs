@@ -34,7 +34,7 @@ sealed partial class CheatMenu
     void DrawTownWindow(int width, int height, UiPainter painter)
     {
         const float W = 560, H = 392;
-        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
+        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f))) * player.HudScale;
         bounds = new(MathF.Round((width - W * scale) / 2), MathF.Round((height - H * scale) / 2), MathF.Round(W * scale), MathF.Round(H * scale));
         controls.Clear(); hits.Clear();
         var snapshot = player.Snapshot;

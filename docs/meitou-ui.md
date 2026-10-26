@@ -65,7 +65,7 @@ no dedicated save image was found in these resources or by inspecting the atlas.
 
 ## In-game HUD
 
-The Meitou mode replaces `Kenshi_MainPanel` with see-through plates on the screen's edges (`PlayerInterface.MeitouHud.cs`; art drawn at run
+The Modern UI style (Settings, Interface, UI style: Faithful, Meitou, Modern; Modern is the Meitou mode with `ModernHud`) replaces `Kenshi_MainPanel` with see-through plates on the screen's edges (`PlayerInterface.MeitouHud.cs`; art drawn at run
 time in `MeitouHudArt.cs`: a white rounded plate, rim and ring nine-sliced under a tint, line icons from SVG path data). Plate tint
 `rgba(18,14,11,.7)`, rim main at 16 %, radii as the tokens; layout in pixels at 1080 lines.
 
@@ -82,4 +82,8 @@ time in `MeitouHudArt.cs`: a white rounded plate, rim and ring nine-sliced under
 - Bottom right: Bag, Stats, Map, Faction, Tech, Craft, Squads, Build.
 - At the pointer: another faction's character's name, faction, health and what a right click does.
 - Build mode hides the HUD, as the original's bar.
+- Squad jobs (the AUT button of the other styles) sits at the right of the squad tabs.
+- Interface scale (60-160 %) sizes this HUD, the cheat menu (Zeus, squad jobs, towns) and the settings window; the game's own windows keep their size.
+- In this style the cheat menu, Zeus, squad jobs, towns and settings windows draw the same see-through plates (`MeitouHudArt.Surface`).
+- The HUD's own text keeps its sizes (`ExactPixels`: the painter's readable minimum does not apply).
 

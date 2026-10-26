@@ -47,7 +47,7 @@ sealed partial class PlayerInterface
         string line = Loc.Tr(text).ReplaceLineEndings(" ");
         LogMessage("", line, MessageTone.System);
         // The Meitou HUD shows them as alerts (top right).
-        if (UiMode == UiMode.Meitou) PushAlert(line, "", error ? "alert" : "info", error ? HudDanger : HudBrass);
+        if (ModernHudOn) PushAlert(line, "", error ? "alert" : "info", error ? HudDanger : HudBrass);
         if (notices.FirstOrDefault(n => n.Text == line && n.Error == error) is { } same)
         {
             same.Count++;

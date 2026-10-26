@@ -121,6 +121,13 @@ sealed class UserConfig
 
     /// <summary>The Meitou HUD's character card shows only its header.</summary>
     public bool HudCardMinimised { get; set; }
+
+    /// <summary>The Modern UI style: Meitou's materials with the new HUD (off: the Meitou style keeps the game's HUD layout).</summary>
+    public bool ModernHud { get; set; } = true;
+
+    /// <summary>Interface scale: the Modern HUD, the cheat menu and the settings window, as a multiple of their size for the screen.</summary>
+    public float UiScale { get; set; } = 1;
+    public const float MinUiScale = 0.6f, MaxUiScale = 1.6f;
     /// <summary>A character that takes a fatal hit explodes, covers everything around in blood and sends bones flying (Advanced settings; an easter egg, off by default, not part of the all Faithful / all Meitou switches; docs/game/luckyren.md).</summary>
     public bool LuckyrenMode { get; set; }
     /// <summary>How many items dropped in play stay on the ground before the oldest goes (Advanced settings; <see cref="Meitou.Simulation.Items.GroundItems.Limit"/>).</summary>

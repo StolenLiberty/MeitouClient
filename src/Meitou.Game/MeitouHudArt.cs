@@ -74,6 +74,32 @@ static class MeitouHudArt
         foreach (var (name, path) in Icons) painter.SetImage(Icon(name), Stroke(path, IconSize, 1.75f), srgb: false);
     }
 
+    static readonly Vector4 Ink = new(175 / 255f, 166 / 255f, 139 / 255f, 1), Brass = new(196 / 255f, 160 / 255f, 98 / 255f, 1);
+
+    /// <summary>
+    /// The Modern style's surfaces for the other windows (the cheat menu, Zeus, squad jobs, towns, settings), as the HUD's: a see-through dark plate with a faint rim for a
+    /// window, a brass-tinted one for a header or the primary button ("paper", "primary"), and a button plate (brass while selected, lighter under the pointer).
+    /// </summary>
+    public static void Surface(List<Meitou.Data.Ui.UiControl> controls, string name, Meitou.Data.Ui.UiRect at, string kind, bool selected, bool hover, Meitou.Data.Ui.UiRect? clip, float alpha, float scale)
+    {
+        var (fill, rim, radius) = kind switch
+        {
+            "window" => (new Vector4(18 / 255f, 14 / 255f, 11 / 255f, 0.88f), Ink with { W = 0.18f }, 12f),
+            "paper" or "primary" => (Brass with { W = hover ? 0.34f : 0.22f }, Brass with { W = 0.85f }, 7f),
+            _ => (selected ? Brass with { W = 0.22f } : hover ? Ink with { W = 0.13f } : new Vector4(1, 1, 1, 0.05f), selected ? Brass with { W = 0.9f } : Ink with { W = 0.18f }, 7f),
+        };
+        foreach (var (texture, tint) in new[] { (Plate, fill), (Rim, rim) })
+        {
+            var p = new Dictionary<string, string>
+            {
+                ["ImageTexture"] = texture, ["Colour"] = string.Create(CultureInfo.InvariantCulture, $"{tint.X} {tint.Y} {tint.Z} {tint.W * alpha}"),
+                ["ImageBorder"] = PlateBorder.ToString(CultureInfo.InvariantCulture),
+                ["ImageBorderScale"] = (radius * scale / PlateRadius).ToString(CultureInfo.InvariantCulture),
+            };
+            controls.Add(new(name, "ImageBox", at, "", "", "", true, p, Vector4.Zero, Clip: clip, Pickable: false));
+        }
+    }
+
     /// <summary>A white rounded square on clear, anti-aliased: filled, or (with <paramref name="line"/> &gt; 0) only a rim that wide inside its edge.</summary>
     public static RgbaImage RoundedRect(int size, float radius, float line)
     {

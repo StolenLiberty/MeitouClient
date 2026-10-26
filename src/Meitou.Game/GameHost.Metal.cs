@@ -1384,6 +1384,8 @@ sealed partial class GameHost
                     {
                         hud.SelectionRings = config.SelectionRings;
                         hud.NameTags = config.NameTags;
+                        hud.ModernHud = config.ModernHud;
+                        hud.HudScale = config.UiScale;
                         hud.Draw(overlay, size.X, size.Y, overlayPass);
                         if (IsSandbox && !g.UiShowcase) DrawSandbox(overlay, size.X, size.Y);
                     }

@@ -26,6 +26,9 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
     Slider CameraRotateSpeed => cameraRotateSpeed ??= new("Camera rotation speed", UserConfig.MinCameraRotateSpeed, UserConfig.MaxCameraRotateSpeed,
         () => config.CameraRotateSpeed, v => { config.CameraRotateSpeed = MathF.Round(v * 2) / 2; CameraRotateSpeedChanged?.Invoke(config.CameraRotateSpeed); },
         "0.#", Faithful: global::Meitou.Data.World.KenshiCamera.DefaultRotateSpeed);
+    Slider? uiScale;
+    Slider UiScaleSlider => uiScale ??= new("Interface scale", UserConfig.MinUiScale, UserConfig.MaxUiScale,
+        () => config.UiScale, v => player.HudScale = config.UiScale = MathF.Round(v * 20) / 20, Text: v => $"{v * 100:0}%");
     Slider? fieldOfView;
     Slider FieldOfViewSlider => fieldOfView ??= new("Field of view", UserConfig.MinFieldOfView, UserConfig.MaxFieldOfView,
         () => config.FieldOfView, v => { config.FieldOfView = MathF.Round(v); FieldOfViewChanged?.Invoke(config.FieldOfView); }, "0", Text: v => $"{v:0}°",
@@ -199,8 +202,17 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
                 + "Running alongside can add up to 33 ms of input delay (one world tick).",
                 Choice: new(() => ["Faithful (in series)", "Meitou (when busy)", "Always on"], () => (int)config.TickAhead, i => config.TickAhead = (TickAheadMode)i)));
         if (page == 2)
-            result.Add(new("UI style", "Choose original Kenshi skins or Meitou materials.", Choice: new(() => ["Faithful", "Meitou"],
-                () => (int)player.UiMode, i => player.SetUiMode((UiMode)i))));
+            result.Add(new("UI style", "Faithful: the game's own look. Meitou: the game's layouts in Meitou materials. Modern: Meitou materials with the new HUD "
+                + "(see-through panels on the screen's edges).", Choice: new(() => ["Faithful", "Meitou", "Modern"],
+                () => player.UiMode == UiMode.Faithful ? 0 : config.ModernHud ? 2 : 1,
+                i => { config.ModernHud = i == 2; player.ModernHud = config.ModernHud; player.SetUiMode(i == 0 ? UiMode.Faithful : UiMode.Meitou); })));
+        if (page == 2) result.Add(new("Interface scale", "Makes the Modern HUD, the cheat menu and this window bigger or smaller.", Slider: UiScaleSlider));
+        if (page == 2)
+            result.Add(new("Name tags", "Show the names over your characters' heads.",
+                Toggle: new("Name tags", () => config.NameTags, v => config.NameTags = v, Remaster: true, OnOff: true)));
+        if (page == 2)
+            result.Add(new("Selection rings", "Draw the green ring on the ground under each selected character.",
+                Toggle: new("Selection rings", () => config.SelectionRings, v => config.SelectionRings = v, Remaster: true, OnOff: true)));
         if (page == 2)
             result.Add(new("Speed units", "The unit of the run speed in the character's information panel (the game: mph).", Choice: new(() => ["mph", "km/h"],
                 () => (int)config.SpeedUnit, i => player.SpeedUnit = config.SpeedUnit = (SpeedUnit)i)));
@@ -279,10 +291,6 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
                 Toggle: new("Doors close behind", () => config.DoorsCloseBehind, v => { config.DoorsCloseBehind = v; DoorsCloseChanged?.Invoke(v); }, Remaster: true, OnOff: true)));
             result.Add(new("Hover outline", "Outline and tint the character under the cursor, in the colour of what a right click would do.",
                 Toggle: new("Hover outline", () => config.HoverOutline, v => config.HoverOutline = v, Remaster: true, OnOff: true)));
-            result.Add(new("Selection rings", "Draw the green ring on the ground under each selected character.",
-                Toggle: new("Selection rings", () => config.SelectionRings, v => config.SelectionRings = v, Remaster: true, OnOff: true)));
-            result.Add(new("Name tags", "Show the names over your characters' heads.",
-                Toggle: new("Name tags", () => config.NameTags, v => config.NameTags = v, Remaster: true, OnOff: true)));
             result.Add(new("luckyren Mode", "A character that takes a fatal hit explodes, covers everything around in blood and sends bones flying everywhere. Its gear falls to the ground around the spot.",
                 Toggle: new("luckyren Mode", () => config.LuckyrenMode, v => config.LuckyrenMode = v),
                 Picture: SettingsMenuArt.LuckyrenImage));
@@ -542,6 +550,8 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
         config.NameTags = true;
         config.LuckyrenMode = false;
         config.GroundItemLimit = global::Meitou.Simulation.Items.GroundItems.DefaultLimit;
+        player.ModernHud = config.ModernHud = true;
+        UiScaleSlider.Set(1);
         player.SetUiMode(UiMode.Meitou);
         player.SpeedUnit = config.SpeedUnit = SpeedUnit.Mph;
         player.Floaters = config.Floaters = FloaterMode.Simple;

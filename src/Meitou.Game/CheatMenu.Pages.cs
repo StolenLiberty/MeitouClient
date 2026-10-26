@@ -276,7 +276,7 @@ sealed partial class CheatMenu
         var at = C(212, y, 888, 34);
         if (!InView(at)) return;
         Surface(at, "paper", clip: viewport);
-        Text(title, at with { X = at.X + 12 * scale, Width = at.Width - 24 * scale }, 18, MeitouLook ? PaperInk : LightInk, clip: viewport);
+        Text(title, at with { X = at.X + 12 * scale, Width = at.Width - 24 * scale }, 18, MeitouLook && !Modern ? PaperInk : LightInk, clip: viewport);
     }
 
     void Label(string text, Meitou.Data.Ui.UiRect at, Meitou.Data.Ui.UiRect clip) => Text(text, at, 11, MutedInk, "Left VCenter", clip);

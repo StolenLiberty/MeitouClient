@@ -329,7 +329,8 @@ public sealed partial class UiPainter : IDisposable
             // Settings request a font baked at its physical pixel size rather than scaling the 16px atlas.
             if (int.TryParse(c.Properties.GetValueOrDefault("FontPixels"), out int pixels) && StandardSource() is { } standardFace)
             {
-                pixels = Math.Clamp(Math.Max(pixels, (int)MathF.Round(minimumTextPixels)), 8, 96);
+                // ExactPixels: a HUD that sizes its own small captions keeps them (else the main UI's readable minimum applies).
+                pixels = Math.Clamp(c.Properties.GetValueOrDefault("ExactPixels") == "true" ? pixels : Math.Max(pixels, (int)MathF.Round(minimumTextPixels)), 7, 96);
                 // An explicit pixel size is Meitou's own text in either mode: oversampled and freely placed.
                 font = UiFontFor("", standardFace.Spec, standardFace.Path, pixels * 64L, 72, false, false);
                 font.Target = overlay.Target;

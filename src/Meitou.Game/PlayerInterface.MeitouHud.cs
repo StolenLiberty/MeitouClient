@@ -15,7 +15,8 @@ namespace Meitou.Game;
 /// The Meitou UI mode's HUD (docs/meitou-ui.md "In-game HUD"), in place of <c>Kenshi_MainPanel</c>: see-through plates on the screen's edges and the middle left to the world.
 /// Top left the day, time, game speed and money; top centre where the camera is (the floor buttons inside a building, the fight's count, Paused); top right the outpost on one line
 /// (its full panel below it on demand) and the alerts; bottom left the character card (minimised to its header or full); bottom centre the orders and the squad; bottom right the
-/// windows; at the pointer a card for another faction's character. Layout units are pixels at 1080 lines, scaled to the window's height.
+/// windows; at the pointer a card for another faction's character. Layout units are pixels at 1080 lines, scaled to the window's height and by
+/// <see cref="HudScale"/>.
 /// </summary>
 sealed partial class PlayerInterface
 {
@@ -39,8 +40,19 @@ sealed partial class PlayerInterface
     float hs = 1;
     int hudSerial;
 
-    /// <summary>The virtual screen width in layout units.</summary>
+    /// <summary>The virtual screen's width and height in layout units.</summary>
     float HudWidth => Width / hs;
+    float HudHeight => Height / hs;
+
+    /// <summary>Interface scale (Settings, Interface): the Modern HUD's size as a multiple of its size for the screen.</summary>
+    public float HudScale { get; set; } = 1;
+    /// <summary>The Modern UI style: the Meitou mode draws this HUD instead of the game's (off: the Meitou style keeps the game's layout).</summary>
+    public bool ModernHud { get; set; } = true;
+    bool ModernHudOn => UiMode == UiMode.Meitou && ModernHud;
+    /// <summary>The Modern style is on: the HUD, and the other windows in its look.</summary>
+    public bool ModernHudShown => ModernHudOn;
+    /// <summary>Opens the squad jobs window for a squad (the cheat menu's; the Modern HUD's Jobs button in the squad dock).</summary>
+    public Action<int>? OpenSquadJobs { get; set; }
     UiRect V(float x, float y, float w, float h) => new(MathF.Round(x * hs), MathF.Round(y * hs), MathF.Round(w * hs), MathF.Round(h * hs));
     string HudId(string tag) => "hud-" + tag + "-" + (hudSerial++).ToString(CultureInfo.InvariantCulture);
     static string Tint(Vector4 c) => string.Create(CultureInfo.InvariantCulture, $"{c.X} {c.Y} {c.Z} {c.W}");
@@ -92,7 +104,7 @@ sealed partial class PlayerInterface
         var p = new Dictionary<string, string>
         {
             ["TextAlign"] = align, ["FontName"] = "Kenshi_StandardFont",
-            ["FontPixels"] = Math.Max(7, (int)MathF.Round(px * hs)).ToString(CultureInfo.InvariantCulture),
+            ["FontPixels"] = Math.Max(7, (int)MathF.Round(px * hs)).ToString(CultureInfo.InvariantCulture), ["ExactPixels"] = "true",
         };
         if (tip is not null) foreach (var pair in UiTooltips.TextProperties(tip)) p[pair.Key] = pair.Value;
         hudControls.Add(new(HudId("text"), "TextBox", V(x, y, w, h), text, "", "", true, p, Vector4.Zero, colour, Pickable: tip is not null, TextScale: px * hs / 16));
@@ -155,7 +167,7 @@ sealed partial class PlayerInterface
     {
         if (uiPainter is { } painter) MeitouHudArt.Ensure(painter);
         hudControls = controls;
-        hs = Height / 1080f;
+        hs = Height / 1080f * Math.Clamp(HudScale, 0.3f, 3);
         hudSerial = 0;
         if (buildMode) return;
         HudClock();
@@ -341,7 +353,7 @@ sealed partial class PlayerInterface
         alertsAt = now;
         foreach (var a in alerts) a.Age += dt;
         alerts.RemoveAll(a => a.Age >= AlertSeconds + AlertFade);
-        if (UiMode != UiMode.Meitou || TitleOpen) return;
+        if (!ModernHudOn || TitleOpen) return;
         bool first = watched.Count == 0;
         var seen = new HashSet<CharacterId>();
         int fighting = 0, foes = 0;
@@ -415,7 +427,7 @@ sealed partial class PlayerInterface
             _ => 196,
         };
         float height = HudCardMinimised ? pad + 56 + pad : pad + 56 + 12 + 32 + 12 + content + (cardTab == CardTab.Overview ? 12 + 44 : 0) + pad;
-        float y0 = 1080 - 24 - height;
+        float y0 = HudHeight - 24 - height;
         HudPlate(x0, y0, width, height);
 
         // Header: portrait, name and faction, the health word, minimise / maximise.
@@ -645,7 +657,7 @@ sealed partial class PlayerInterface
         var (name, state, stats, status, bad) = BuildingLines(focus);
         var rows = BuildingRows(focus);
         float height = pad + 48 + 12 + rows.Count * 32 + (rows.Count > 0 ? 6 : 0) + (state.Length + stats.Length) * 28 + pad;
-        float y0 = 1080 - 24 - height, y = y0 + pad, inner = width - 2 * pad, x = x0 + pad;
+        float y0 = HudHeight - 24 - height, y = y0 + pad, inner = width - 2 * pad, x = x0 + pad;
         HudPlate(x0, y0, width, height);
         HudRound(x, y, 48, 48, HudTile, 4);
         HudIcon("build", x + 12, y + 12, 24, HudInk);
@@ -700,7 +712,7 @@ sealed partial class PlayerInterface
             (Loc.Tr("Squads"), Loc.Tr("Squads"), "squad", "hud:overview", "4", null, tab == 4),
             (Loc.Tr("Build"), Loc.Tr("Build"), "build", "meitou:build", "", InputAction.ToggleBuild, buildMode),
         ];
-        float width = 8 + windows.Length * 56 + (windows.Length - 1) * 4 + 8, x = HudWidth - 24 - width, y = 1080 - 24 - 72;
+        float width = 8 + windows.Length * 56 + (windows.Length - 1) * 4 + 8, x = HudWidth - 24 - width, y = HudHeight - 24 - 72;
         HudPlate(x, y, width, 72);
         float bx = x + 8;
         foreach (var w in windows)
@@ -741,12 +753,20 @@ sealed partial class PlayerInterface
 
         // The tabs' row.
         float tabsWidth = 0;
-        var tabLabels = tabs.Select(t => HudFit(t.Name.ToUpperInvariant(), 13, 150)).ToList();
-        var tabWidths = tabs.Select((t, i) => HudMeasure(tabLabels[i], 13) + 8 + HudMeasure(t.Members.Count.ToString(CultureInfo.InvariantCulture), 13) + 20).ToList();
-        tabsWidth = tabWidths.Sum() + 2 * tabs.Count + 30;
+        // The tabs' names shorten until the row (with New squad and Squad jobs) fits the room.
+        float jobsWidth = OpenSquadJobs is not null ? 12 + 16 + 6 + HudMeasure(Loc.Tr("Squad jobs"), 12) + 12 + 8 : 0;
+        List<string> tabLabels = [];
+        List<float> tabWidths = [];
+        for (float longest = 150; ; longest -= 10)
+        {
+            tabLabels = [.. tabs.Select(t => HudFit(t.Name.ToUpperInvariant(), 13, longest))];
+            tabWidths = [.. tabs.Select((t, i) => HudMeasure(tabLabels[i], 13) + 8 + HudMeasure(t.Members.Count.ToString(CultureInfo.InvariantCulture), 13) + 20)];
+            tabsWidth = tabWidths.Sum() + 2 * tabs.Count + 30 + jobsWidth;
+            if (tabsWidth + 28 <= space || longest <= 30) break;
+        }
         float dockWidth = MathF.Min(space, MathF.Max(rowWidth, tabsWidth) + 28);
         float dockHeight = 10 + 26 + 8 + shownRows * pitch - 4 + 12;
-        float dx = MathF.Round(centre - dockWidth / 2), dy = 1080 - 24 - dockHeight;
+        float dx = MathF.Round(centre - dockWidth / 2), dy = HudHeight - 24 - dockHeight;
         HudPlate(dx, dy, dockWidth, dockHeight);
         float tx = dx + 14;
         var active = session.CurrentSnapshot.ActiveSquad;
@@ -765,11 +785,21 @@ sealed partial class PlayerInterface
         }
         var plus = HudButton("squad-new", tx + 4, dy + 11, 24, 24, "hud:squad-new", tip: Loc.Tr("New squad"));
         HudIcon("plus", tx + 10, dy + 17, 12, plus);
-        if (rows > shownRows && tabsWidth + 170 <= dockWidth)
+        // Squad jobs (the squad autonomy window): lit while the shown squad has a job.
+        if (OpenSquadJobs is not null)
         {
-            int hidden = members.Count - shownRows * columns;
-            HudText(Loc.Tr("Scroll for {1} more", Math.Max(hidden, 0)), dx + dockWidth - 14 - 160, dy + 10, 160, 24, 12, HudMuted, "Right VCenter");
+            string jobs = Loc.Tr("Squad jobs");
+            float jw = 12 + 16 + 6 + HudMeasure(jobs, 12) + 12, jx = dx + dockWidth - 12 - jw;
+            bool working = tabs.FirstOrDefault(t => t.Id == active)?.Work is { On: true };
+            var ink = HudButton("squad-jobs", jx, dy + 10, jw, 26, "hud:squad-jobs", active: working,
+                tip: Loc.Tr("Jobs, shifts and fight stance for this squad (they work on their own)"));
+            HudIcon("jobs", jx + 12, dy + 15, 16, ink);
+            HudText(jobs, jx + 34, dy + 10, jw - 34, 26, 12, ink);
+            if (rows > shownRows && tabsWidth + 170 <= dockWidth)
+                HudText(Loc.Tr("Scroll for {1} more", Math.Max(members.Count - shownRows * columns, 0)), jx - 8 - 160, dy + 10, 160, 26, 12, HudMuted, "Right VCenter");
         }
+        else if (rows > shownRows && tabsWidth + 170 <= dockWidth)
+            HudText(Loc.Tr("Scroll for {1} more", Math.Max(members.Count - shownRows * columns, 0)), dx + dockWidth - 14 - 160, dy + 10, 160, 24, 12, HudMuted, "Right VCenter");
 
         // The portraits' page (the squad bar's: box selection and the wheel use it).
         float py = dy + 10 + 26 + 8, px = MathF.Round(centre - rowWidth / 2);
@@ -890,7 +920,7 @@ sealed partial class PlayerInterface
         float height = 12 + 22 + 16 + 8 + 22 + (hint.Length > 0 ? 18 : 0) + 12;
         float x = mouse.X / hs + 24, y = mouse.Y / hs + 24;
         if (x + width > HudWidth - 8) x = mouse.X / hs - 24 - width;
-        if (y + height > 1080 - 8) y = mouse.Y / hs - 24 - height;
+        if (y + height > HudHeight - 8) y = mouse.Y / hs - 24 - height;
         var tint = hover.Colour with { W = 1 };
         var start = hudControls.Count;
         HudPlate(x, y, width, height, rim: tint with { W = 0.45f });
@@ -939,6 +969,7 @@ sealed partial class PlayerInterface
                 UpdateMenuPause();
                 break;
             case "squad-tab": PickSquadTab(n); break;
+            case "squad-jobs": OpenSquadJobs?.Invoke(session.World.Player.Squad); break;
             case "squad-new": Say(new NewSquadCommand(session.Camera.Current.Target) { Tick = session.World.Tick }); break;
         }
     }
@@ -946,7 +977,7 @@ sealed partial class PlayerInterface
     /// <summary>The outpost panel opened under the outpost line: moved there once, after it was first laid out (the original's place is under the old bar).</summary>
     void PlaceTownScreen(MyGuiScreenFrame screen)
     {
-        if (townPlaced || UiMode != UiMode.Meitou || screen.Controls.Count == 0) return;
+        if (townPlaced || !ModernHudOn || screen.Controls.Count == 0) return;
         var root = screen.Controls.FirstOrDefault(c => c.Name == "TownPanel")?.Bounds ?? screen.Controls[0].Bounds;
         var want = new Vector2(Width - 24 * hs - root.Width, (20 + 48 + 8) * hs);
         faithfulScreens.SetOffset(TownScreen, faithfulScreens.GetOffset(TownScreen) + want - new Vector2(root.X, root.Y));

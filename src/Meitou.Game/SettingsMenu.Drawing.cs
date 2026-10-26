@@ -12,6 +12,7 @@ sealed partial class SettingsMenu
     static readonly Vector4 MutedInk = new(0.52f, 0.49f, 0.43f, 1);
     static readonly Vector4 Brass = new(196 / 255f, 160 / 255f, 98 / 255f, 1);
     bool Meitou => player.UiMode == UiMode.Meitou;
+    bool Modern => player.ModernHudShown;
     int textViewportHeight;
     readonly Dictionary<(string Text, int Width, int Size, int Height, int Scale, string Language), float> textHeights = [];
 
@@ -30,6 +31,12 @@ sealed partial class SettingsMenu
 
     void Surface(UiRect at, string kind, bool selected = false, bool hover = false, UiRect? clip = null)
     {
+        if (Modern && player.SettingsPainter is { } hudPainter)
+        {
+            MeitouHudArt.Ensure(hudPainter);
+            MeitouHudArt.Surface(controls, "settings-surface", at, kind, selected, hover, clip, 1, scale);
+            return;
+        }
         if (Meitou)
         {
             string texture = kind switch { "window" => "window", "primary" or "paper" => hover ? "paper-hover" : "paper", _ => selected ? "button-selected" : hover ? "button-hover" : "button" };
@@ -63,7 +70,7 @@ sealed partial class SettingsMenu
             Surface(drawn, primary ? "primary" : "button", selected || pressed, true, clip);
             Opacity(first, hover);
         }
-        var ink = primary && Meitou ? new Vector4(20 / 255f, 8 / 255f, 6 / 255f, 1) : System.Numerics.Vector4.Lerp(MainInk, LightInk, selected ? 1 : hover);
+        var ink = primary && Meitou && !Modern ? new Vector4(20 / 255f, 8 / 255f, 6 / 255f, 1) : System.Numerics.Vector4.Lerp(MainInk, LightInk, selected ? 1 : hover);
         Text(label, new(drawn.X + 10 * scale, drawn.Y, drawn.Width - 20 * scale, drawn.Height), primary ? 15 : 13, ink, "Center", clip);
         if (clip is null || at.Intersect(clip.Value).Height >= at.Height - 1)
             hits.Add(new(at, action));
@@ -79,7 +86,7 @@ sealed partial class SettingsMenu
         if (!Visible || player.SettingsPainter is not { } painter) return;
         AdvanceMotion();
         art.Ensure(painter, Meitou, player.UiAtlas);
-        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
+        scale = Math.Min(Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f))) * player.HudScale, Math.Min(height / 760f, width / 1160f));
         textViewportHeight = height;
         bounds = new(MathF.Round((width - 1120 * scale) / 2), MathF.Round((height - 720 * scale) / 2), MathF.Round(1120 * scale), MathF.Round(720 * scale));
         bounds = bounds with { Y = bounds.Y + (1 - Ease(menuProgress)) * 8 * scale };
@@ -102,12 +109,12 @@ sealed partial class SettingsMenu
             int index = i;
             Button(Pages[i], R(20, 58 + i * 38, 156, 32), () => Navigate(index), page == i);
         }
-        Text(Meitou ? "MEITOU" : "FAITHFUL", R(28, 610, 148, 18), 11, MutedInk);
+        Text(Modern ? "MODERN" : Meitou ? "MEITOU" : "FAITHFUL", R(28, 610, 148, 18), 11, MutedInk);
         Text(BuildVersion.Tag, R(28, 630, 148, 16), 11, MutedInk);
         Text(BuildVersion.Commit, R(28, 646, 148, 16), 11, MutedInk);
         int contentStart = controls.Count;
         Surface(R(212, 56, 888, 34), "paper");
-        Text(Pages[page], R(224, 56, 864, 34), 18, new(20 / 255f, 8 / 255f, 6 / 255f, 1));
+        Text(Pages[page], R(224, 56, 864, 34), 18, Modern ? LightInk : new(20 / 255f, 8 / 255f, 6 / 255f, 1));
         float top = 98;
         if (page == 1)
         {

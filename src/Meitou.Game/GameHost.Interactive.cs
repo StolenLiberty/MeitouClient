@@ -131,6 +131,7 @@ sealed partial class GameHost
                 },
             };
         var cheats = new CheatMenu(player, () => session.World, () => scene.Database, () => popData, () => session.Camera.Current.Target);
+        player.OpenSquadJobs = cheats.OpenJobs;
         bool cheatDrag = false;
         void ApplyCameraRotateSpeed(float speed) => session.Camera.Settings.RotateSpeedX = session.Camera.Settings.RotateSpeedY =
             Math.Clamp(speed, UserConfig.MinCameraRotateSpeed, UserConfig.MaxCameraRotateSpeed);
@@ -635,6 +636,8 @@ sealed partial class GameHost
                 {
                     player.SelectionRings = config.SelectionRings;
                     player.NameTags = config.NameTags;
+                    player.ModernHud = config.ModernHud;
+                    player.HudScale = config.UiScale;
                     player.Draw(overlay, size.X, size.Y);
                 }
                 if (ui && overlay is not null && IsSandbox) DrawSandbox(overlay, size.X, size.Y);

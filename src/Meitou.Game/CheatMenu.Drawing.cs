@@ -27,6 +27,8 @@ sealed partial class CheatMenu
     const float ContentTop = 140, ContentBottom = 668;
 
     bool MeitouLook => player.UiMode == UiMode.Meitou;
+    /// <summary>The Modern UI style: the windows take the HUD's see-through plates.</summary>
+    bool Modern => player.ModernHudShown;
 
     UiRect R(float x, float y, float w, float h) => new(MathF.Round(bounds.X + x * scale), MathF.Round(bounds.Y + y * scale), MathF.Round(w * scale), MathF.Round(h * scale));
 
@@ -51,6 +53,12 @@ sealed partial class CheatMenu
 
     void Surface(UiRect at, string kind, bool selected = false, bool hover = false, UiRect? clip = null, float alpha = 1)
     {
+        if (Modern && player.SettingsPainter is { } hudPainter)
+        {
+            MeitouHudArt.Ensure(hudPainter);
+            MeitouHudArt.Surface(controls, "cheat-surface", at, kind, selected, hover, clip, alpha, scale);
+            return;
+        }
         if (MeitouLook)
         {
             string texture = kind switch { "window" => "window", "paper" => hover ? "paper-hover" : "paper", _ => selected ? "button-selected" : hover ? "button-hover" : "button" };
@@ -98,7 +106,7 @@ sealed partial class CheatMenu
         bool hovered = enabled && Hovered(at, clip);
         var drawn = at with { Y = at.Y + (hovered && pointerDown ? scale : 0) };
         Surface(drawn, primary ? "paper" : "button", selected || hovered && pointerDown, hovered, clip);
-        var colour = !enabled ? MutedInk : primary && MeitouLook ? PaperInk : ink ?? (selected || hovered ? LightInk : MainInk);
+        var colour = !enabled ? MutedInk : primary && MeitouLook && !Modern ? PaperInk : ink ?? (selected || hovered ? LightInk : MainInk);
         Text(label, new(drawn.X + 8 * scale, drawn.Y, drawn.Width - 16 * scale, drawn.Height), primary ? size + 1 : size, colour, "Center", clip);
         if (enabled && Clickable(at, clip)) hits.Add(new(at, action));
     }
@@ -238,7 +246,7 @@ sealed partial class CheatMenu
         if (jobsMode) { DrawJobsWindow(width, height, painter); return; }
         if (zeusMode) { DrawZeus(width, height, painter); return; }
         // The window's size goes with the screen, times the size its corner was dragged to; it stays where its title strip was dragged (centred until then).
-        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f))) * windowZoom;
+        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f))) * windowZoom * player.HudScale;
         float ww = MathF.Round(1120 * scale), wh = MathF.Round(720 * scale);
         var place = windowPlace ?? new Vector2((width - ww) / 2, (height - wh) / 2);
         place = new(Math.Clamp(place.X, 60 * scale - ww, width - 60 * scale), Math.Clamp(place.Y, 0, height - 44 * scale));

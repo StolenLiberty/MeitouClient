@@ -168,7 +168,7 @@ sealed partial class CheatMenu
 
     void DrawZeus(int width, int height, UiPainter painter)
     {
-        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
+        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f))) * player.HudScale;
         controls.Clear(); hits.Clear();
         // Clear of the performance line along the top and of the HUD's bottom panels; solid, so nothing of the HUD shows through it.
         float pw = MathF.Round(ZeusWidth * scale), top = MathF.Round(48 * scale), bottom = MathF.Round(280 * scale);

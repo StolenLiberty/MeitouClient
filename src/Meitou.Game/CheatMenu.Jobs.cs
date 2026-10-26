@@ -82,7 +82,7 @@ sealed partial class CheatMenu
     void DrawJobsWindow(int width, int height, UiPainter painter)
     {
         const float W = 1080, H = 700;
-        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
+        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f))) * player.HudScale;
         controls.Clear(); hits.Clear();
         if (assigning is { } assign) { DrawAssigning(width, height, painter, assign); return; }
         // Near the top of the screen (clear of the HUD's bottom panels) unless dragged by its title strip; the place is kept while the game runs.
@@ -249,13 +249,14 @@ sealed partial class CheatMenu
 
     UiRect jobsButton;
 
-    /// <summary>The AUT button on the HUD (0.69, 0.788 of the screen): opens the window for the squad on the squad bar; lit while that squad has a job. Drawn while the HUD shows and the window is closed.</summary>
+    /// <summary>The AUT button on the game's HUD (0.69, 0.788 of the screen; the Modern HUD draws its own): opens the window for the squad on the squad bar; lit while that squad has a job. Drawn while the HUD shows and the window is closed.</summary>
     public void DrawHudButton(int width, int height)
     {
         jobsButton = default;
-        if (visible || !player.UiVisible || player.TitleOpen || player.EditorOpen || player.ModalOpen || !world().Player.Exists || player.SettingsPainter is not { } painter) return;
+        // The Modern HUD has the button in its squad dock.
+        if (visible || Modern || !player.UiVisible || player.TitleOpen || player.EditorOpen || player.ModalOpen || !world().Player.Exists || player.SettingsPainter is not { } painter) return;
         art.Ensure(painter, MeitouLook, player.UiAtlas);
-        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f)));
+        scale = Math.Max(0.35f, Math.Min(1.25f, Math.Min(height / 900f, width / 1280f))) * player.HudScale;
         jobsButton = new(MathF.Round(width * 0.69f), MathF.Round(height * 0.788f), MathF.Round(Math.Max(width * 0.015f, 34 * scale)), MathF.Round(height * 0.0358f));
         controls.Clear(); hits.Clear();
         bool lit = Snap.PlayerSquads.FirstOrDefault(q => q.Id == world().Player.Squad)?.Work is { On: true };

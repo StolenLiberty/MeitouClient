@@ -218,7 +218,7 @@ sealed partial class PlayerInterface
         faithfulScreens.FocusRing = UiMode == UiMode.Meitou;
         bool hud =!TitleOpen && !EditorOpen && !conversationShown;   // the conversation panel covers the HUD bar (engine reading of its layout)
         // The Meitou mode draws its own HUD (PlayerInterface.MeitouHud.cs); the outpost's full panel only when its line is opened.
-        bool meitouHud = hud && UiMode == UiMode.Meitou;
+        bool meitouHud = hud && ModernHudOn;
         SyncTownPanel(hud && (!meitouHud || outpostOpen));
         var controls = hud && !meitouHud ? MyGuiPresentation.Arrange(faithfulHud, Width, Height, b, uiResources.Layers).ToList() : [];
         UiRect FaithfulSlot(string name) => controls.FirstOrDefault(c => c.Name == name)?.Bounds ?? default;
