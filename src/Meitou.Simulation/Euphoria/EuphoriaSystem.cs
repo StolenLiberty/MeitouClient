@@ -362,9 +362,11 @@ public sealed class EuphoriaSystem : ITickSystem, IHitReactions, IRagdollHandOff
     /// <summary>The blow: an impulse on the part struck, along the hit, and the shot reaction on that part (it staggers, steps to keep its balance, and catches its fall).</summary>
     void Push(Agent a, CharacterCold cold, in HitPush push)
     {
-        int k = PartOf(cold, push.Part);
+        int k = push.Body is >= 0 and < EuphoriaData.Parts ? push.Body : PartOf(cold, push.Part);
         nm_agent_get_part_transforms(a.Handle, a.Parts, EuphoriaData.Parts);
         float[] at = [a.Parts[k * 7], a.Parts[k * 7 + 1], a.Parts[k * 7 + 2]];
+        // Where the blade touched, when it is near the part (the body may have moved since the touch was traced).
+        if (push.At is { } touched && Space.ToDelirium(touched, a.Origin) is var t && Vector3.Distance(t, new Vector3(at[0], at[1], at[2])) < 0.4f) (at[0], at[1], at[2]) = (t.X, t.Y, t.Z);
         var dir = Space.DirectionToDelirium(push.Direction);
         // Hits on a body still reacting stack: each one before it has its balance back counts half again more, so a character set on by several goes down.
         float strength = Math.Clamp(push.Strength * (1 + StackPerHit * a.Hits), 0, StrongestHit);

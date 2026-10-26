@@ -63,6 +63,28 @@ Space: Kenshi (x, y, z) units = Delirium (x, −z, y) × 0.1 m, about each body'
 - **Cap**: 24 bodies; a new one past it replaces the farthest from the camera focus, or plays the clip.
 - Not for animals, carried or caged characters, ones getting up or crawling on a downed leg.
 
+## Blade contact
+
+`Combat/BladeContactSystem` (with the euphoria bodies, same toggle; after them in the slow-world
+step). Combat's rolls still decide hit, block or miss; this makes a hit look like one.
+- **Blade**: the weapon in the `hands` point (`Bip01 Prop2`, a child of `Bip01 R Hand`) runs along
+  its mesh's +Y (**Observed** on `katana05_bare`, `hacker05_bare`, `hacker04_bare`, `polearm03`:
+  grip at −2.4 to −4.6, tip at 10.2 to 12.3 units); traced from 1.5 to the mesh's highest Y.
+- **Body**: 11 capsules over the defender's bones in the pose on show (a euphoria body's included):
+  pelvis-spine1 1.7, spine1-neck 1.8, neck-head 1.1, upper arms 0.6, forearms 0.5, thighs 0.85,
+  calves 0.6 units; each is a euphoria part (for the push).
+- **Held off**: for swings within 90 m of the camera, a blade that would go into the body is turned
+  at the shoulder (`Bip01 R UpperArm`, its children follow) until it rests on the surface, on the
+  side it first touched (so it does not jump through as the swing goes on). Probe, two
+  Greenlanders with katanas: the animated blade was inside the body on 156 of 1197 swinging ticks,
+  up to 20 cm; held, at most 2 mm.
+- **Hit stop**: a blow that lands freezes the swing (every bone) as soon as its blade is on the body
+  (within 6 ticks of the blow) for 0.12 s, then blends back over 0.1 s.
+- **Push**: a landed blow whose blade touched the body in the last 8 ticks pushes the euphoria body
+  at the touch point, on the touched part, the way the blade was moving (24 of 29 hits in the probe).
+- The overrides are published like a ragdoll's (`IRagdollSource`, after the euphoria bodies). Off
+  hand on two-handed weapons, blocks and misses are not handled yet.
+
 Deterministic across runs and thread counts (**Verified** by probe: two Greenlanders fighting
 30 s, threads 2 and 4). Not saved: a reaction in progress is lost on load.
 Cost (probe): about 0.4 ms per body per 1/60 s step on one thread; bodies step in parallel.

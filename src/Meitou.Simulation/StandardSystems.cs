@@ -216,6 +216,10 @@ public static class StandardSystems
             {
                 systems.Add(euphoria = new Meitou.Simulation.Euphoria.EuphoriaSystem(o.Ragdolls, o.Euphoria, o.RagdollEnvironment));
                 if (combat is not null) combat.Reactions = euphoria;
+                // Blades that meet the bodies they hit, after the euphoria bodies (it traces against them).
+                var blades = new Meitou.Simulation.Combat.BladeContactSystem(o.Ragdolls);
+                systems.Add(blades);
+                if (combat is not null) combat.Blades = blades;
             }
             // Ragdolls right after the animation: they start from and pin to this tick's pose, and the whole body's position is theirs before anything later reads it.
             if (o.Ragdolls is not null) systems.Add(ragdolls = new Meitou.Simulation.Ragdolls.RagdollSystem(o.Ragdolls, o.RagdollEnvironment) { HandOff = euphoria });

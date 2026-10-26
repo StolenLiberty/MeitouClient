@@ -110,6 +110,16 @@ public sealed partial class CombatSystem
             knockout = true;
         }
         var push = Push(new Vector3(-toAttacker.X, 0, -toAttacker.Y), damage, toughness, part, false);
+        // Where the blade met the body (Meitou): the push goes from there, the way the blade moved; and the swing stops on it.
+        if (Blades is { } blades)
+        {
+            if (blades.Touch(world, a, d, out var touchAt, out var touchDirection, out int touchBody))
+            {
+                var along = new Vector3(touchDirection.X, 0, touchDirection.Z);
+                push = push with { At = touchAt, Body = touchBody, Direction = along.LengthSquared() > 0.04f ? Vector3.Normalize(along) : push.Direction };
+            }
+            blades.Struck(world, a, d);
+        }
         if (dc.Medical.Incapacitated)
         {
             D.Down = true;

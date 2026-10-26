@@ -68,6 +68,7 @@ sealed partial class GameHost
     {
         var set = BuildStandardSystems(interactive, data, settings);
         if (set.Euphoria is { } euphoria) euphoria.Enabled = config.Euphoria;
+        foreach (var blades in set.Systems.OfType<Meitou.Simulation.Combat.BladeContactSystem>()) blades.Enabled = config.Euphoria;
         return set;
     }
 
