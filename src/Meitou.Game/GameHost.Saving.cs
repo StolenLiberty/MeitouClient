@@ -69,7 +69,18 @@ sealed partial class GameHost
         var set = BuildStandardSystems(interactive, data, settings);
         if (set.Euphoria is { } euphoria) euphoria.Enabled = config.Euphoria;
         foreach (var blades in set.Systems.OfType<Meitou.Simulation.Combat.BladeContactSystem>()) blades.Enabled = config.Euphoria;
+        SetDynamicMovement(set.Systems, config.DynamicMovement);
         return set;
+    }
+
+    /// <summary>Turns the dynamic movement on or off in a world's movement and combat systems.</summary>
+    static void SetDynamicMovement(IEnumerable<Meitou.Simulation.ITickSystem> systems, bool on)
+    {
+        foreach (var system in systems)
+        {
+            if (system is Meitou.Simulation.MovementSystem movement) movement.Dynamic = on;
+            else if (system is Meitou.Simulation.Combat.CombatSystem combat) combat.Dynamic = on;
+        }
     }
 
     /// <summary>The euphoria characters (docs/euphoria.md): loaded once, on a worker thread, with the ragdolls; whether they loaded goes to the log.</summary>

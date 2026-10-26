@@ -337,6 +337,13 @@ shoves a stander aside; one in a bed or cage does not give; a sitter (resting or
 never moved, by contact or separation (**Observed**: the original pushes no sitter), and is not solid (walkers steer past), lying and carried bodies are not in the way, a character closing on its spot
 is not stopped, and an unwalkable result falls back to its own step.
 
+**Dynamic movement** (Meitou, Settings, Advanced; `MovementSystem.Dynamic` / `CombatSystem.Dynamic`, off in the tests): a body turns at
+5.2 rad/s standing down to 2.6 at full speed (the game's 4π is near instant), a walker gathers speed over about 0.35 s from its last speed (a sharp
+turn slows it, `Turn` scales speed by the cosine of what is left of the turn); a fighter turns to its target at 4.2 rad/s, 0.8 once its swing has
+started (it commits to the blow), starts a swing only within 30 degrees of its target, and neither blocks nor dodges a blow from more than 110 degrees
+off where it faces. **Observed** (probe): a 180-degree new target is swung at after about 0.75 s of turning instead of at once; 12 one-on-one duels
+take about as long as without it.
+
 ## Navmesh
 
 Own DotRecast builder/cache (`Meitou.Navigation`), not Havok runtime. Default cells 2, height 1,

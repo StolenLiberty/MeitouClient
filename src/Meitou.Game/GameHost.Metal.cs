@@ -519,6 +519,7 @@ sealed partial class GameHost
                 UpscalerStatus = UpscalerStatusText,
                 AttackSlotsChanged = slots => { foreach (var combat in session.World.Systems.OfType<Meitou.Simulation.Combat.CombatSystem>()) combat.AttackSlots = slots; },
                 LateDefencesChanged = on => { foreach (var combat in session.World.Systems.OfType<Meitou.Simulation.Combat.CombatSystem>()) combat.LateDefences = on; },
+                DynamicMovementChanged = on => SetDynamicMovement(session.World.Systems, on),
                 EuphoriaChanged = on => { foreach (var euphoria in session.World.Systems.OfType<Meitou.Simulation.Euphoria.EuphoriaSystem>()) euphoria.Enabled = on; foreach (var blades in session.World.Systems.OfType<Meitou.Simulation.Combat.BladeContactSystem>()) blades.Enabled = on; },
                 DoorsCloseChanged = on => { foreach (var locks in session.World.Systems.OfType<Meitou.Simulation.Locks.LockSystem>()) locks.DoorsCloseBehind = on; },
                 OffscreenChanged = () =>

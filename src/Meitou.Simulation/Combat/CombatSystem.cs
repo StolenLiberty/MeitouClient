@@ -51,6 +51,21 @@ public sealed partial class CombatSystem : ITickSystem, IStateHashed
 
     public CombatOptions Settings { get; }
 
+    /// <summary>
+    /// Meitou's dynamic movement (with <see cref="MovementSystem.Dynamic"/>): a fighter turns to its target at a body's pace instead of snapping round, swings only once it
+    /// faces the target within <see cref="DynamicSwingCone"/>, hardly turns while the swing is under way, and cannot block or dodge a blow from beyond
+    /// <see cref="DynamicGuardCone"/> of where it faces (it does not see it coming).
+    /// </summary>
+    public bool Dynamic { get; set; }
+    public const float DynamicSwingCone = 0.52f, DynamicGuardCone = 1.92f;
+
+    /// <summary>How far (radians, either way) <paramref name="slot"/> faces from the way to <paramref name="other"/> (last tick's places).</summary>
+    static float FacingOff(ReadOnlySpan<CharacterHot> prev, int slot, int other)
+    {
+        float dx = prev[other].Position.X - prev[slot].Position.X, dz = prev[other].Position.Z - prev[slot].Position.Z;
+        return dx * dx + dz * dz < 1e-6f ? 0 : MathF.Abs(MathF.IEEERemainder(MathF.Atan2(dx, dz) - prev[slot].Yaw, MathF.Tau));
+    }
+
     /// <summary>How many enemies may melee one target at once, before the target race's <c>extra attack slots</c>: CONSTANTS <c>max num attack slots</c> (1, Faithful) unless a setting changes it.</summary>
     public int AttackSlots { get; set; }
 
@@ -326,7 +341,13 @@ public sealed partial class CombatSystem : ITickSystem, IStateHashed
             // On a path to the target (the pursuit's) the movement system steers it: facing the target here would undo each tick's turn towards a waypoint that lies
             // well off the straight line, and a walker more than 90 degrees off its waypoint does not step (MovementSystem.Turn).
             if (!Settings.SelfApproach && (n.Flags & (ushort)MoveFlags.HasPath) != 0) continue;
-            n.Yaw = MathF.Atan2(dir.X, dir.Y);
+            // Dynamic movement: it turns to the target at a body's pace (hardly at all mid-swing), never snapping onto a new one.
+            if (Dynamic)
+            {
+                var heading = MovementSystem.Turn(prev[i].Yaw, dir, 1, dt, s.AttackTech >= 0 ? MovementSystem.DynamicSwingTurn : MovementSystem.DynamicFightTurn).Dir;
+                n.Yaw = MathF.Atan2(heading.X, heading.Y);
+            }
+            else n.Yaw = MathF.Atan2(dir.X, dir.Y);
             if (!Settings.SelfApproach) continue;
             // A crossbowman stands while it aims or reloads and walks up only while closing in.
             bool shooting = s.Ranged && s.RangedState != (byte)RangedStates.Closing;

@@ -100,6 +100,8 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
     public Action<bool>? LateDefencesChanged { get; init; }
     /// <summary>Turns the physical hit reactions on or off in the running world (<see cref="UserConfig.Euphoria"/>).</summary>
     public Action<bool>? EuphoriaChanged { get; init; }
+    /// <summary>Applies the Dynamic movement switch to the running world.</summary>
+    public Action<bool>? DynamicMovementChanged { get; init; }
     /// <summary>Applies the turret gunner facing fix to the running combat system.</summary>
     public Action<bool>? GunnerFacingChanged { get; init; }
     /// <summary>Called when an off-screen switch changes (the config holds the new values).</summary>
@@ -274,6 +276,9 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
                 + "They stagger the way the blow pushes them, step to keep their balance, and a big enough hit knocks them over. Up to 24 at once, the nearest to the camera. "
                 + "In the game a hit plays a stumble animation.",
                 Toggle: new("Physical hit reactions", () => config.Euphoria, v => { config.Euphoria = v; EuphoriaChanged?.Invoke(v); }, Remaster: true, OnOff: true)));
+            result.Add(new("Dynamic movement", "Meitou: bodies turn at a natural pace instead of snapping round, and gather speed when they set off. A fighter turns to face a new "
+                + "target before it swings, commits to a swing once it starts, and cannot block or dodge a blow from behind. In the game characters turn instantly and swing at once.",
+                Toggle: new("Dynamic movement", () => config.DynamicMovement, v => { config.DynamicMovement = v; DynamicMovementChanged?.Invoke(v); }, Remaster: true, OnOff: true)));
             result.Add(new("Squads keep their people", "Roaming squads keep their characters when they leave the area around your squads, and travel on as themselves. "
                 + "In the game they are removed and new ones are made later.",
                 Toggle: new("Squads keep their people", () => config.KeepRoamers, v => { config.KeepRoamers = v; OffscreenChanged?.Invoke(); }, Remaster: true, OnOff: true)));

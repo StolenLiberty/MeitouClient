@@ -87,6 +87,23 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
     /// 0.15 s before it runs; docs/game/pathfinding.md "Turning").
     /// </summary>
     public const float TurnRate = 4 * MathF.PI;
+
+    /// <summary>
+    /// Meitou's dynamic movement (Settings, Advanced; off in the game and the tests): bodies turn at a body's pace instead of at once and gather speed when they set off.
+    /// Standing they turn <see cref="DynamicTurnStanding"/> rad/s, at full speed <see cref="DynamicTurnRunning"/> (a runner curves round instead of pivoting); a fighter
+    /// turns to its target at <see cref="DynamicFightTurn"/> and, once its swing has started, only <see cref="DynamicSwingTurn"/>: the blow goes where it was aimed. A walker
+    /// reaches its speed in about <see cref="DynamicStartSeconds"/>. The combat system's half: <see cref="Combat.CombatSystem.Dynamic"/>.
+    /// </summary>
+    public bool Dynamic { get; set; }
+    public const float DynamicTurnStanding = 5.2f, DynamicTurnRunning = 2.6f, DynamicFightTurn = 4.2f, DynamicSwingTurn = 0.8f, DynamicStartSeconds = 0.35f;
+
+    /// <summary>How fast a body turns at <paramref name="speed"/> of its top <paramref name="top"/> (rad/s): the game's at once, or the dynamic movement's.</summary>
+    float TurnRateFor(float speed, float top) =>
+        !Dynamic ? TurnRate : DynamicTurnStanding + (DynamicTurnRunning - DynamicTurnStanding) * Math.Clamp(speed / MathF.Max(top, 1), 0, 1);
+
+    /// <summary>A fighter's turn rate toward its target: slow once its swing has started (dynamic movement), else as it would turn.</summary>
+    float FightTurnRate(World world, int slot) =>
+        !Dynamic ? TurnRate : Fights is { } f && f.StateOf(world.Characters.IdOf(slot)).AttackTech >= 0 ? DynamicSwingTurn : DynamicFightTurn;
     /// <summary>
     /// Seconds between the requests of a walker on the provisional part of a long route (<see cref="PathResult.Exact"/>), which ask for the path again as
     /// zones load ahead of it, and how many times running it may be stopped there by ground the route did not know before it gives up (engine choices).
@@ -600,7 +617,7 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
                 if (face != Vector2.Zero)
                 {
                     facing = true;
-                    var heading = Turn(p.Yaw, face, 1, dt).Dir;
+                    var heading = Turn(p.Yaw, face, 1, dt, FightTurnRate(world, i)).Dir;
                     n.Yaw = MathF.Atan2(heading.X, heading.Y);
                 }
             }
@@ -689,17 +706,19 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
             else
             {
                 // A path is followed at the top speed at once (the nav agent sets its velocity to top speed x direction); the 15 / s ramp is the combat steering's.
-                speed = cold.InCombat && desired > speed ? MathF.Min(speed + Acceleration * dt, desired) : desired;
+                // Dynamic movement: one setting off gathers speed (its last speed, lowered by a turn it made, is where it starts from).
+                speed = cold.InCombat && desired > speed ? MathF.Min(speed + Acceleration * dt, desired)
+                    : Dynamic && desired > speed ? MathF.Min(speed + MathF.Max(desired / DynamicStartSeconds, 40) * dt, desired) : desired;
                 if (dir != Vector2.Zero && FaceOf(prev, n, cold) is { } face)
                 {
                     // In its footwork a fighter walks its path whichever way it lies and turns to face its target (the side steps, docs/animation.md "Side steps").
                     facing = true;
-                    var heading = Turn(p.Yaw, face, 1, dt).Dir;
+                    var heading = Turn(p.Yaw, face, 1, dt, FightTurnRate(world, i)).Dir;
                     n.Yaw = MathF.Atan2(heading.X, heading.Y);
                 }
                 else if (dir != Vector2.Zero)
                 {
-                    (dir, speed) = Turn(p.Yaw, dir, speed, dt);
+                    (dir, speed) = Turn(p.Yaw, dir, speed, dt, TurnRateFor(speed, n.MaxSpeed));
                     n.Yaw = MathF.Atan2(dir.X, dir.Y);   // also while it turns on the spot
                 }
             }
@@ -888,11 +907,11 @@ public sealed partial class MovementSystem(PathService paths) : ITickSystem, IDi
         return d.LengthSquared() > 1e-4f ? Vector2.Normalize(d) : null;
     }
 
-    public static (Vector2 Dir, float Speed) Turn(float yaw, Vector2 wanted, float speed, float dt)
+    public static (Vector2 Dir, float Speed) Turn(float yaw, Vector2 wanted, float speed, float dt, float rate = TurnRate)
     {
         float target = MathF.Atan2(wanted.X, wanted.Y);
         float delta = MathF.IEEERemainder(target - yaw, MathF.Tau);
-        float max = TurnRate * dt;
+        float max = rate * dt;
         float heading = MathF.Abs(delta) <= max ? target : yaw + MathF.CopySign(max, delta);
         float left = MathF.IEEERemainder(target - heading, MathF.Tau);
         return (new Vector2(MathF.Sin(heading), MathF.Cos(heading)), speed * MathF.Max(0, MathF.Cos(left)));

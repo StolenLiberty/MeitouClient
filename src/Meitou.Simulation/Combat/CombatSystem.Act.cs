@@ -277,6 +277,8 @@ public sealed partial class CombatSystem
         var fighter = cold.Fighter!;
         if (!fighter.CanAttack || Orders.Has(cold, CharacterOrders.Block)) return;   // the Block order: defends, starts no attack
         if (!s.Engaged) return;   // left out by its target: it circles (PursuitSystem)
+        // Dynamic movement: it swings only once it has turned to face the target.
+        if (Dynamic && FacingOff(table.Previous, i, s.TargetSlot) > DynamicSwingCone) return;
         // No one but enemies within its body room (x1.2 in state 5): the ask fails (FUN_14060c670, FUN_1402b3180).
         if (NearestFriend(world, i, in s, cold) < BodyRoom(cold) * (s.CircleState ? CircleRoomFactor : 1)) return;
         var tc = table.Cold(t)!;
@@ -591,6 +593,8 @@ public sealed partial class CombatSystem
         s.ReactedSlot = attacker;
         s.ReactedSeq = attack.AttackSeq;
         s.ReactedBlow = blow;
+        // Dynamic movement: a blow from behind is not seen coming, so it is neither blocked nor dodged.
+        if (Dynamic && FacingOff(prev, i, attacker) > DynamicGuardCone) return;
 
         var fighter = cold.Fighter!;
         float meleeDefence = Eff(cold, StatsEnumerated.MeleeDefence);

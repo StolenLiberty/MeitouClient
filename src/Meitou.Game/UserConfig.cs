@@ -82,6 +82,9 @@ sealed class UserConfig
     public bool KeepRoamers { get; set; } = true;
     /// <summary>Physical hit reactions (Advanced settings, Meitou-only, docs/euphoria.md): hit characters stumble, keep their balance or fall as euphoria bodies made from GTA IV's.</summary>
     public bool Euphoria { get; set; } = true;
+
+    /// <summary>Dynamic movement: bodies turn at a body's pace and gather speed, fighters turn to their target before they swing (<see cref="Meitou.Simulation.MovementSystem.Dynamic"/>).</summary>
+    public bool DynamicMovement { get; set; } = true;
     /// <summary>The GTA IV install the euphoria bodies are imported from (null: GTA IV in Kenshi's Steam library, or the <c>MEITOU_GTA4</c> environment variable).</summary>
     public string? Gta4Folder { get; set; }
     public bool OffscreenFights { get; set; } = true;
