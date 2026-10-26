@@ -118,7 +118,7 @@ public sealed partial class CombatSystem
                 var along = new Vector3(touchDirection.X, 0, touchDirection.Z);
                 push = push with { At = touchAt, Body = touchBody, Direction = along.LengthSquared() > 0.04f ? Vector3.Normalize(along) : push.Direction };
             }
-            blades.Struck(world, a, d);
+            blades.Struck(world, a, d, blow);
         }
         if (dc.Medical.Incapacitated)
         {

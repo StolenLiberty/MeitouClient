@@ -78,8 +78,14 @@ step). Combat's rolls still decide hit, block or miss; this makes a hit look lik
   side it first touched (so it does not jump through as the swing goes on). Probe, two
   Greenlanders with katanas: the animated blade was inside the body on 156 of 1197 swinging ticks,
   up to 20 cm; held, at most 2 mm.
-- **Hit stop**: a blow that lands freezes the swing (every bone) as soon as its blade is on the body
-  (within 6 ticks of the blow) for 0.12 s, then blends back over 0.1 s.
+- **Hit stop and recovery**: a blow that lands freezes the swing (every bone) as soon as its blade
+  is on the body (within 6 ticks of the blow) for 0.12 s; the fighter then eases (smoothstep) over
+  0.35 s into the stance it swung from (its pose on the swing's first tick) instead of following
+  through, holds it, and eases back into the animation over 0.2 s once the swing is over, half way
+  to a combo's next blow, or when a new swing starts. The blade is held off the body in every one
+  of these poses (the arm's turn applied to the whole arm). Kenshi's swings land late in their clips
+  (`Cut left`: blow at 0.81 of the clip, swing over at 0.97), so the follow-through after the blow is
+  what this replaces. Probe: no shown blade inside the body in any phase (20 hits).
 - **Push**: a landed blow whose blade touched the body in the last 8 ticks pushes the euphoria body
   at the touch point, on the touched part, the way the blade was moving (24 of 29 hits in the probe).
 - The overrides are published like a ragdoll's (`IRagdollSource`, after the euphoria bodies). Off
