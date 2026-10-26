@@ -277,7 +277,7 @@ short (`CharacterCold.ArriveYaw`); Shift queues it (a queued spot keeps no facin
 
 Meitou-only, after Total War (`MovementSystem.Formations.cs`). A `FormationOrder` makes its characters a `FormationGroup`; each member (`CharacterCold.Formation`,
 `FormationSpot`, `FormationYaw`) holds its spot as if on Hold (`Orders.Holding`, `Orders.HoldPointOf` give the spot), so it attacks what passes the post test and
-chases only within the hold leash. Once a tick (`KeepFormations`, start of Schedule) an idle member out of combat farther than `FormationReturnSlack` from its spot walks back
+chases only within the hold leash; a member shooting a crossbow never walks to close in (`Fighting`): it shoots from its spot or waits. Once a tick (`KeepFormations`, start of Schedule) an idle member out of combat farther than `FormationReturnSlack` from its spot walks back
 (at most every `FormationReturnSeconds`) and one on it is turned to the facing. A member leaves on any other order: a plain move of only part of the formation, a follow,
 a job (any task but Idle, Attack, or the formation's own walk, `FormationWalk`), an attack on a target the player picked (`AttackOrder.Picked`), prison, death, or leaving
 the world. A move order given to exactly one formation's members marches it: the stored shape (`FormationGroup.Offsets`) centred on the target, turned to face the way from

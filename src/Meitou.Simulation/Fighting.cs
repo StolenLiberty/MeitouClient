@@ -80,6 +80,8 @@ public sealed class PursuitSystem(CombatSystem combat) : ITickSystem
         {
             float far = combat.StateOf(new CharacterId(t, next[t].Generation)).TargetSlot == i ? 140 : 80;
             holding = Vector2.DistanceSquared(Orders.HoldPointOf(cold, n.Position), new Vector2(next[t].Position.X, next[t].Position.Z)) > far * far;
+            // A crossbowman in a formation shoots from its spot: it never walks to close in (Meitou-only, docs/simulation.md "Formations").
+            if (st.Ranged && cold.Formation is not null) holding = true;
         }
         // In its footwork with a clear line to the target, the fight steering moves it (docs/game/combat.md "Fight steering"): its state sets the band, no paths.
         if (Steer(world, i, ref n, cold, st, t, holding)) return;
