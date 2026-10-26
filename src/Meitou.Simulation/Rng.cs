@@ -55,6 +55,8 @@ public enum RngPurpose : uint
     AllyHelp = 27,
     /// <summary>A captive's answer to "Join me or die" (<see cref="Slavery.SlaverySystem"/>), keyed by the captive and the tick.</summary>
     Enslave = 28,
+    /// <summary>A euphoria body's random stream (<see cref="Euphoria.EuphoriaSystem"/>), keyed by the character and the tick it starts.</summary>
+    Euphoria = 29,
 }
 
 /// <summary>

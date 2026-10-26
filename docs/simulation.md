@@ -559,6 +559,7 @@ when the host passes `CharacterRigs` (the game does; tests and goldens do not). 
   spin at 30 rad/s and the contact margin is 8 units (Bepu, 30 Hz ticks: a thin limb moving more than its radius per tick
   tunnels); a dynamic body that crosses from above the terrain to more than 1 unit under it is put back on it.
 - **Hash**: mask, frozen, age, blend and body poses in system order.
+- **Euphoria**: a character a euphoria body holds ([euphoria](euphoria.md)) gets no ragdoll; one it lets go of starts from its pose (`IRagdollHandOff`).
 
 - **Save** (Meitou key, [ragdolls](game/ragdolls.md#saves)): a whole-body ragdoll's body poses, frozen flag and age (`Saving/RagdollSave`); the loaded
   character's first ragdoll starts from them when its root lies within 20 of where it stands, else (and for carried or limb ragdolls) from the animation.

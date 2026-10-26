@@ -80,6 +80,10 @@ sealed class UserConfig
     /// <summary>The off-screen switches (Advanced settings; Faithful off, Meitou on; docs/simulation.md "Off-screen tier"): roaming squads keep their characters off screen,
     /// hostile squads that meet off screen fight it out, a squad coming back has healed for the time away.</summary>
     public bool KeepRoamers { get; set; } = true;
+    /// <summary>Physical hit reactions (Advanced settings, Meitou-only, docs/euphoria.md): hit characters stumble, keep their balance or fall as euphoria bodies made from GTA IV's.</summary>
+    public bool Euphoria { get; set; } = true;
+    /// <summary>The GTA IV install the euphoria bodies are imported from (null: GTA IV in Kenshi's Steam library, or the <c>MEITOU_GTA4</c> environment variable).</summary>
+    public string? Gta4Folder { get; set; }
     public bool OffscreenFights { get; set; } = true;
     public bool OffscreenHealing { get; set; } = true;
     /// <summary>Campaign data counts each <c>inherits from</c> ancestor once (Fixes settings; Faithful off: twice, as the game does, doubling inherited squad weights and follow-up chances).</summary>

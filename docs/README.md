@@ -12,6 +12,7 @@ used as a naming reference for our 1.0.68 analysis; they are **Observed** until 
 - [animation](animation.md)
 - [bench](bench.md)
 - [engine](engine.md)
+- [euphoria](euphoria.md): Meitou physical hit reactions, GTA IV's euphoria bodies (Delirium Physics)
 - [faithful-ui-parity](faithful-ui-parity.md)
 - [character-renderer](character-renderer.md)
 - [character-viewer](character-viewer.md)

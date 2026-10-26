@@ -635,6 +635,8 @@ public sealed partial class CombatSystem : IProjectileSource
                     break;
             }
         }
+        var push = Push(p.Direction, damage, toughness, part, true);
+        bool heavyBolt = damage.Cut + damage.Blunt + damage.Pierce + damage.ExtraStun > DamageFormulas.StumbleThreshold(toughness, combat);
         if (dc.Medical.Incapacitated)
         {
             D.Down = true;
@@ -642,10 +644,11 @@ public sealed partial class CombatSystem : IProjectileSource
             D.NextBlow = 0;
             D.ReactTech = -1;
             Sound(world, SoundKind.Down, v, p.Shooter, prev[v].Position, fatal: death);
+            Reactions?.Hit(world, v, push, down: true);
         }
-        // Only a heavy bolt staggers (engine choice: the original's reaction to a bolt was not traced).
-        else if (damage.Cut + damage.Blunt + damage.Pierce + damage.ExtraStun > DamageFormulas.StumbleThreshold(toughness, combat))
-            Stagger(world, ref D, v, dc, true, now, (ulong)(uint)p.Id ^ 0x424F4C54UL);
+        // Only a heavy bolt staggers (engine choice: the original's reaction to a bolt was not traced); with the physical reactions every bolt pushes.
+        else if (heavyBolt || Reactions?.Takes(world, v) == true)
+            Stagger(world, ref D, v, dc, heavyBolt, now, (ulong)(uint)p.Id ^ 0x424F4C54UL, push);
         if (dc.Stats is { } vs && dc.Fighter is { } vf)
             xp.Combat(vs, dc.Race, XpEvent.HitTaken, vf.Unarmed, StatsEnumerated.None, p.ShooterSkill, StrengthFactor(dc, vf));
         bool shooterAlive = p.Shooter < prev.Length && prev[p.Shooter].Alive && prev[p.Shooter].Generation == p.ShooterGeneration;

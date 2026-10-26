@@ -85,7 +85,8 @@ public sealed partial class World : IDisposable
     Trading.ITradeSource? trades;
     Production.ProductionSystem? production;
     Dialogue.IDialogueSource? dialogues;
-    Ragdolls.IRagdollSource? ragdolls;
+    /// <summary>What sets the characters' bones, the first that has a pose wins (the euphoria reactions are placed before the ragdolls).</summary>
+    readonly List<Ragdolls.IRagdollSource> ragdolls = [];
 
     public World(WorldSettings settings, IWalkability walkability, IEnumerable<ITickSystem>? systems = null, CharacterTable? characters = null)
     {
@@ -101,7 +102,7 @@ public sealed partial class World : IDisposable
         trades = this.systems.OfType<Trading.ITradeSource>().FirstOrDefault();
         production = this.systems.OfType<Production.ProductionSystem>().FirstOrDefault();
         dialogues = this.systems.OfType<Dialogue.IDialogueSource>().FirstOrDefault();
-        ragdolls = this.systems.OfType<Ragdolls.IRagdollSource>().FirstOrDefault();
+        ragdolls.AddRange(this.systems.OfType<Ragdolls.IRagdollSource>());
         Characters = characters ?? new CharacterTable();
         Grid = new SpatialGrid(settings.GridCellSize);
         pool = new WorkerPool(settings.Threads);
@@ -196,7 +197,15 @@ public sealed partial class World : IDisposable
         projectiles ??= system as IProjectileSource;
         trades ??= system as Trading.ITradeSource;
         dialogues ??= system as Dialogue.IDialogueSource;
-        ragdolls ??= system as Ragdolls.IRagdollSource;
+        if (system is Ragdolls.IRagdollSource source) ragdolls.Add(source);
+    }
+
+    /// <summary>The bones a ragdoll or a euphoria body sets for the character now (null: the animation's).</summary>
+    internal Meitou.Data.Characters.BonePose? RagdollPose(CharacterId id)
+    {
+        foreach (var source in ragdolls)
+            if (source.Publish(id) is { } pose) return pose;
+        return null;
     }
 
     /// <summary>Whether the character answers the player's Talk (the dialogue system finds event-1 dialogue for it, and with <paramref name="talker"/> given, a line of it passes now); the host asks between ticks.</summary>

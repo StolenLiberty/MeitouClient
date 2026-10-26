@@ -1,0 +1,14 @@
+# Delirium Physics (https://github.com/PVCPC/delirium-physics, GPL-3.0-only), the engine, its file readers and its C library, as Meitou uses them
+# (docs/euphoria.md). Meitou's changes: nm_init_art (PC .art files, either character slot), nm_prepare_from_game (the GTA IV import, src/prep.rs), nmprep.
+[workspace]
+members = ["crates/delirium-data", "crates/delirium", "crates/delirium-sdk", "crates/nmprep"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+publish = false
+
+[profile.dev]
+opt-level = 3

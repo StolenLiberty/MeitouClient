@@ -109,14 +109,16 @@ public sealed partial class CombatSystem
             dc.Medical.KnockOut(dc.Medical.PutDownKoSeconds(ctx, 0.002f));
             knockout = true;
         }
+        var push = Push(new Vector3(-toAttacker.X, 0, -toAttacker.Y), damage, toughness, part, false);
         if (dc.Medical.Incapacitated)
         {
             D.Down = true;
             D.AttackTech = -1;
             D.NextBlow = 0;
             D.ReactTech = -1;
+            Reactions?.Hit(world, d, push, down: true);
         }
-        else Stagger(world, ref D, d, dc, damage.Cut + damage.Blunt + damage.Pierce + damage.ExtraStun > DamageFormulas.StumbleThreshold(toughness, combat), now, CombatRolls.BlowCounter(a, seq, blow, 0));
+        else Stagger(world, ref D, d, dc, damage.Cut + damage.Blunt + damage.Pierce + damage.ExtraStun > DamageFormulas.StumbleThreshold(toughness, combat), now, CombatRolls.BlowCounter(a, seq, blow, 0), push);
         GainCombatXp(ac, dc, XpEvent.HitDealt, XpEvent.HitTaken);
         Sound(world, SoundKind.Hit, d, a, prev[d].Position, heavy: D.HitHeavy, unarmed: fighter.Unarmed, robot: ac.Race.IsRobot);
         Splash(world, d, dc, -new Vector2(toAttacker.X, toAttacker.Y), damage.Cut + damage.Blunt + damage.Pierce);
@@ -135,7 +137,7 @@ public sealed partial class CombatSystem
     /// already playing; it is big when heavy and none was playing. A picked clip cancels the defender's own swing (that blow never lands) and its reaction, and holds it helpless
     /// until the clip ends (the knockback is the clip's root motion). With no clip to play the swing is still cancelled, with a short pause. Takes effect at the next Act.
     /// </summary>
-    void Stagger(World world, ref CombatSlot D, int d, CharacterCold dc, bool heavy, int now, ulong counter)
+    void Stagger(World world, ref CombatSlot D, int d, CharacterCold dc, bool heavy, int now, ulong counter, in HitPush push)
     {
         // Outside a fight (docs/game/combat.md "Stagger outside a fight"): one getting up is left alone; any other drops its task, which is planned again from its start,
         // unless it mans a turret (shooting at a live target).
@@ -147,6 +149,19 @@ public sealed partial class CombatSystem
                 return;
             }
             if (dc.Gunning is null) Restart(world.Characters, d, dc);
+        }
+        // A physical reaction (Meitou, docs/euphoria.md) in place of the clip: every hit, light ones too, pushes; the reaction holds the character helpless while it lasts.
+        if (Reactions is { } reactions && reactions.Hit(world, d, push, down: false))
+        {
+            D.HitHeavy = heavy;
+            D.AttackTech = -1;
+            D.NextBlow = 0;
+            D.ReactTech = -1;
+            D.StumbleClip = -1;
+            D.StunUntil = Math.Max(D.StunUntil, now + Math.Max(1, (int)MathF.Ceiling(ReactionHold / world.TickSeconds)));
+            dc.StaggeredUntil = Math.Max(dc.StaggeredUntil, D.StunUntil);
+            D.ReadyTick = Math.Max(D.ReadyTick, D.StunUntil);
+            return;
         }
         bool stumbling = D.StumbleClip >= 0 && now < D.StunUntil;
         D.HitHeavy = heavy && !stumbling;
@@ -166,6 +181,9 @@ public sealed partial class CombatSystem
         }
         else D.ReadyTick = Math.Max(D.ReadyTick, now + (int)MathF.Ceiling(CombatTuning.InterruptPause / world.TickSeconds));
     }
+
+    /// <summary>How long a physical reaction holds the character at first, in seconds; the reaction keeps holding it while it lasts (<see cref="Hold"/>).</summary>
+    const float ReactionHold = 0.2f;
 
     /// <summary>
     /// A blow's packet times its impact point's <c>power N</c> (stored x0.01): cut, blunt, pierce and extra stun (<b>Verified</b>, <c>attackImpactCheck</c> FUN_14060a2f0 scales

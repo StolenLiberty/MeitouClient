@@ -79,6 +79,9 @@ public sealed class StandardSystemOptions
     public Meitou.Data.Characters.CharacterRigs? Ragdolls { get; init; }
     /// <summary>What ragdolls fall onto (null: the walkable ground, no buildings).</summary>
     public Meitou.Simulation.Ragdolls.IRagdollEnvironment? RagdollEnvironment { get; init; }
+    /// <summary>The euphoria characters (Meitou-only, docs/euphoria.md; <see cref="Meitou.Simulation.Euphoria.EuphoriaData.Shared"/>): given with <see cref="Ragdolls"/>, hits push
+    /// physical bodies instead of playing the stumble clips. Null: off.</summary>
+    public Task<Meitou.Simulation.Euphoria.EuphoriaData?>? Euphoria { get; init; }
 }
 
 /// <summary>The built systems in tick order, with the ones the host talks to.</summary>
@@ -104,6 +107,7 @@ public sealed class StandardSystemSet
     public Meitou.Simulation.Construction.ConstructionSystem? Construction { get; init; }
     public Meitou.Simulation.Production.ProductionSystem? Production { get; init; }
     public Meitou.Simulation.Ragdolls.RagdollSystem? Ragdolls { get; init; }
+    public Meitou.Simulation.Euphoria.EuphoriaSystem? Euphoria { get; init; }
     public Meitou.Simulation.Dialogue.DialogueSystem? Dialogue { get; init; }
 }
 
@@ -172,6 +176,7 @@ public static class StandardSystems
         Meitou.Simulation.Carrying.CarrySystem? carry = null;
         Meitou.Simulation.Kidnap.KidnapSystem? kidnap = null;
         Meitou.Simulation.Ragdolls.RagdollSystem? ragdolls = null;
+        Meitou.Simulation.Euphoria.EuphoriaSystem? euphoria = null;
         if (Has(StandardParts.Carry))
         {
             // The lift takes the length of the shoulder lift left clip (1 s when the lengths are not known).
@@ -206,8 +211,14 @@ public static class StandardSystems
             var lengths = o.AnimationLengths ?? new AnimationLengths();
             var animation = new AnimationSystem(library, lengths, o.AnimationBlendRate ?? 4, combat);
             systems.Add(animation);
+            // The euphoria bodies right after the animation (they start from this tick's pose) and before the ragdolls (which wait for them and start from their pose).
+            if (o.Ragdolls is not null && o.Euphoria is not null)
+            {
+                systems.Add(euphoria = new Meitou.Simulation.Euphoria.EuphoriaSystem(o.Ragdolls, o.Euphoria, o.RagdollEnvironment));
+                if (combat is not null) combat.Reactions = euphoria;
+            }
             // Ragdolls right after the animation: they start from and pin to this tick's pose, and the whole body's position is theirs before anything later reads it.
-            if (o.Ragdolls is not null) systems.Add(ragdolls = new Meitou.Simulation.Ragdolls.RagdollSystem(o.Ragdolls, o.RagdollEnvironment));
+            if (o.Ragdolls is not null) systems.Add(ragdolls = new Meitou.Simulation.Ragdolls.RagdollSystem(o.Ragdolls, o.RagdollEnvironment) { HandOff = euphoria });
             animation.Ragdolls = ragdolls;
             // The stealth knock-out swing lasts the length of the knockout record's clip.
             if (carry is not null && library.IndexOf(Meitou.Simulation.Carrying.CarrySystem.KnockoutClip) is >= 0 and var ko) carry.KnockoutSeconds = lengths.Of(library.Definitions[ko].Clip);
@@ -250,6 +261,6 @@ public static class StandardSystems
         if (talk is not null && aggro is not null) aggro.Memory = talk.Memory;
         if (talk is not null && population is not null) population.Memory = talk.Memory;
         if (arrest is not null) arrest.Talk = talk;
-        return new StandardSystemSet { Systems = systems, Population = population, Movement = movement, Combat = combat, Aggro = aggro, Carry = carry, Kidnap = kidnap, Captives = captives, Crime = crime, Arrest = arrest, Locks = locks, Beds = beds, Trade = trade, Ai = ai, Construction = construction, Production = production, Ragdolls = ragdolls, Dialogue = talk };
+        return new StandardSystemSet { Systems = systems, Population = population, Movement = movement, Combat = combat, Aggro = aggro, Carry = carry, Kidnap = kidnap, Captives = captives, Crime = crime, Arrest = arrest, Locks = locks, Beds = beds, Trade = trade, Ai = ai, Construction = construction, Production = production, Ragdolls = ragdolls, Euphoria = euphoria, Dialogue = talk };
     }
 }

@@ -1,0 +1,11 @@
+[package]
+name = "nmprep"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+delirium = { path = "../delirium" }
+delirium-data = { path = "../delirium-data" }
+delirium-sdk = { path = "../delirium-sdk" }

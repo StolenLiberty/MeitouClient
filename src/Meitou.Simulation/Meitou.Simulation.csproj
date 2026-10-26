@@ -13,4 +13,9 @@
   <ItemGroup>
     <PackageReference Include="BepuPhysics" Version="2.4.0" />
   </ItemGroup>
+  <!-- Delirium Physics (native/delirium, built by its build.sh): the euphoria bodies (docs/euphoria.md). Beside the program, for every project that references this one. -->
+  <ItemGroup>
+    <None Include="..\..\native\delirium\lib\win-x64\delirium_physics.dll" Link="delirium_physics.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\native\delirium\lib\linux-x64\libdelirium_physics.so" Link="libdelirium_physics.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
 </Project>

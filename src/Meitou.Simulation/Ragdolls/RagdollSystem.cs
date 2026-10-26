@@ -34,6 +34,13 @@ public interface IRagdollSource
     BonePose? Publish(CharacterId id);
 }
 
+/// <summary>A system that drives a whole body before the ragdoll does (the euphoria reactions, docs/euphoria.md): while it holds a character no ragdoll is built for it, and a
+/// ragdoll built after it lets go starts from the pose it published last (<see cref="IRagdollSource.Publish"/>).</summary>
+public interface IRagdollHandOff : IRagdollSource
+{
+    bool Holds(CharacterId id);
+}
+
 /// <summary>
 /// Physics ragdolls (docs/game/ragdolls.md; engine choices in docs/simulation.md "Ragdolls"): the whole body of a knocked-out or dead character, the forearms and head of a
 /// carried one (all but the carry bone of an animal), and a human's collapsed limbs. Bodies are built from the race's ragdoll file on the character's animated pose; bodies the
@@ -63,6 +70,9 @@ public sealed class RagdollSystem : ITickSystem, IStateHashed, IRagdollState, IR
     readonly Dictionary<RagdollDefinition, (TypedIndex Shape, BodyInertia Inertia)[]> shapes = new(ReferenceEqualityComparer.Instance);
     IAnimationSource? animations;
     int nextTag = 1;
+
+    /// <summary>The euphoria reactions (null: none): a character they hold gets no ragdoll yet, and one they let go of starts from their pose.</summary>
+    public IRagdollHandOff? HandOff { get; set; }
 
     /// <param name="environment">Ground and buildings; null: the world's walkable ground (<see cref="WalkabilityEnvironment"/>).</param>
     public RagdollSystem(CharacterRigs rigs, IRagdollEnvironment? environment = null)
@@ -184,6 +194,7 @@ public sealed class RagdollSystem : ITickSystem, IStateHashed, IRagdollState, IR
                 if (r is null && (wanted & RagdollPart.Whole) != 0) restore = saved;
             }
             if (r is null && wanted == RagdollPart.None) continue;
+            if (r is null && HandOff?.Holds(id) == true) continue;
             if (r is null)
             {
                 float scale = cold is { Fighter.IsAnimal: true, Medical: { } size } ? size.ScaleK : 1;
@@ -277,21 +288,21 @@ public sealed class RagdollSystem : ITickSystem, IStateHashed, IRagdollState, IR
         var scratch = setup.Rig.Rent();
         try
         {
-            PoseDerived(scratch, setup, carrier);
+            PoseNow(rigs, animations, scratch, setup, carrier);
             return CarryPose.Attach(scratch.DerivedPosition[bone] - new Vector3(0, setup.GroundOffset, 0), scratch.DerivedRotation[bone], CarryPose.Height01(cold.Appearance));
         }
         finally { setup.Rig.Return(scratch); }
     }
 
-    /// <summary>Poses <paramref name="scratch"/> as the character's animation and its fixed posture layers do now (model space).</summary>
-    void PoseDerived(PoseScratch scratch, CharacterPoseSetup setup, CharacterCold cold)
+    /// <summary>Poses <paramref name="scratch"/> as the character's animation and its fixed posture layers do now (model space), with <paramref name="overrides"/> on top.</summary>
+    internal static void PoseNow(CharacterRigs rigs, IAnimationSource? animations, PoseScratch scratch, CharacterPoseSetup setup, CharacterCold cold, BonePose? overrides = null)
     {
         var layers = new List<ActiveLayer>();
         if (cold.Animation is { } animation && animations is not null)
             foreach (var layer in animations.Publish(animation))
                 if (setup.Rig.Layer(rigs.Database, layer.Name, setup.Animal) is { } def) layers.Add(new ActiveLayer(def, MathF.Max(layer.Time, 0), layer.Weight));
         foreach (var (def, time) in setup.Fixed) layers.Add(new ActiveLayer(def, time, 1));
-        scratch.PoseDerived(setup.Shape, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(layers));
+        scratch.PoseDerived(setup.Shape, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(layers), overrides);
     }
 
     /// <summary>Whether a saved ragdoll belongs to this one: a pose for each body, its root where the character stands (a platoon that travelled since moves its characters).</summary>
@@ -308,14 +319,14 @@ public sealed class RagdollSystem : ITickSystem, IStateHashed, IRagdollState, IR
             ? new SavedRagdoll(r.Frozen, r.Age, (RigidTransform[])r.Pose.Clone())
             : null;
 
-    /// <summary>Every body's pose where the character's animation puts its bone now, in world space.</summary>
+    /// <summary>Every body's pose where the character's animation (or the euphoria pose it was let go in, <see cref="HandOff"/>) puts its bone now, in world space.</summary>
     RigidTransform[] Animated(Ragdoll r, CharacterCold cold, Matrix4x4 placement)
     {
         var rig = r.Setup.Rig;
         var scratch = rig.Rent();
         try
         {
-            PoseDerived(scratch, r.Setup, cold);
+            PoseNow(rigs, animations, scratch, r.Setup, cold, HandOff?.Publish(r.Id));
             var turn = Quaternion.CreateFromRotationMatrix(placement with { M41 = 0, M42 = 0, M43 = 0 });
             turn = Quaternion.Normalize(turn);
             var bodies = r.Definition.Bodies;

@@ -141,7 +141,7 @@ public sealed partial class World
                 Watchers = watchers,
                 Bar = cold is { IsPlayer: true } ? PickBar(cold, state[i].Task) : null,
                 Prison = cold is { IsImprisoned: true } ? new PrisonView(!(cold.InWhat is { } cageId && Fixtures.Find(cageId) is { } cage && cage.Lock is not { EffectivelyLocked: true }), cold.SentenceLength, cold.SentenceStart + cold.SentenceLength - GameHours) { CageOwner = cold.InWhat is { } owned && Fixtures.Find(owned) is { } jail ? jail.Owner : -1, CageId = cold.InWhat } : null,
-                Ragdoll = ragdolls?.Publish(id),
+                Ragdoll = RagdollPose(id),
                 StealthKoChance = koSlot >= 0 && i != koSlot && cold is { IsPlayer: false } && Carrying.CarrySystem.CanBeKnockedOut(cold)
                     ? Carrying.CarrySystem.StealthKoChance(table.Cold(koSlot)!, cold, aggro?.Spotted(i, table.IdOf(koSlot)) == true) : null,
             };

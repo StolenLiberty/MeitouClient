@@ -95,6 +95,8 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
     public Action<int>? AttackSlotsChanged { get; init; }
     /// <summary>Applies the late-dodges setting to the running combat system.</summary>
     public Action<bool>? LateDefencesChanged { get; init; }
+    /// <summary>Turns the physical hit reactions on or off in the running world (<see cref="UserConfig.Euphoria"/>).</summary>
+    public Action<bool>? EuphoriaChanged { get; init; }
     /// <summary>Applies the turret gunner facing fix to the running combat system.</summary>
     public Action<bool>? GunnerFacingChanged { get; init; }
     /// <summary>Called when an off-screen switch changes (the config holds the new values).</summary>
@@ -256,6 +258,10 @@ sealed partial class SettingsMenu(PlayerInterface player, SettingsPanel values, 
             result.Add(new("Late dodges and blocks", "Balance change: a dodge or block that succeeds its roll but starts a moment late still works, "
                 + "instead of failing as in the game. Makes skilled fighters much harder to wear down when several enemies attack at once.",
                 Toggle: new("Late dodges and blocks", () => config.LateDefences, v => { config.LateDefences = v; LateDefencesChanged?.Invoke(v); }, Remaster: true, OnOff: true)));
+            result.Add(new("Physical hit reactions", "Meitou: hit characters react with real physics, made from GTA IV's euphoria bodies (needs GTA IV installed in the same Steam library). "
+                + "They stagger the way the blow pushes them, step to keep their balance, and a big enough hit knocks them over. Up to 24 at once, the nearest to the camera. "
+                + "In the game a hit plays a stumble animation.",
+                Toggle: new("Physical hit reactions", () => config.Euphoria, v => { config.Euphoria = v; EuphoriaChanged?.Invoke(v); }, Remaster: true, OnOff: true)));
             result.Add(new("Squads keep their people", "Roaming squads keep their characters when they leave the area around your squads, and travel on as themselves. "
                 + "In the game they are removed and new ones are made later.",
                 Toggle: new("Squads keep their people", () => config.KeepRoamers, v => { config.KeepRoamers = v; OffscreenChanged?.Invoke(); }, Remaster: true, OnOff: true)));

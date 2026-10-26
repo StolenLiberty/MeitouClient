@@ -64,7 +64,30 @@ sealed partial class GameHost
     }
 
     /// <summary>The system list and its order are <see cref="StandardSystems"/>' (docs/simulation.md "Threading"); built again for each world.</summary>
-    Meitou.Simulation.StandardSystemSet BuildSystems(bool interactive, PopulationData? data = null, NewGameSettings? settings = null) =>
+    Meitou.Simulation.StandardSystemSet BuildSystems(bool interactive, PopulationData? data = null, NewGameSettings? settings = null)
+    {
+        var set = BuildStandardSystems(interactive, data, settings);
+        if (set.Euphoria is { } euphoria) euphoria.Enabled = config.Euphoria;
+        return set;
+    }
+
+    /// <summary>The euphoria characters (docs/euphoria.md): loaded once, on a worker thread, with the ragdolls; whether they loaded goes to the log.</summary>
+    Task<Meitou.Simulation.Euphoria.EuphoriaData?>? Euphoria()
+    {
+        if (characterRigs is null) return null;
+        var task = Meitou.Simulation.Euphoria.EuphoriaData.Shared(Meitou.Simulation.Euphoria.EuphoriaData.DefaultFolder,
+            Meitou.Simulation.Euphoria.EuphoriaData.FindGame(install.Root, config.Gta4Folder));
+        if (!euphoriaLogged)
+        {
+            euphoriaLogged = true;
+            task.ContinueWith(t => Console.Error.WriteLine(t.Result is null ? $"euphoria  off: {Meitou.Simulation.Euphoria.EuphoriaData.Problem}" : "euphoria  bodies ready"), TaskScheduler.Default);
+        }
+        return task;
+    }
+
+    bool euphoriaLogged;
+
+    Meitou.Simulation.StandardSystemSet BuildStandardSystems(bool interactive, PopulationData? data, NewGameSettings? settings) =>
         Meitou.Simulation.StandardSystems.Build(data ?? popData!, simWalkability!, new Meitou.Simulation.StandardSystemOptions
         {
             // The sandbox compares motion with the original on characters standing still: a hostile foe there must not start a fight by itself. The duel and the battle script their fights.
@@ -92,6 +115,7 @@ sealed partial class GameHost
             AnimationBlendRate = popData!.Bodies.Constants.AnimationBlendRate,
             Ragdolls = characterRigs,
             RagdollEnvironment = ragdollGeometry,
+            Euphoria = Euphoria(),
         });
 
     /// <summary>Once per frame, between ticks: the notices of the write worker, the requests of the keys, a finished read.</summary>
